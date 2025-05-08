@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 
-import Player from "../Player";
+import Player from "../engine/Player";
 import {UIHand} from "./UIHand";
 import {UIBattlefield} from "./UIBattlefield";
 import {pixi} from "./UIRoot";

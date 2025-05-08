@@ -1,11 +1,11 @@
 import * as PIXI from "pixi.js";
 
-import {Battlefield} from "../Zone";
-import gameEventManager, {GameEventType} from "../GameEvents/GameEventManager";
-import {GameEvent_ChangeCardZone} from "../GameEvents";
+import {Battlefield} from "../engine/Zone";
+import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
+import {GameEvent_ChangeCardZone} from "../engine/events";
 import UICard from "./UICard";
-import Card from "../Card";
-import {autobind} from "../typeUtility";
+import Card from "../engine/Card";
+import {autobind} from "../utility/typeUtility";
 
 export class UIBattlefield extends PIXI.Container {
     battlefield: Battlefield

@@ -1,16 +1,17 @@
 import * as PIXI from "pixi.js";
 
-import {game, loadImageFromExternalUrl} from "../renderer";
-import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "../PlayerAction";
-import {Battlefield, Hand} from "../Zone";
-import {activatedAbilitiesCosts} from "../workers";
-import {showCustomContextMenu} from "../contextMenu";
-import Card from "../Card";
-import gameEventManager, {GameEventType} from "../GameEvents/GameEventManager";
-import {autobind} from "../typeUtility";
-import {GameEvent_TapCard} from "../GameEvents";
-import GameEvent_UntapCard from "../GameEvents/GameEvent_UntapCard";
+import {loadImageFromExternalUrl} from "../electron/renderer";
+import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "../engine/PlayerAction";
+import {Battlefield, Hand} from "../engine/Zone";
+import {activatedAbilitiesCosts} from "../engine/workers";
+import {showCustomContextMenu} from "./contextMenu";
+import Card from "../engine/Card";
+import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
+import {autobind} from "../utility/typeUtility";
+import {GameEvent_TapCard} from "../engine/events";
+import GameEvent_UntapCard from "../engine/events/GameEvent_UntapCard";
 import {pixi} from "./UIRoot";
+import {game} from "../engine/root";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;

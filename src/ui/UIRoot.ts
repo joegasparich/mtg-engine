@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 
-import Player from "../Player";
+import Player from "../engine/Player";
 import {UIPlayer} from "./UIPlayer";
 
 export let pixi: PIXI.Application = null;

@@ -1,7 +1,7 @@
 import Player from "./Player";
-import gameEventManager from "./GameEvents/GameEventManager";
-import GameEvent_UntapCard from "./GameEvents/GameEvent_UntapCard";
-import {GameEvent_DrawCard} from "./GameEvents/GameEvent_DrawCard";
+import gameEventManager from "./events/GameEventManager";
+import GameEvent_UntapCard from "./events/GameEvent_UntapCard";
+import {GameEvent_DrawCard} from "./events/GameEvent_DrawCard";
 
 interface Step {
     onStart(player: Player): void;

@@ -3,9 +3,9 @@ import * as PIXI from "pixi.js";
 import Player from "./Player";
 import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
-import gameEventManager, {GameEvent_Simple, GameEventType} from "./GameEvents/GameEventManager";
-import {GameEvent_StepEnd, GameEvent_StepStart} from "./GameEvents";
-import {GameEvent_DrawCard} from "./GameEvents/GameEvent_DrawCard";
+import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
+import {GameEvent_StepEnd, GameEvent_StepStart} from "./events";
+import {GameEvent_DrawCard} from "./events/GameEvent_DrawCard";
 
 export default class Game {
     players: Player[] = [];

@@ -1,7 +1,7 @@
 import {PlayerAction} from "./PlayerAction";
 import {Battlefield, Hand, Library} from "./Zone";
 import Card from "./Card";
-import {cardData} from "./renderer";
+import {cardData} from "./root";
 
 export enum ManaColour {
     W, U, B, R, G, C

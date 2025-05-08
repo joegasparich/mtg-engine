@@ -1,10 +1,10 @@
 import Card from "./Card";
-import {game} from "./renderer";
-import {ActivatedAbilityDef} from "./CardDef";
+import {ActivatedAbilityDef} from "../defs";
 import {abilityEffects} from "./workers";
-import gameEventManager from "./GameEvents/GameEventManager";
+import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
-import {GameEvent_CastSpell} from "./GameEvents";
+import {GameEvent_CastSpell} from "./events";
+import {game} from "./root";
 
 export interface PlayerAction {
     label: () => string;

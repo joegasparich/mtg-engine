@@ -5,7 +5,7 @@ export default defineConfig({
     build: {
         sourcemap: true,
         rollupOptions: {
-            input: 'src/main.ts',
+            input: 'src/electron/main.ts',
         },
     },
 })

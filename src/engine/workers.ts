@@ -1,6 +1,6 @@
 import {ActivatedAbilityCostWorker} from "./triggeredAbilityCosts";
 import {AbilityEffectWorker} from "./abilityEffects";
-import {AbilityEffectType, ActivatedAbilityCostType} from "./CardDef";
+import {AbilityEffectType, ActivatedAbilityCostType} from "../defs";
 
 export const activatedAbilitiesCosts = new Map<ActivatedAbilityCostType, ActivatedAbilityCostWorker>();
 export const abilityEffects = new Map<AbilityEffectType, AbilityEffectWorker>();

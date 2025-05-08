@@ -1,7 +1,7 @@
-import { GameEvent_ChangeCardZone } from ".";
+import { GameEvent_ChangeCardZone } from "./index";
 import Card from "../Card";
-import {game} from "../renderer";
 import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
+import {game} from "../root";
 
 export default class GameEvent_CastSpell extends GameEvent {
     type = GameEventType.CastSpell;

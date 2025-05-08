@@ -1,11 +1,11 @@
 import Card from "./Card";
-import {game} from "./renderer";
-import {CardType} from "./CardDef";
-import gameEventManager from "./GameEvents/GameEventManager";
+import {CardType} from "../defs";
+import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
 import {abilityEffects} from "./workers";
-import {GameEvent_ChangeCardZone} from "./GameEvents";
-import {shuffleArray} from "./arrayUtility";
+import {GameEvent_ChangeCardZone} from "./events";
+import {shuffleArray} from "../utility/arrayUtility";
+import {game} from "./root";
 
 export class Zone {
     name: string;

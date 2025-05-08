@@ -1,4 +1,4 @@
-import {CardDef} from "./CardDef";
+import {CardDef} from "../defs";
 import {Zone} from "./Zone";
 
 export default class Card {

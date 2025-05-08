@@ -1,11 +1,11 @@
 import {
     AbilityEffectData,
     AbilityEffectType,
-} from "./CardDef";
-import {game} from "./renderer";
+} from "../defs";
 import Card from "./Card";
 import {ManaColour} from "./Player";
-import gameEventManager, {GameEvent_Simple, GameEventType} from "./GameEvents/GameEventManager";
+import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
+import {game} from "./root";
 
 export interface AbilityEffectWorker {
     type: AbilityEffectType;

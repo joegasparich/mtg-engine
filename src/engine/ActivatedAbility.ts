@@ -1,8 +1,8 @@
-import {ActivatedAbilityDef} from "./CardDef";
+import {ActivatedAbilityDef} from "../defs";
 import Card from "./Card";
 import {abilityEffects, activatedAbilitiesCosts} from "./workers";
-import gameEventManager from "./GameEvents/GameEventManager";
-import {GameEvent_ActivateAbility} from "./GameEvents";
+import gameEventManager from "./events/GameEventManager";
+import {GameEvent_ActivateAbility} from "./events";
 
 export default class ActivatedAbility {
     ownerID: number;

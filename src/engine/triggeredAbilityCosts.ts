@@ -1,7 +1,7 @@
-import {ActivatedAbilityCostType} from "./CardDef";
+import {ActivatedAbilityCostType} from "../defs";
 import Card from "./Card";
-import gameEventManager from "./GameEvents/GameEventManager";
-import {GameEvent_TapCard} from "./GameEvents";
+import gameEventManager from "./events/GameEventManager";
+import {GameEvent_TapCard} from "./events";
 
 export interface ActivatedAbilityCostWorker {
     type: ActivatedAbilityCostType;
