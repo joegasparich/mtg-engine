@@ -1,0 +1,27 @@
+[
+    {
+        "name": "Forest",
+        "image_url": "https://cards.scryfall.io/normal/front/8/1/8100bceb-ffba-487a-bb45-4fe2a156a8dc.jpg?1743205126",
+        "oracle_text": "({T}: Add {G}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "Tap",
+                "effects": [
+                    {
+                        "type": "AbilityEffect_AddMana",
+                        "G": 1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "Grizzly Bears",
+        "image_url": "https://cards.scryfall.io/normal/front/4/0/409f9b88-f03e-40b6-9883-68c14c37c0de.jpg?156254673",
+        "oracle_text": "({T}: Add {G}.)",
+        "type": "Creature",
+        "cost": "{1}{G}"
+    }
+]
+

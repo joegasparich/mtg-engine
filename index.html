@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy"
+          content="
+              script-src 'self' 'unsafe-eval';
+              worker-src blob:;
+              style-src 'self' 'unsafe-inline';
+              img-src 'self' data: https:;
+              connect-src 'self' http://localhost:* data:;  default-src 'self'
+          ">
+
+    <title>Hello World!</title>
+    <link rel="stylesheet" href="src/index.css">
+  </head>
+  <body>
+    <script type="module" src="/src/renderer.ts"></script>
+  </body>
+</html>
