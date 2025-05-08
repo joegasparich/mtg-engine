@@ -22,7 +22,7 @@ export default class Game {
 
         return player;
     }
-    currentPlayer(): Player {
+    activePlayer(): Player {
         return this.players[this.currentTurnPlayerID];
     }
 
@@ -58,7 +58,7 @@ export default class Game {
         this.endStep(this.currentStepIndex)
         this.currentStepIndex++;
 
-        if (this.currentStepIndex == StepIndex.End)
+        if (this.currentStepIndex > StepIndex.End)
             this.nextTurn();
         else {
             this.startStep(this.currentStepIndex)
@@ -66,11 +66,11 @@ export default class Game {
     }
 
     private startStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepStart(this.currentPlayer(), index));
-        Step.all[index].onStart(this.currentPlayer());
+        gameEventManager.addEvent(new GameEvent_StepStart(this.activePlayer(), index));
+        Step.all[index].onStart(this.activePlayer());
     }
     private endStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepEnd(this.currentPlayer(), index));
-        Step.all[index].onEnd(this.currentPlayer());
+        gameEventManager.addEvent(new GameEvent_StepEnd(this.activePlayer(), index));
+        Step.all[index].onEnd(this.activePlayer());
     }
 }

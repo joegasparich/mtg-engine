@@ -75,12 +75,10 @@ export class Stack extends Zone {
     }
 
     private resolveSpell(spell: Card) {
-        const player = game.players[spell.controllerID];
-
         switch (spell.def.type) {
             case CardType.Land:
             case CardType.Creature:
-                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, player.battlefield));
+                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.controller.battlefield));
                 break;
             default:
                 break;
@@ -89,7 +87,7 @@ export class Stack extends Zone {
 
     private resolveAbility(ability: ActivatedAbility) {
         for (const effect of ability.def.effects) {
-            abilityEffects.get(effect.type).perform(effect, ability.card, ability.ownerID)
+            abilityEffects.get(effect.type).perform(effect, ability.card, ability.owner)
         }
     }
 }

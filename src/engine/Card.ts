@@ -1,10 +1,13 @@
 import {CardDef} from "../defs";
 import {Zone} from "./Zone";
+import {game} from "./root";
+import Player from "./Player";
+import {StepIndex} from "./Step";
 
 export default class Card {
     // Ownership
-    readonly ownerID: number;
-    controllerID: number;
+    readonly owner: Player;
+    controller: Player;
 
     readonly def: CardDef;
 
@@ -15,10 +18,10 @@ export default class Card {
     // Characteristics (eventually copy over everything from def
     cost: number[]; // W U B R G Colourless Any
 
-    constructor(cardDef: CardDef, ownerID: number) {
+    constructor(cardDef: CardDef, owner: Player) {
         this.def = cardDef;
-        this.ownerID = ownerID;
-        this.controllerID = ownerID;
+        this.owner = owner;
+        this.controller = owner;
 
         if (cardDef.cost)
             this.parseCost(cardDef.cost)
@@ -43,6 +46,12 @@ export default class Card {
     }
 
     canPlay() {
+        if (game.activePlayer() != this.controller)
+            return false;
+
+        if (game.currentStepIndex != StepIndex.Main && game.currentStepIndex != StepIndex.SecondMain)
+            return false;
+
         return true;
     }
 }

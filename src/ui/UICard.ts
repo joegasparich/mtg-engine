@@ -12,6 +12,7 @@ import {GameEvent_TapCard} from "../engine/events";
 import GameEvent_UntapCard from "../engine/events/GameEvent_UntapCard";
 import {pixi} from "./UIRoot";
 import {game} from "../engine/root";
+import Player from "../engine/Player";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -42,16 +43,14 @@ export default class UICard extends PIXI.Sprite {
     }
 
     // TODO: Put this somewhere better
-    getActions(actorID: number): PlayerAction[] {
+    getActions(actor: Player): PlayerAction[] {
         const actions: PlayerAction[] = [];
 
-        if (actorID != this.card.controllerID)
+        if (actor != this.card.controller)
             return actions;
 
-        const player = game.players[actorID];
-
         if (this.card.zone instanceof Hand) {
-            if (player.manaPool.canPay(this.card.cost) && this.card.canPlay()) {
+            if (actor.manaPool.canPay(this.card.cost) && this.card.canPlay()) {
                 actions.push(new PlayerAction_PlayCard(this.card));
             }
         }
@@ -59,7 +58,7 @@ export default class UICard extends PIXI.Sprite {
         if (this.card.zone instanceof Battlefield) {
             if (this.card.def.activated_abilities) {
                 for (const abilityData of this.card.def.activated_abilities) {
-                    if (activatedAbilitiesCosts.get(abilityData.cost).payable(this.card, actorID)) {
+                    if (activatedAbilitiesCosts.get(abilityData.cost).payable(this.card, actor)) {
                         actions.push(new PlayerAction_ActivatedAbility(abilityData, this.card));
                     }
                 }
@@ -106,11 +105,11 @@ export default class UICard extends PIXI.Sprite {
                 this.position = this.preDragPos;
         }
         if (event.button == 2) {
-            const actions = this.getActions(game.currentTurnPlayerID);
+            const actions = this.getActions(game.activePlayer());
 
             if (actions.length > 0) {
                 showCustomContextMenu(event.global, actions.map(a => a.label()), index => {
-                    game.currentPlayer().performAction(actions[index]);
+                    game.activePlayer().performAction(actions[index]);
                 }, event);
             }
         }

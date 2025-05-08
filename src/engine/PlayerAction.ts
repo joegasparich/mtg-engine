@@ -5,10 +5,11 @@ import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
 import {GameEvent_CastSpell} from "./events";
 import {game} from "./root";
+import Player from "./Player";
 
 export interface PlayerAction {
     label: () => string;
-    perform: (ownerID: number) => void;
+    perform: (owner: Player) => void;
     // target
 }
 export class PlayerAction_PlayCard implements PlayerAction {
@@ -22,9 +23,7 @@ export class PlayerAction_PlayCard implements PlayerAction {
         return `Play ${this.card.def.name}`;
     }
 
-    perform(playerID: number) {
-        const player = game.players[playerID];
-
+    perform(player: Player) {
         if (this.card.cost && !player.manaPool.canPay(this.card.cost)) {
             console.log("Attempted to play card with unpayable cost")
             return;
@@ -32,7 +31,7 @@ export class PlayerAction_PlayCard implements PlayerAction {
 
         player.manaPool.pay(this.card.cost);
 
-        gameEventManager.addEvent(new GameEvent_CastSpell(playerID, this.card));
+        gameEventManager.addEvent(new GameEvent_CastSpell(player, this.card));
     }
 }
 export class PlayerAction_ActivatedAbility implements PlayerAction {
@@ -48,8 +47,8 @@ export class PlayerAction_ActivatedAbility implements PlayerAction {
         return `${this.abilityDef.cost}: ${this.abilityDef.effects.map(e => abilityEffects.get(e.type).label(e, this.card)).join(", ")}`
     }
 
-    perform(playerID: number) {
-        const ability = new ActivatedAbility(playerID, this.abilityDef, this.card);
+    perform(player: Player) {
+        const ability = new ActivatedAbility(player, this.abilityDef, this.card);
 
         ability.perform()
     }

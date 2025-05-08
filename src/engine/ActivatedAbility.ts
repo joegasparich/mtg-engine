@@ -3,15 +3,16 @@ import Card from "./Card";
 import {abilityEffects, activatedAbilitiesCosts} from "./workers";
 import gameEventManager from "./events/GameEventManager";
 import {GameEvent_ActivateAbility} from "./events";
+import Player from "./Player";
 
 export default class ActivatedAbility {
-    ownerID: number;
+    owner: Player;
 
     def: ActivatedAbilityDef;
     card: Card;
 
-    constructor(ownerID: number, abilityDef: ActivatedAbilityDef, card: Card) {
-        this.ownerID = ownerID;
+    constructor(owner: Player, abilityDef: ActivatedAbilityDef, card: Card) {
+        this.owner = owner;
         this.def = abilityDef;
         this.card = card;
     }
@@ -21,7 +22,7 @@ export default class ActivatedAbility {
     }
 
     perform() {
-        if (!activatedAbilitiesCosts.get(this.def.cost).payable(this.card, this.ownerID)) {
+        if (!activatedAbilitiesCosts.get(this.def.cost).payable(this.card, this.owner)) {
             console.log("Attempted to trigger unpayable ability")
             return;
         }

@@ -13,12 +13,12 @@ export default class GameEvent_ActivateAbility extends GameEvent {
 
         this.ability = ability;
 
-        this.label = `Player ${ability.ownerID} activated ability of ${ability.card.def.name} (${ability.label()})`;
+        this.label = `Player ${ability.owner} activated ability of ${ability.card.def.name} (${ability.label()})`;
     }
 
     perform() {
         // Pay cost
-        activatedAbilitiesCosts.get(this.ability.def.cost).pay(this.ability.card, this.ability.ownerID);
+        activatedAbilitiesCosts.get(this.ability.def.cost).pay(this.ability.card, this.ability.owner);
 
         // Add ability to stack
         game.stack.abilityActivated(this.ability);

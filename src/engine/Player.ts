@@ -59,13 +59,13 @@ export default class Player {
     constructor(id: number, deck: number[]) {
         this.id = id;
         this.library.cards = deck.map(i => {
-            let card = new Card(cardData[i], id);
+            let card = new Card(cardData[i], this);
             card.zone = this.library;
             return card;
         });
     }
 
     performAction(action: PlayerAction) {
-        action.perform(this.id);
+        action.perform(this);
     }
 }

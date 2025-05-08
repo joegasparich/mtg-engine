@@ -2,12 +2,13 @@ import {ActivatedAbilityCostType} from "../defs";
 import Card from "./Card";
 import gameEventManager from "./events/GameEventManager";
 import {GameEvent_TapCard} from "./events";
+import Player from "./Player";
 
 export interface ActivatedAbilityCostWorker {
     type: ActivatedAbilityCostType;
 
-    payable: (card: Card, activatorID: number) => boolean;
-    pay: (card: Card, activatorID: number) => void;
+    payable: (card: Card, activator: Player) => boolean;
+    pay: (card: Card, activator: Player) => void;
 }
 export namespace ActivatedAbilityCostWorker {
     type Constructor<T> = {
@@ -28,13 +29,13 @@ export namespace ActivatedAbilityCostWorker {
 class ActivatedAbilityCostWorker_Tap {
     type = ActivatedAbilityCostType.Tap;
 
-    payable(card: Card, activatorID: number): boolean {
-        if (card.controllerID != activatorID)
+    payable(card: Card, activator: Player): boolean {
+        if (card.controller != activator)
             return false; // Card not under our control
 
         return !card.Tapped();
     }
-    pay(card: Card, activatorID: number): void {
+    pay(card: Card, activator: Player): void {
         gameEventManager.addEvent(new GameEvent_TapCard(card))
     }
 }

@@ -3,15 +3,14 @@ import {
     AbilityEffectType,
 } from "../defs";
 import Card from "./Card";
-import {ManaColour} from "./Player";
+import Player, {ManaColour} from "./Player";
 import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
-import {game} from "./root";
 
 export interface AbilityEffectWorker {
     type: AbilityEffectType;
 
     label:  (data: AbilityEffectData, card: Card) => string;
-    perform: (data: AbilityEffectData, card: Card, activatorID: number) => void;
+    perform: (data: AbilityEffectData, card: Card, activator: Player) => void;
 }
 export namespace AbilityEffectWorker {
     type Constructor<T> = {
@@ -44,15 +43,15 @@ class AbilityEffectWorker_AddMana {
         return "Add Mana";
     }
 
-    perform(data: AbilityEffectData, card: Card, activatorID: number): void {
+    perform(data: AbilityEffectData, card: Card, activator: Player): void {
         const casted_data = data as AbilityEffectData_AddMana;
 
-        game.players[activatorID].manaPool.pool[ManaColour.W] += casted_data.W ?? 0;
-        game.players[activatorID].manaPool.pool[ManaColour.U] += casted_data.U ?? 0;
-        game.players[activatorID].manaPool.pool[ManaColour.B] += casted_data.B ?? 0;
-        game.players[activatorID].manaPool.pool[ManaColour.R] += casted_data.R ?? 0;
-        game.players[activatorID].manaPool.pool[ManaColour.G] += casted_data.G ?? 0;
-        game.players[activatorID].manaPool.pool[ManaColour.C] += casted_data.C ?? 0;
+        activator.manaPool.pool[ManaColour.W] += casted_data.W ?? 0;
+        activator.manaPool.pool[ManaColour.U] += casted_data.U ?? 0;
+        activator.manaPool.pool[ManaColour.B] += casted_data.B ?? 0;
+        activator.manaPool.pool[ManaColour.R] += casted_data.R ?? 0;
+        activator.manaPool.pool[ManaColour.G] += casted_data.G ?? 0;
+        activator.manaPool.pool[ManaColour.C] += casted_data.C ?? 0;
 
         // TODO: Make it log what kind of mana
         gameEventManager.addEvent(new GameEvent_Simple(GameEventType.Log, "Mana Added"));
