@@ -2,6 +2,11 @@ import * as PIXI from "pixi.js";
 
 import Player from "../engine/Player";
 import {UIPlayer} from "./UIPlayer";
+import DOMButton from "./dom/DOMButton";
+import {game} from "../engine/root";
+import DOMLabel from "./dom/DOMLabel";
+import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
+import {Step} from "../engine/Step";
 
 export let pixi: PIXI.Application = null;
 
@@ -27,6 +32,21 @@ export default class UIRoot extends PIXI.Container {
 
     constructor() {
         super();
+
+        // TODO: Probably need to clean these up
+        const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
+        const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
+        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => game.nextStep());
+        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => game.skipToNextPhase())
+        const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => game.skipToNextTurn());
+
+        gameEventManager.on(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
+        gameEventManager.on(GameEventType.StepStart, () => {
+            currentStepLabel.text = Step.toString(game.currentStepIndex);
+
+            const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
+            nextPhaseButton.text = `Skip to ${Step.toStringPhase(nextPhase)}`;
+        });
     }
 
     onPlayerAdded(player: Player) {

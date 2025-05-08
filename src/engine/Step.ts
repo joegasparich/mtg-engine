@@ -131,6 +131,14 @@ export enum StepIndex {
     End
 }
 
+export enum PhaseIndex {
+    Beginning,
+    Main,
+    Combat,
+    SecondMain,
+    End
+}
+
 export namespace Step {
     export const Untap = new UntapStep();
     export const Upkeep = new UpkeepStep();
@@ -158,8 +166,26 @@ export namespace Step {
         End
     ];
 
-    export function toString(index: StepIndex): string {
-        switch (index) {
+    export const NUM_PHASES = 5;
+    export function phaseIndex(stepIndex: StepIndex): number {
+        if (stepIndex <= StepIndex.Draw) return PhaseIndex.Beginning;
+        if (stepIndex <= StepIndex.Main) return PhaseIndex.Main;
+        if (stepIndex <= StepIndex.EndOfCombat) return PhaseIndex.Combat;
+        if (stepIndex <= StepIndex.SecondMain) return PhaseIndex.SecondMain;
+        if (stepIndex <= StepIndex.End) return PhaseIndex.End;
+    }
+    export function phaseStart(phaseIndex: number): StepIndex {
+        switch (phaseIndex) {
+            case PhaseIndex.Beginning: return StepIndex.Untap;
+            case PhaseIndex.Main: return StepIndex.Main;
+            case PhaseIndex.Combat: return StepIndex.BeginningOfCombat;
+            case PhaseIndex.SecondMain: return StepIndex.SecondMain;
+            case PhaseIndex.End: return StepIndex.End;
+        }
+    }
+
+    export function toString(stepIndex: StepIndex): string {
+        switch (stepIndex) {
             case StepIndex.Untap: return "Untap";
             case StepIndex.Upkeep: return "Upkeep";
             case StepIndex.Draw: return "Draw";
@@ -173,4 +199,17 @@ export namespace Step {
             case StepIndex.End: return "End";
         }
     }
+
+    export function toStringPhase(phaseIndex: PhaseIndex): string {
+        switch (phaseIndex) {
+            case PhaseIndex.Beginning: return "Beginning";
+            case PhaseIndex.Main: return "Main";
+            case PhaseIndex.Combat: return "Combat";
+            case PhaseIndex.SecondMain: return "Second main";
+            case PhaseIndex.End: return "End";
+        }
+    }
+}
+
+export class phaseStart {
 }

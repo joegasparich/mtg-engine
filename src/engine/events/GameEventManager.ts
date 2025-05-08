@@ -1,5 +1,6 @@
 export enum GameEventType {
     Log,
+    TurnStart,
     StepStart,
     StepEnd,
     CastSpell,

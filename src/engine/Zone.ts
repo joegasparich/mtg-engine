@@ -49,7 +49,7 @@ export class Stack extends Zone {
         this.name = "Stack";
     }
 
-    onEnter(card: Card) {
+    override onEnter(card: Card) {
         super.onEnter(card);
 
         this.stack.push(card);

@@ -1,5 +1,3 @@
-import * as PIXI from "pixi.js";
-
 import Player from "./Player";
 import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
@@ -44,14 +42,18 @@ export default class Game {
         this.currentTurnPlayerID = 0;
         this.turnNumber = 0;
         this.currentStepIndex = 0;
+
+        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
+
         this.startStep(this.currentStepIndex);
     }
     nextTurn() {
-        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.Log, "Next turn"));
-
         this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
         this.turnNumber++;
         this.currentStepIndex = 0;
+
+        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
+
         this.startStep(this.currentStepIndex);
     }
     nextStep() {
@@ -63,6 +65,18 @@ export default class Game {
         else {
             this.startStep(this.currentStepIndex)
         }
+    }
+    skipToNextTurn() {
+        do {
+            this.nextStep();
+        } while (this.currentStepIndex != 0)
+    }
+    skipToNextPhase() {
+        const nextPhaseIndex = (Step.phaseIndex(this.currentStepIndex) + 1) % Step.NUM_PHASES;
+        const nextPhaseStep = Step.phaseStart(nextPhaseIndex)
+        do {
+            this.nextStep()
+        } while (this.currentStepIndex != nextPhaseStep)
     }
 
     private startStep(index: StepIndex) {
