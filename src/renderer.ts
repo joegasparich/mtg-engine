@@ -1,10 +1,10 @@
 import * as PIXI from 'pixi.js';
-import {session} from 'electron';
 import type {ElectronAPI} from './preload';
 
 import cardJSON from "./cards.json";
 import Game from "./Game";
 import {CardDef} from "./CardDef";
+import UIRoot from "./ui/UIRoot";
 
 declare global {
     interface Window {
@@ -15,20 +15,13 @@ declare global {
 }
 
 export let game: Game = null;
-export let pixi: PIXI.Application = null;
+export let uiRoot = new UIRoot();
 export const cardData = cardJSON as CardDef[];
 
 const playerOneDeck = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
 const playerTwoDeck = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
 
 async function main() {
-    pixi = new PIXI.Application();
-    await pixi.init({ background: '#1099bb', resizeTo: window });
-    document.body.appendChild(pixi.canvas);
-    pixi.ticker.add(tick);
-    pixi.stage.eventMode = 'static';
-    pixi.stage.hitArea = pixi.screen;
-
     game = new Game();
 
     window.game = game;
@@ -39,8 +32,11 @@ async function main() {
             game.nextStep();
     })
 
-    const playerOne = game.addPlayer(playerOneDeck, new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2), 0);
-    const playerTwo = game.addPlayer(playerTwoDeck, new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2), 180);
+    const playerOne = game.addPlayer(playerOneDeck);
+    const playerTwo = game.addPlayer(playerTwoDeck);
+
+    uiRoot.onPlayerAdded(playerOne);
+    uiRoot.onPlayerAdded(playerTwo);
 
     game.startGame();
 }

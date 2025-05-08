@@ -1,7 +1,5 @@
 import Card from "./Card";
-import * as PIXI from "pixi.js";
-import {game, pixi} from "./renderer";
-import {calculateCardPositionsRelativeToCenter} from "./drawUtility";
+import {game} from "./renderer";
 import {CardType} from "./CardDef";
 import gameEventManager from "./GameEvents/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
@@ -23,11 +21,7 @@ export class Zone {
 }
 
 export class Library extends Zone {
-    constructor() {
-        super();
-
-        this.name = "Library"
-    }
+    name = "Library"
 
     shuffle() {
         shuffleArray(this.cards);
@@ -39,59 +33,11 @@ export class Library extends Zone {
 }
 
 export class Battlefield extends Zone {
-    nextCardPos = 100;
-
-    // Rendering
-    container = new PIXI.Container()
-
-    constructor() {
-        super();
-
-        this.name = "Battlefield";
-    }
-
-    onEnter(card: Card) {
-        super.onEnter(card);
-
-        card.position = new PIXI.Point(this.nextCardPos, this.nextCardPos);
-        this.nextCardPos += 10;
-
-        this.container.addChild(card);
-    }
-
-    onLeave(card: Card) {
-        super.onLeave(card);
-
-        this.container.removeChild(card);
-    }
+    name = "Battlefield";
 }
 
 export class Hand extends Zone {
-    // Rendering
-    container = new PIXI.Container()
-
-    constructor() {
-        super();
-
-        this.name = "Hand";
-    }
-
-    onEnter(card: Card): void {
-        super.onEnter(card);
-
-        this.container.addChild(card);
-
-        const positions = calculateCardPositionsRelativeToCenter(this.cards.length, card.width + 30, pixi.screen.width * 0.67)
-        for (let i = 0; i < this.cards.length; i++) {
-            this.cards[i].position.x = positions[i];
-        }
-    }
-
-    onLeave(card: Card): void {
-        super.onLeave(card);
-
-        this.container.removeChild(card);
-    }
+    name = "Hand";
 }
 
 export class Stack extends Zone {

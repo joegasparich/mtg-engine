@@ -15,9 +15,9 @@ export default class Game {
     turnNumber = 0;
     currentStepIndex = 0;
 
-    addPlayer(deck: number[], position: PIXI.Point, rotation: number): Player {
+    addPlayer(deck: number[]): Player {
         const id = this.players.length;
-        const player = new Player(id, deck, position, rotation);
+        const player = new Player(id, deck);
         this.players.push(player);
 
         return player;

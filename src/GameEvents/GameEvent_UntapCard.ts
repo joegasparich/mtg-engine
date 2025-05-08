@@ -16,6 +16,5 @@ export default class GameEvent_UntapCard extends GameEvent {
 
     perform() {
         this.card.tapped = false;
-        this.card.OnUntap();
     }
 }

@@ -33,18 +33,18 @@ export class GameEvent_Simple extends GameEvent {
 type Listener = (event: GameEvent) => void;
 
 class GameEventManager {
-    // private readonly listeners = new Map<GameEventType, Set<Listener>>();
-    //
-    // on(eventType: GameEventType, listener: Listener) {
-    //     if (!this.listeners.has(eventType))
-    //         this.listeners.set(eventType, new Set<Listener>());
-    //
-    //     this.listeners.get(eventType).add(listener);
-    // }
-    //
-    // off(eventType: GameEventType, listener: Listener) {
-    //     this.listeners.get(eventType).add(listener);
-    // }
+    private readonly listeners = new Map<GameEventType, Set<Listener>>();
+
+    on(eventType: GameEventType, listener: Listener) {
+        if (!this.listeners.has(eventType))
+            this.listeners.set(eventType, new Set<Listener>());
+
+        this.listeners.get(eventType).add(listener);
+    }
+
+    off(eventType: GameEventType, listener: Listener) {
+        this.listeners.get(eventType).add(listener);
+    }
 
     activeEvents: GameEvent[] = [];
     performingEvents: boolean;
@@ -81,6 +81,8 @@ class GameEventManager {
                 const event = events[i];
 
                 event.perform();
+                this.listeners.get(event.type)?.forEach(listener => listener(event));
+
                 console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
                 event.callback?.();
             }

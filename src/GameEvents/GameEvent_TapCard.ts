@@ -16,6 +16,5 @@ export default class GameEvent_TapCard extends GameEvent {
 
     perform() {
         this.card.tapped = true;
-        this.card.OnTap();
     }
 }
