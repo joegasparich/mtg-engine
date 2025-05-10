@@ -10,9 +10,10 @@
                 "effects": [
                     {
                         "type": "AbilityEffect_AddMana",
-                        "G": 1
+                        "mana": "{G}"
                     }
-                ]
+                ],
+                "manaAbility": true
             }
         ]
     },

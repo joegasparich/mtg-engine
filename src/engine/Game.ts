@@ -97,7 +97,7 @@ export default class Game {
     }
     checkAutoSkip() {
         // Automatically advance step if there are no actions
-        if (this.activePlayer() != null && this.activePlayer()?.getActions().length > 0)
+        if (this.activePlayer() != null && this.activePlayer()?.getActions(true).length > 0)
             return;
 
         // TODO: We don't care about mana abilities unless there is something to pay for

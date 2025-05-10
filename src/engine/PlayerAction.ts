@@ -5,6 +5,7 @@ import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
 import {GameEvent_CastSpell} from "./events";
 import Player from "./Player";
+import {ManaUtility} from "./mana";
 
 export interface PlayerAction {
     label: () => string;
@@ -23,12 +24,12 @@ export class PlayerAction_PlayCard implements PlayerAction {
     }
 
     perform(player: Player) {
-        if (this.card.cost && !player.manaPool.canPay(this.card.cost)) {
+        if (this.card.cost && !ManaUtility.canPay(this.card.cost, player.manaPool)) {
             console.log("Attempted to play card with unpayable cost")
             return;
         }
 
-        player.manaPool.pay(this.card.cost);
+        ManaUtility.pay(this.card.cost, player.manaPool);
 
         gameEventManager.addEvent(new GameEvent_CastSpell(player, this.card));
     }

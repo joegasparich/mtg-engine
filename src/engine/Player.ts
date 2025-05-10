@@ -2,53 +2,13 @@ import {PlayerAction} from "./PlayerAction";
 import {Battlefield, Hand, Library} from "./Zone";
 import Card from "./Card";
 import {cardData} from "./root";
-
-export enum ManaColour {
-    W, U, B, R, G, C
-}
-
-class ManaPool {
-    // W U B R G Colourless Any
-    pool = [0, 0, 0, 0, 0, 0];
-
-    canPay(cost: number[]): boolean {
-        return this.pay(cost, [...this.pool]);
-    }
-
-    // This picks the colours for the player prioritising colourless
-    pay(cost: number[], pool: number[] = this.pool): boolean {
-        if (!cost)
-            return true;
-
-        // WUBRG + specifically colourless
-        for (let i = 0; i < 6; i++) {
-            if (pool[i] < cost[i])
-                return false;
-
-            pool[i] -= cost[i];
-        }
-
-        // Any, prioritising colourless
-        let any = cost[6];
-        for (let i = 5; i >= 0; i--) {
-            if (pool[i] > 0) {
-                var diff = Math.min(any, pool[i]);
-                any -= diff;
-                pool[i] -= diff;
-            }
-
-            if (any <= 0)
-                return true;
-        }
-    }
-}
-
+import {ManaAmount, ManaUtility} from "./mana";
 
 export default class Player {
     id: number;
 
     life: 20;
-    manaPool = new ManaPool();
+    manaPool: ManaAmount = [0, 0, 0, 0, 0, 0];
 
     library: Library = new Library();
     hand: Hand = new Hand();
@@ -65,18 +25,43 @@ export default class Player {
         });
     }
 
-    getActions(): PlayerAction[] {
+    getActions(factorInPotentialMana = false): PlayerAction[] {
         const actions: PlayerAction[] = [];
 
+        const originalMana: Readonly<ManaAmount> = [...this.manaPool];
+        if (factorInPotentialMana) {
+            const potentialMana = this.getPotentialMana();
+            for (let i = 0; i < 6; i++)
+                this.manaPool[i] += potentialMana[i];
+        }
+
         for (const card of this.hand.cards) {
-            actions.push(...card.getActions(this));
+            actions.push(...card.getActions(this, true));
         }
 
         for (const card of this.battlefield.cards) {
-            actions.push(...card.getActions(this));
+            actions.push(...card.getActions(this, true));
+        }
+
+        if (factorInPotentialMana) {
+            this.manaPool = [...originalMana];
         }
 
         return actions;
+    }
+
+    getPotentialMana(): Readonly<ManaAmount> {
+        const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
+
+        for (const card of this.hand.cards) {
+            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this))
+        }
+
+        for (const card of this.battlefield.cards) {
+            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this))
+        }
+
+        return potentialMana;
     }
 
     performAction(action: PlayerAction) {

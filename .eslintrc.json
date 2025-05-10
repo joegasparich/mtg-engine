@@ -13,7 +13,8 @@
     "plugin:import/typescript"
   ],
   "rules": {
-    " @typescript-eslint/no-namespace": false
+    "@typescript-eslint/no-namespace": false,
+    "semi": "error"
   },
   "parser": "@typescript-eslint/parser"
 }

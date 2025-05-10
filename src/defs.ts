@@ -18,22 +18,18 @@ export enum ActivatedAbilityCostType {
 
 export interface ActivatedAbilityDef {
     cost: ActivatedAbilityCostType,
-    effects: AbilityEffectData[]
+    effects: AbilityEffectDef[],
+    manaAbility: boolean
 }
 
 export enum AbilityEffectType {
     AddMana = "AbilityEffect_AddMana"
 }
 
-export interface AbilityEffectData {
+export interface AbilityEffectDef {
     type: AbilityEffectType,
 }
 
-export interface AbilityEffectData_AddMana extends AbilityEffectData {
-    W: number
-    U: number
-    B: number
-    R: number
-    G: number
-    C: number
+export interface AbilityEffectDef_AddMana extends AbilityEffectDef {
+    mana: string, // {3}{G}{G}
 }
