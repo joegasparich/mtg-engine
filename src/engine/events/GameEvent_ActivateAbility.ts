@@ -13,7 +13,7 @@ export default class GameEvent_ActivateAbility extends GameEvent {
 
         this.ability = ability;
 
-        this.label = `Player ${ability.owner} activated ability of ${ability.card.def.name} (${ability.label()})`;
+        this.label = `Player ${ability.owner} activated ability of ${ability.card.name} (${ability.label()})`;
     }
 
     perform() {

@@ -8,29 +8,54 @@ import {showCustomContextMenu} from "./contextMenu";
 import Card from "../engine/Card";
 import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
 import {autobind} from "../utility/typeUtility";
-import {GameEvent_TapCard} from "../engine/events";
-import GameEvent_UntapCard from "../engine/events/GameEvent_UntapCard";
+import {GameEvent_TapCard, GameEvent_UntapCard} from "../engine/events";
 import {pixi} from "./UIRoot";
-import {game} from "../engine/root";
+import {game, uiRoot} from "../engine/root";
 import Player from "../engine/Player";
+
+import {GlowFilter} from "pixi-filters";
+import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
+const MIN_DRAG = 100; // ms
 
 export default class UICard extends PIXI.Sprite {
-    card: Card;
+    public readonly card: Card;
+
+    private _selected = false;
+    public get selected() { return this._selected };
+    public set selected(val: boolean) {
+        if (this._selected == val)
+            return;
+
+        this._selected = val;
+        if (this._selected) {
+            this.filters = [
+                new GlowFilter({
+                    distance: 20,
+                    outerStrength: 2,
+                    quality: 0.5
+                })
+            ]
+        } else {
+            this.filters = [];
+        }
+    }
 
     constructor(card: Card) {
         super();
 
         this.card = card;
 
+        uiRoot.registerCard(this);
+
         loadImageFromExternalUrl(card.def.image_url).then(tex => this.texture = tex)
         this.width = CARD_WIDTH;
         this.height = CARD_HEIGHT;
         this.anchor = new PIXI.Point(0.5, 0.5);
 
-        // Events
+        // Events, TODO: Clean these up if card is destroyed
         this.eventMode = 'static';
         this.cursor = 'pointer';
         this.on('pointerdown', this.onMouseDown);
@@ -40,72 +65,66 @@ export default class UICard extends PIXI.Sprite {
 
         gameEventManager.on(GameEventType.TapCard, this.onCardTapped)
         gameEventManager.on(GameEventType.UntapCard, this.onCardUntapped)
-    }
 
-    // TODO: Put this somewhere better
-    getActions(actor: Player): PlayerAction[] {
-        const actions: PlayerAction[] = [];
-
-        if (actor != this.card.controller)
-            return actions;
-
-        if (this.card.zone instanceof Hand) {
-            if (actor.manaPool.canPay(this.card.cost) && this.card.canPlay()) {
-                actions.push(new PlayerAction_PlayCard(this.card));
-            }
-        }
-
-        if (this.card.zone instanceof Battlefield) {
-            if (this.card.def.activated_abilities) {
-                for (const abilityData of this.card.def.activated_abilities) {
-                    if (activatedAbilitiesCosts.get(abilityData.cost).payable(this.card, actor)) {
-                        actions.push(new PlayerAction_ActivatedAbility(abilityData, this.card));
-                    }
-                }
-            }
-        }
-
-        return actions;
+        this.onRender = this.render;
     }
 
     @autobind
-    public onCardTapped(event: GameEvent_TapCard) {
+    render(renderer: PIXI.Renderer) {
+        // Called every frame
+    }
+
+    @autobind
+    private onCardTapped(event: GameEvent_TapCard) {
         if (event.card != this.card)
             return;
 
         this.angle = 90;
     }
     @autobind
-    public onCardUntapped(event: GameEvent_UntapCard) {
+    private onCardUntapped(event: GameEvent_UntapCard) {
         if (event.card != this.card)
             return;
 
         this.angle = 0;
     }
 
-    preDragPos: PIXI.Point;
+    public setSelected(selected: boolean) {
+        this.selected = selected;
+    }
+
+    private preDragPos: PIXI.Point;
+    private dragStartTime: number;
     @autobind
     onDrag(event: PIXI.FederatedPointerEvent) {
+        if (Date.now() - this.dragStartTime < MIN_DRAG)
+            return;
+
+        this.alpha = 0.5;
         this.parent.toLocal(event.global, null, this.position);
     }
 
     @autobind
-    onMouseDown(event: PIXI.FederatedPointerEvent) {
+    private onMouseDown(event: PIXI.FederatedPointerEvent) {
         if (event.button == 0) {
-            this.alpha = 0.5;
             this.preDragPos = this.position.clone();
+            this.dragStartTime = Date.now();
             pixi.stage.on('pointermove', this.onDrag);
         }
     }
 
     @autobind
-    onMouseUp(event: PIXI.FederatedPointerEvent) {
+    private onMouseUp(event: PIXI.FederatedPointerEvent) {
         if (event.button == 0) {
             if (!(this.card.zone instanceof Battlefield))
                 this.position = this.preDragPos;
+
+            if (Date.now() - this.dragStartTime < MIN_DRAG) {
+                uiEventManager.fire(new UIEvent_CardClicked(this.card))
+            }
         }
         if (event.button == 2) {
-            const actions = this.getActions(game.activePlayer());
+            const actions = this.card.getActions(game.activePlayer());
 
             if (actions.length > 0) {
                 showCustomContextMenu(event.global, actions.map(a => a.label()), index => {
@@ -116,7 +135,7 @@ export default class UICard extends PIXI.Sprite {
     }
 
     @autobind
-    globalMouseUp(event: PIXI.FederatedPointerEvent) {
+    private globalMouseUp(event: PIXI.FederatedPointerEvent) {
         if (event.button == 0) {
             pixi.stage.off('pointermove', this.onDrag);
             this.alpha = 1;

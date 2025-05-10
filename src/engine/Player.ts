@@ -65,6 +65,20 @@ export default class Player {
         });
     }
 
+    getActions(): PlayerAction[] {
+        const actions: PlayerAction[] = [];
+
+        for (const card of this.hand.cards) {
+            actions.push(...card.getActions(this));
+        }
+
+        for (const card of this.battlefield.cards) {
+            actions.push(...card.getActions(this));
+        }
+
+        return actions;
+    }
+
     performAction(action: PlayerAction) {
         action.perform(this);
     }

@@ -30,10 +30,7 @@ class ActivatedAbilityCostWorker_Tap {
     type = ActivatedAbilityCostType.Tap;
 
     payable(card: Card, activator: Player): boolean {
-        if (card.controller != activator)
-            return false; // Card not under our control
-
-        return !card.Tapped();
+        return !card.tapped;
     }
     pay(card: Card, activator: Player): void {
         gameEventManager.addEvent(new GameEvent_TapCard(card))

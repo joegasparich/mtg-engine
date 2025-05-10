@@ -4,6 +4,7 @@ import GameEvent_CastSpell from "./GameEvent_CastSpell";
 import GameEvent_ChangeCardZone from "./GameEvent_ChangeCardZone";
 import GameEvent_ActivateAbility from "./GameEvent_ActivateAbility";
 import GameEvent_TapCard from "./GameEvent_TapCard";
+import GameEvent_UntapCard from "./GameEvent_UntapCard";
 
 export {
     GameEvent,
@@ -12,6 +13,7 @@ export {
     GameEvent_StepEnd,
     GameEvent_CastSpell,
     GameEvent_TapCard,
+    GameEvent_UntapCard,
     GameEvent_ChangeCardZone,
     GameEvent_ActivateAbility,
 }

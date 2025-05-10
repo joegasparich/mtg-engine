@@ -1,7 +1,10 @@
 export type DOMPosition = { top?: string; left?: string; right?: string; bottom?: string };
 
 export default abstract class DOMElement {
-    element: HTMLElement;
+    protected element: HTMLElement;
+
+    get className(): string { return this.element.className; }
+    set className(val: string) { this.element.className = val; }
 
     protected constructor(element: HTMLElement, position: DOMPosition) {
         this.element = element;
@@ -21,5 +24,14 @@ export default abstract class DOMElement {
         if (this.element.parentNode) {
             this.element.parentNode.removeChild(this.element);
         }
+    }
+
+    public hide(): void {
+        this.element.style.display = 'none';
+    }
+
+    public show(): void {
+        this.element.style.display = 'block';
+
     }
 }

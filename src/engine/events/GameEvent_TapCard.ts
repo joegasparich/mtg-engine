@@ -11,7 +11,7 @@ export default class GameEvent_TapCard extends GameEvent {
 
         this.card = card;
 
-        this.label = `Card ${this.card?.def?.name} was tapped`;
+        this.label = `Card ${this.card.name} was tapped`;
     }
 
     perform() {

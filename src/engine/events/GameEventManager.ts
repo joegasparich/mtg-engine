@@ -44,7 +44,7 @@ class GameEventManager {
     }
 
     off(eventType: GameEventType, listener: Listener) {
-        this.listeners.get(eventType).add(listener);
+        this.listeners.get(eventType).delete(listener);
     }
 
     activeEvents: GameEvent[] = [];

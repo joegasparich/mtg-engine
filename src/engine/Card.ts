@@ -1,8 +1,10 @@
-import {CardDef} from "../defs";
-import {Zone} from "./Zone";
+import {ActivatedAbilityDef, CardDef, CardType} from "../defs";
+import {Battlefield, Hand, Zone} from "./Zone";
 import {game} from "./root";
 import Player from "./Player";
 import {StepIndex} from "./Step";
+import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "./PlayerAction";
+import {activatedAbilitiesCosts} from "./workers";
 
 export default class Card {
     // Ownership
@@ -15,19 +17,30 @@ export default class Card {
     zone: Zone;
     tapped = false;
 
-    // Characteristics (eventually copy over everything from def
+    // Characteristics
+    name: string;
+    type: CardType;
     cost: number[]; // W U B R G Colourless Any
+    activatedAbilities: ActivatedAbilityDef[] = [];
 
     constructor(cardDef: CardDef, owner: Player) {
         this.def = cardDef;
         this.owner = owner;
         this.controller = owner;
 
-        if (cardDef.cost)
-            this.parseCost(cardDef.cost)
+        this.copyFromDef(cardDef)
     }
 
-    public Tapped() { return this.tapped }
+    copyFromDef(cardDef: CardDef) {
+        this.name = cardDef.name;
+        this.type = cardDef.type
+
+        if (cardDef.cost)
+            this.parseCost(cardDef.cost)
+
+        if (cardDef.activated_abilities)
+            this.activatedAbilities = [...cardDef.activated_abilities];
+    }
 
     parseCost(cost: string) {
         this.cost = [0, 0, 0, 0, 0, 0, 0];
@@ -45,11 +58,41 @@ export default class Card {
         }
     }
 
+    public getActions(actor: Player): PlayerAction[] {
+        const actions: PlayerAction[] = [];
+
+        if (actor != this.controller)
+            return actions;
+
+        if (this.zone instanceof Hand) {
+            if (actor.manaPool.canPay(this.cost) && this.canPlay()) {
+                actions.push(new PlayerAction_PlayCard(this));
+            }
+        }
+
+        if (this.zone instanceof Battlefield) {
+            for (const abilityDef of this.activatedAbilities) {
+                if (this.canActivate(abilityDef) && activatedAbilitiesCosts.get(abilityDef.cost).payable(this, actor)) {
+                    actions.push(new PlayerAction_ActivatedAbility(abilityDef, this));
+                }
+            }
+        }
+
+        return actions;
+    }
+
     canPlay() {
         if (game.activePlayer() != this.controller)
             return false;
 
         if (game.currentStepIndex != StepIndex.Main && game.currentStepIndex != StepIndex.SecondMain)
+            return false;
+
+        return true;
+    }
+
+    canActivate(abilityDef: ActivatedAbilityDef) {
+        if (game.activePlayer() != this.controller)
             return false;
 
         return true;

@@ -4,7 +4,6 @@ import {abilityEffects} from "./workers";
 import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
 import {GameEvent_CastSpell} from "./events";
-import {game} from "./root";
 import Player from "./Player";
 
 export interface PlayerAction {
@@ -20,7 +19,7 @@ export class PlayerAction_PlayCard implements PlayerAction {
     }
 
     label() {
-        return `Play ${this.card.def.name}`;
+        return `Play ${this.card.name}`;
     }
 
     perform(player: Player) {

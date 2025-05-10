@@ -16,7 +16,7 @@ export default class GameEvent_CastSpell extends GameEvent {
         this.caster = caster;
         this.card = card;
 
-        this.label = `Player ${this.caster.id} cast ${this.card.def.name}`;
+        this.label = `Player ${this.caster.id} cast ${this.card.name}`;
     }
 
     perform() {

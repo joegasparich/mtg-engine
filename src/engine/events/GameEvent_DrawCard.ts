@@ -18,7 +18,7 @@ export class GameEvent_DrawCard extends GameEvent {
     perform() {
         const card = this.player.library.getTopCard();
 
-        this.label = `Player ${this.player.id} drew ${card.def.name} from library`;
+        this.label = `Player ${this.player.id} drew ${card.name} from library`;
 
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
     }

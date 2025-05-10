@@ -16,7 +16,7 @@ export default class GameEvent_ChangeCardZone extends GameEvent {
         this.oldZone = card.zone;
         this.newZone = newZone
 
-        this.label = `Card ${this.card?.def?.name} changed zones from ${this.card.zone?.name} to ${this.newZone?.name}`;
+        this.label = `Card ${this.card.name} changed zones from ${this.card.zone?.name} to ${this.newZone.name}`;
     }
 
     perform() {

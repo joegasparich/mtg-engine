@@ -7,6 +7,9 @@ import {game} from "../engine/root";
 import DOMLabel from "./dom/DOMLabel";
 import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
 import {Step} from "../engine/Step";
+import Card from "../engine/Card";
+import UICard from "./UICard";
+import uiEventManager, {UIEvent_CardDeselected, UIEvent_CardSelected, UIEventType} from "./UIEventManager";
 
 export let pixi: PIXI.Application = null;
 
@@ -29,6 +32,7 @@ export default class UIRoot extends PIXI.Container {
     players: UIPlayer[] = [];
     playerToUIPlayer = new Map<Player, UIPlayer>();
     uiPlayerToPlayer = new Map<UIPlayer, Player>();
+    cardToUICard = new Map<Card, UICard>();
 
     constructor() {
         super();
@@ -47,6 +51,9 @@ export default class UIRoot extends PIXI.Container {
             const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
             nextPhaseButton.text = `Skip to ${Step.toStringPhase(nextPhase)}`;
         });
+
+        uiEventManager.on(UIEventType.CardSelected, (event: UIEvent_CardSelected) => this.cardToUICard.get(event.card).setSelected(true));
+        uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.cardToUICard.get(event.card).setSelected(false));
     }
 
     onPlayerAdded(player: Player) {
@@ -60,5 +67,13 @@ export default class UIRoot extends PIXI.Container {
         this.players.push(uiPlayer);
         this.playerToUIPlayer.set(player, uiPlayer);
         this.uiPlayerToPlayer.set(uiPlayer, player);
+    }
+
+    registerCard(uiCard: UICard) {
+        this.cardToUICard.set(uiCard.card, uiCard);
+    }
+
+    deregisterCard(uiCard: UICard) {
+        this.cardToUICard.delete(uiCard.card);
     }
 }

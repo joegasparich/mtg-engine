@@ -11,7 +11,7 @@ export default class GameEvent_UntapCard extends GameEvent {
 
         this.card = card;
 
-        this.label = `Card ${this.card?.def?.name} was untapped`;
+        this.label = `Card ${this.card.name} was untapped`;
     }
 
     perform() {

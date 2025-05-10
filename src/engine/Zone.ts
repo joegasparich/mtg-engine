@@ -75,7 +75,7 @@ export class Stack extends Zone {
     }
 
     private resolveSpell(spell: Card) {
-        switch (spell.def.type) {
+        switch (spell.type) {
             case CardType.Land:
             case CardType.Creature:
                 gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.controller.battlefield));

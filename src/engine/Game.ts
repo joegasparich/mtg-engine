@@ -10,6 +10,7 @@ export default class Game {
     stack = new Stack();
 
     currentTurnPlayerID = 0;
+    activePlayerID = -1;
     turnNumber = 0;
     currentStepIndex = 0;
 
@@ -20,8 +21,17 @@ export default class Game {
 
         return player;
     }
-    activePlayer(): Player {
+    currentTurnPlayer(): Player {
         return this.players[this.currentTurnPlayerID];
+    }
+    activePlayer(): Player | null {
+        if (this.activePlayerID < 0)
+            return null;
+
+        return this.players[this.activePlayerID];
+    }
+    randomOpponent(player: Player): Player {
+        return this.players[(player.id + 1) % 2]; // TODO: Randomize
     }
 
     startGame() {
@@ -40,12 +50,15 @@ export default class Game {
         }
 
         this.currentTurnPlayerID = 0;
+        this.activePlayerID = -1;
         this.turnNumber = 0;
         this.currentStepIndex = 0;
 
         gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
 
         this.startStep(this.currentStepIndex);
+
+        this.checkAutoSkip()
     }
     nextTurn() {
         this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
@@ -55,6 +68,8 @@ export default class Game {
         gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
 
         this.startStep(this.currentStepIndex);
+
+        this.checkAutoSkip()
     }
     nextStep() {
         this.endStep(this.currentStepIndex)
@@ -65,6 +80,8 @@ export default class Game {
         else {
             this.startStep(this.currentStepIndex)
         }
+
+        this.checkAutoSkip()
     }
     skipToNextTurn() {
         do {
@@ -78,13 +95,22 @@ export default class Game {
             this.nextStep()
         } while (this.currentStepIndex != nextPhaseStep)
     }
+    checkAutoSkip() {
+        // Automatically advance step if there are no actions
+        if (this.activePlayer() != null && this.activePlayer()?.getActions().length > 0)
+            return;
+
+        // TODO: We don't care about mana abilities unless there is something to pay for
+
+        this.nextStep()
+    }
 
     private startStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepStart(this.activePlayer(), index));
-        Step.all[index].onStart(this.activePlayer());
+        gameEventManager.addEvent(new GameEvent_StepStart(this.currentTurnPlayer(), index));
+        Step.all[index].onStart(this.currentTurnPlayer());
     }
     private endStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepEnd(this.activePlayer(), index));
-        Step.all[index].onEnd(this.activePlayer());
+        gameEventManager.addEvent(new GameEvent_StepEnd(this.currentTurnPlayer(), index));
+        Step.all[index].onEnd(this.currentTurnPlayer());
     }
 }
