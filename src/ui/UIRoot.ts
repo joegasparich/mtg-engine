@@ -3,9 +3,13 @@ import * as PIXI from "pixi.js";
 import Player from "../engine/Player";
 import {UIPlayer} from "./UIPlayer";
 import DOMButton from "./dom/DOMButton";
-import {game} from "../engine/root";
+import {game, uiRoot} from "../engine/root";
 import DOMLabel from "./dom/DOMLabel";
-import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
+import gameEventManager, {
+    GameEvent_GoToNextPhase,
+    GameEvent_GoToNextStep, GameEvent_GoToNextTurn,
+    GameEventType
+} from "../engine/events/GameEventManager";
 import {Step} from "../engine/Step";
 import Card from "../engine/Card";
 import UICard from "./UICard";
@@ -34,15 +38,17 @@ export default class UIRoot extends PIXI.Container {
     uiPlayerToPlayer = new Map<UIPlayer, Player>();
     cardToUICard = new Map<Card, UICard>();
 
+    mousePos = new PIXI.Point();
+
     constructor() {
         super();
 
         // TODO: Probably need to clean these up
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
         const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
-        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => game.nextStep());
-        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => game.skipToNextPhase())
-        const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => game.skipToNextTurn());
+        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep(true)));
+        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()))
+        const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
 
         gameEventManager.on(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
         gameEventManager.on(GameEventType.StepStart, () => {
@@ -54,6 +60,8 @@ export default class UIRoot extends PIXI.Container {
 
         uiEventManager.on(UIEventType.CardSelected, (event: UIEvent_CardSelected) => this.cardToUICard.get(event.card).setSelected(true));
         uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.cardToUICard.get(event.card).setSelected(false));
+
+        pixi.stage.addEventListener('pointermove', (e) => this.mousePos.copyFrom(e.global));
     }
 
     onPlayerAdded(player: Player) {
@@ -70,6 +78,10 @@ export default class UIRoot extends PIXI.Container {
     }
 
     registerCard(uiCard: UICard) {
+        if (uiRoot.cardToUICard.has(uiCard.card)) {
+            console.error(`UI Card already exists for ${uiCard.card.def.name}`);
+        }
+
         this.cardToUICard.set(uiCard.card, uiCard);
     }
 

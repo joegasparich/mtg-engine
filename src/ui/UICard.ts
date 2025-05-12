@@ -1,9 +1,7 @@
 import * as PIXI from "pixi.js";
 
 import {loadImageFromExternalUrl} from "../electron/renderer";
-import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "../engine/PlayerAction";
-import {Battlefield, Hand} from "../engine/Zone";
-import {activatedAbilitiesCosts} from "../engine/workers";
+import {Battlefield} from "../engine/Zone";
 import {showCustomContextMenu} from "./contextMenu";
 import Card from "../engine/Card";
 import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
@@ -11,10 +9,9 @@ import {autobind} from "../utility/typeUtility";
 import {GameEvent_TapCard, GameEvent_UntapCard} from "../engine/events";
 import {pixi} from "./UIRoot";
 import {game, uiRoot} from "../engine/root";
-import Player from "../engine/Player";
 
 import {GlowFilter} from "pixi-filters";
-import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
+import uiEventManager, {UIEvent_CardClicked, UIEvent_StartTargeting} from "./UIEventManager";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -95,12 +92,14 @@ export default class UICard extends PIXI.Sprite {
 
     private preDragPos: PIXI.Point;
     private dragStartTime: number;
+    private hasDragged: boolean;
     @autobind
     onDrag(event: PIXI.FederatedPointerEvent) {
         if (Date.now() - this.dragStartTime < MIN_DRAG)
             return;
 
         this.alpha = 0.5;
+        this.hasDragged = true;
         this.parent.toLocal(event.global, null, this.position);
     }
 
@@ -119,7 +118,7 @@ export default class UICard extends PIXI.Sprite {
             if (!(this.card.zone instanceof Battlefield))
                 this.position = this.preDragPos;
 
-            if (Date.now() - this.dragStartTime < MIN_DRAG) {
+            if (!this.hasDragged) {
                 uiEventManager.fire(new UIEvent_CardClicked(this.card))
             }
         }
@@ -139,6 +138,7 @@ export default class UICard extends PIXI.Sprite {
         if (event.button == 0) {
             pixi.stage.off('pointermove', this.onDrag);
             this.alpha = 1;
+            this.hasDragged = false;
         }
     }
 }

@@ -1,5 +1,10 @@
+import {game} from "../root";
+
 export enum GameEventType {
     Log,
+    GoToNextStep,
+    GoToNextPhase,
+    GoToNextTurn,
     TurnStart,
     StepStart,
     StepEnd,
@@ -28,6 +33,50 @@ export class GameEvent_Simple extends GameEvent {
 
         this.type = type;
         this.label = label;
+    }
+}
+
+export class GameEvent_GoToNextStep extends GameEvent {
+    allowAutoSkip: boolean;
+
+    constructor(allowAutoSkip: boolean) {
+        super();
+
+        this.type = GameEventType.GoToNextStep;
+        this.label = "Go to next turn";
+
+        this.allowAutoSkip = allowAutoSkip;
+    }
+
+    perform() {
+        game.nextStep(this.allowAutoSkip);
+    }
+}
+
+export class GameEvent_GoToNextPhase extends GameEvent {
+
+    constructor() {
+        super();
+
+        this.type = GameEventType.GoToNextPhase;
+        this.label = "Go to next turn";
+    }
+
+    perform() {
+        game.skipToNextPhase();
+    }
+}
+
+export class GameEvent_GoToNextTurn extends GameEvent {
+    constructor() {
+        super();
+
+        this.type = GameEventType.GoToNextTurn;
+        this.label = "Go to next turn";
+    }
+
+    perform() {
+        game.skipToNextTurn();
     }
 }
 

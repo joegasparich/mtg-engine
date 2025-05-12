@@ -6,41 +6,23 @@ import {GameEvent_ChangeCardZone} from "../engine/events";
 import UICard from "./UICard";
 import Card from "../engine/Card";
 import {autobind} from "../utility/typeUtility";
+import {UIZone} from "./UIZone";
 
-export class UIBattlefield extends PIXI.Container {
+export class UIBattlefield extends UIZone {
     battlefield: Battlefield
 
-    cardMap = new Map<Card, UICard>();
     nextCardPos = 100;
 
     constructor(battlefield: Battlefield) {
-        super();
+        super(battlefield);
 
         this.battlefield = battlefield;
-
-        gameEventManager.on(GameEventType.ChangeCardZone, this.onCardChangedZone)
     }
 
-    @autobind
-    onCardChangedZone(event: GameEvent_ChangeCardZone) {
-        if (event.newZone == this.battlefield)
-            this.addCard(event.card);
-        if (event.oldZone == this.battlefield)
-            this.removeCard(event.card);
-    }
-
-    addCard(card: Card) {
-        const uiCard = new UICard(card);
-        this.addChild(uiCard);
-        this.cardMap.set(card, uiCard);
+    addCard(uiCard: UICard) {
+        super.addCard(uiCard);
 
         uiCard.position = new PIXI.Point(this.nextCardPos, this.nextCardPos);
         this.nextCardPos += 10;
-    }
-
-    removeCard(card: Card) {
-        const uiCard = this.cardMap.get(card);
-        this.removeChild(uiCard);
-        this.cardMap.delete(card);
     }
 }

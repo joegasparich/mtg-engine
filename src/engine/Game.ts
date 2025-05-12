@@ -60,49 +60,42 @@ export default class Game {
 
         this.checkAutoSkip()
     }
-    nextTurn() {
-        this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
-        this.turnNumber++;
-        this.currentStepIndex = 0;
-
-        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
-
-        this.startStep(this.currentStepIndex);
-
-        this.checkAutoSkip()
-    }
-    nextStep() {
+    nextStep(doAutoSkip: boolean) {
         this.endStep(this.currentStepIndex)
         this.currentStepIndex++;
 
         if (this.currentStepIndex > StepIndex.End)
-            this.nextTurn();
-        else {
-            this.startStep(this.currentStepIndex)
+        {
+            this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
+            this.turnNumber++;
+            this.currentStepIndex = 0;
+
+            gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
         }
 
-        this.checkAutoSkip()
+        this.startStep(this.currentStepIndex)
+
+        if (doAutoSkip)
+            this.checkAutoSkip()
     }
     skipToNextTurn() {
         do {
-            this.nextStep();
+            this.nextStep(false);
         } while (this.currentStepIndex != 0)
+
+        this.checkAutoSkip()
     }
     skipToNextPhase() {
         const nextPhaseIndex = (Step.phaseIndex(this.currentStepIndex) + 1) % Step.NUM_PHASES;
         const nextPhaseStep = Step.phaseStart(nextPhaseIndex)
         do {
-            this.nextStep()
+            this.nextStep(false)
         } while (this.currentStepIndex != nextPhaseStep)
     }
     checkAutoSkip() {
         // Automatically advance step if there are no actions
-        if (this.activePlayer() != null && this.activePlayer()?.getActions(true).length > 0)
-            return;
-
-        // TODO: We don't care about mana abilities unless there is something to pay for
-
-        this.nextStep()
+        if (Step.all[this.currentStepIndex].canAutoSkip(this.currentTurnPlayer()))
+            this.nextStep(true);
     }
 
     private startStep(index: StepIndex) {

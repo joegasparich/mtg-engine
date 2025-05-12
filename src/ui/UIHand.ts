@@ -1,47 +1,29 @@
 import * as PIXI from "pixi.js";
 
 import {Hand} from "../engine/Zone";
-import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
-import {GameEvent_ChangeCardZone} from "../engine/events";
 import UICard, {CARD_WIDTH} from "./UICard";
-import Card from "../engine/Card";
-import {autobind} from "../utility/typeUtility";
 import {calculateCardPositionsRelativeToCenter} from "./drawUtility";
 import {pixi} from "./UIRoot";
+import {UIZone} from "./UIZone";
 
-export class UIHand extends PIXI.Container {
-    hand: Hand
 
-    cardMap = new Map<Card, UICard>();
+export class UIHand extends UIZone {
+    hand: Hand;
 
     constructor(hand: Hand) {
-        super();
+        super(hand);
 
         this.hand = hand;
-
-        gameEventManager.on(GameEventType.ChangeCardZone, this.onCardChangedZone)
     }
 
-    @autobind
-    onCardChangedZone(event: GameEvent_ChangeCardZone) {
-        if (event.newZone == this.hand)
-            this.addCard(event.card);
-        if (event.oldZone == this.hand)
-            this.removeCard(event.card);
-    }
-
-    addCard(card: Card) {
-        const uiCard = new UICard(card);
-        this.addChild(uiCard);
-        this.cardMap.set(card, uiCard);
+    addCard(uiCard: UICard) {
+        super.addCard(uiCard);
 
         this.updatePositions();
     }
 
-    removeCard(card: Card) {
-        const uiCard = this.cardMap.get(card);
-        this.removeChild(uiCard);
-        this.cardMap.delete(card);
+    removeCard(uiCard: UICard) {
+        super.removeCard(uiCard);
 
         this.updatePositions();
     }
