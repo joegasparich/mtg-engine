@@ -5,7 +5,6 @@ import ActivatedAbility from "./ActivatedAbility";
 import {abilityEffects} from "./workers";
 import {GameEvent_ChangeCardZone} from "./events";
 import {shuffleArray} from "../utility/arrayUtility";
-import {game} from "./root";
 
 export class Zone {
     name: string;
@@ -74,7 +73,7 @@ export class Stack extends Zone {
         // gameEventManager.addEvent(new GameEvent_SimpleEvent(GameEventType.Log, "Stack Resolved"));
     }
 
-    private resolveSpell(spell: Card) {
+    resolveSpell(spell: Card) {
         switch (spell.type) {
             case CardType.Land:
             case CardType.Creature:
@@ -85,7 +84,7 @@ export class Stack extends Zone {
         }
     }
 
-    private resolveAbility(ability: ActivatedAbility) {
+    resolveAbility(ability: ActivatedAbility) {
         for (const effect of ability.def.effects) {
             abilityEffects.get(effect.type).perform(effect, ability.card, ability.owner)
         }

@@ -4,7 +4,7 @@ import gameEventManager, {GameEventType} from "../engine/events/GameEventManager
 import {autobind} from "../utility/typeUtility";
 import {GameEvent_ChangeCardZone} from "../engine/events";
 import UICard from "./UICard";
-import {uiRoot} from "../engine/root";
+import {uiRoot} from "./UIRoot";
 
 export class UIZone extends PIXI.Container {
     zone: Zone;

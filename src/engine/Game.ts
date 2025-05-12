@@ -2,10 +2,15 @@ import Player from "./Player";
 import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
 import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
-import {GameEvent_StepEnd, GameEvent_StepStart} from "./events";
-import {GameEvent_DrawCard} from "./events/GameEvent_DrawCard";
+import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "./events";
+
+class GameOptions {
+    allowAutoSkip = false;
+}
 
 export default class Game {
+    options: GameOptions;
+
     players: Player[] = [];
     stack = new Stack();
 
@@ -13,6 +18,10 @@ export default class Game {
     activePlayerID = -1;
     turnNumber = 0;
     currentStepIndex = 0;
+
+    static init() {
+        game = new Game();
+    }
 
     addPlayer(deck: number[]): Player {
         const id = this.players.length;
@@ -34,17 +43,19 @@ export default class Game {
         return this.players[(player.id + 1) % 2]; // TODO: Randomize
     }
 
-    startGame() {
+    startGame(options?: GameOptions) {
+        this.options = options ?? new GameOptions();
+
         gameEventManager.addEvent(new GameEvent_Simple(GameEventType.Log, "Game started"));
 
         // Shuffle libraries
-        for (let player of this.players) {
+        for (const player of this.players) {
             player.library.shuffle();
         }
 
         // Draw 7
         for (let i = 0; i < 7; i++) {
-            for (let player of this.players) {
+            for (const player of this.players) {
                 gameEventManager.addEvent(new GameEvent_DrawCard(player));
             }
         }
@@ -58,10 +69,11 @@ export default class Game {
 
         this.startStep(this.currentStepIndex);
 
-        this.checkAutoSkip()
+        if (this.options.allowAutoSkip)
+            this.checkAutoSkip();
     }
     nextStep(doAutoSkip: boolean) {
-        this.endStep(this.currentStepIndex)
+        this.endStep(this.currentStepIndex);
         this.currentStepIndex++;
 
         if (this.currentStepIndex > StepIndex.End)
@@ -73,24 +85,25 @@ export default class Game {
             gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
         }
 
-        this.startStep(this.currentStepIndex)
+        this.startStep(this.currentStepIndex);
 
         if (doAutoSkip)
-            this.checkAutoSkip()
+            this.checkAutoSkip();
     }
     skipToNextTurn() {
         do {
             this.nextStep(false);
-        } while (this.currentStepIndex != 0)
+        } while (this.currentStepIndex != 0);
 
-        this.checkAutoSkip()
+        if (game.options.allowAutoSkip)
+            this.checkAutoSkip();
     }
     skipToNextPhase() {
         const nextPhaseIndex = (Step.phaseIndex(this.currentStepIndex) + 1) % Step.NUM_PHASES;
-        const nextPhaseStep = Step.phaseStart(nextPhaseIndex)
+        const nextPhaseStep = Step.phaseStart(nextPhaseIndex);
         do {
-            this.nextStep(false)
-        } while (this.currentStepIndex != nextPhaseStep)
+            this.nextStep(false);
+        } while (this.currentStepIndex != nextPhaseStep);
     }
     checkAutoSkip() {
         // Automatically advance step if there are no actions
@@ -106,4 +119,10 @@ export default class Game {
         gameEventManager.addEvent(new GameEvent_StepEnd(this.currentTurnPlayer(), index));
         Step.all[index].onEnd(this.currentTurnPlayer());
     }
+
+    currentStep() {
+        return Step.all[this.currentStepIndex];
+    }
 }
+
+export let game: Game;

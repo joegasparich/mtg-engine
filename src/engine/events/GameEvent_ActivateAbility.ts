@@ -1,7 +1,7 @@
 import ActivatedAbility from "../ActivatedAbility";
 import {activatedAbilitiesCosts} from "../workers";
 import {GameEvent, GameEventType} from "./GameEventManager";
-import {game} from "../root";
+import {game} from "../Game";
 
 export default class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;

@@ -2,7 +2,7 @@ import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
 import Player from "../Player";
 import { GameEvent_ChangeCardZone } from "./index";
 
-export class GameEvent_DrawCard extends GameEvent {
+export default class GameEvent_DrawCard extends GameEvent {
     type = GameEventType.DrawCard;
 
     player: Player;

@@ -1,26 +1,28 @@
 import Player from "./Player";
 import gameEventManager from "./events/GameEventManager";
-import GameEvent_UntapCard from "./events/GameEvent_UntapCard";
-import {GameEvent_DrawCard} from "./events/GameEvent_DrawCard";
-import DOMLabel from "../ui/dom/DOMLabel";
 import {autobind} from "../utility/typeUtility";
 import uiEventManager, {
     UIEvent_CardClicked, UIEvent_CardDeselected, UIEvent_CardSelected, UIEvent_StartTargeting,
     UIEventType
 } from "../ui/UIEventManager";
 import {CombatManager} from "./CombatManager";
-import {game} from "./root";
-import DOMButton from "../ui/dom/DOMButton";
-import {GameEvent_TapCard} from "./events";
+import {game} from "./Game";
+import {GameEvent_DrawCard, GameEvent_TapCard, GameEvent_UntapCard} from "./events";
 import canBlockAttacker = CombatManager.canBlockAttacker;
 
 interface Step {
+    message: string | null;
+    actions: [string, (() => void)][]
+
     onStart(player: Player): void;
     onEnd(player: Player): void;
     canAutoSkip(player: Player): boolean;
 }
 
 class UntapStep implements Step {
+    message: string = null;
+    actions: [label: string, action: () => void][] = [];
+
     onStart(player: Player): void {
         // Does not give priority: 502.4
         game.activePlayerID = -1;
@@ -40,6 +42,9 @@ class UntapStep implements Step {
 }
 
 class UpkeepStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
+
     onStart(player: Player): void {
         // 503.1
         game.activePlayerID = game.currentTurnPlayerID;
@@ -54,6 +59,9 @@ class UpkeepStep implements Step {
 }
 
 class DrawStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
+
     onStart(player: Player): void {
         // 504.1
         gameEventManager.addEvent(new GameEvent_DrawCard(player));
@@ -72,6 +80,9 @@ class DrawStep implements Step {
 }
 
 class MainStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
+
     onStart(player: Player): void {
         // 505.6
 
@@ -87,6 +98,9 @@ class MainStep implements Step {
 }
 
 class BeginningOfCombatStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
+
     onStart(player: Player): void {
         CombatManager.attackingPlayer = game.currentTurnPlayer();
         // 507.2
@@ -103,30 +117,17 @@ class BeginningOfCombatStep implements Step {
 }
 
 class DeclareAttackersStep implements Step {
-    messageLabel: DOMLabel;
-    finishDeclaring: DOMButton;
-
-    constructor() {
-        this.messageLabel = new DOMLabel("Declare attackers", { top: '0', left: '0', right: '0' });
-        this.messageLabel.className = "message";
-        this.messageLabel.hide();
-
-        this.finishDeclaring = new DOMButton("Finish declaring", { top: '75px', left: '45%', right: '45%' }, this.onFinishDeclaring);
-        this.finishDeclaring.hide();
-    }
+    message: string = null;
+    actions: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 508.1
-        this.messageLabel.show();
-        this.finishDeclaring.show();
-        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked)
-        // this.messageLabel.hide();
-        // this.finishDeclaring.hide();
+        this.message = "Declare attackers";
+        this.actions = [["Finish declaring", this.onFinishDeclaring]];
+        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked);
     }
     onEnd(player: Player): void {
-        this.messageLabel.hide(); // Temp
-        this.finishDeclaring.hide();
-        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked)
+        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked);
     }
 
     canAutoSkip(player: Player): boolean {
@@ -152,7 +153,7 @@ class DeclareAttackersStep implements Step {
     @autobind
     onFinishDeclaring() {
         // 508.1f
-        for (let card of CombatManager.attackingCreatures.keys()) {
+        for (const card of CombatManager.attackingCreatures.keys()) {
             gameEventManager.addEvent(new GameEvent_TapCard(card));
         }
 
@@ -161,40 +162,27 @@ class DeclareAttackersStep implements Step {
         game.activePlayerID = game.currentTurnPlayerID;
         // TODO: Pass priority
 
-        game.nextStep(true);
+        game.nextStep(game.options.allowAutoSkip);
     }
 }
 
 class DeclareBlockersStep implements Step {
-    messageLabel: DOMLabel;
-    finishDeclaring: DOMButton;
+    message: string = null;
+    actions: [string, () => void][] = [];
 
     targeters: UIEvent_StartTargeting[] = [];
 
-    constructor() {
-        this.messageLabel = new DOMLabel("Declare blockers", { top: '0', left: '0', right: '0'});
-        this.messageLabel.className = "message";
-        this.messageLabel.hide();
-
-        this.finishDeclaring = new DOMButton("Finish declaring", { top: '75px', left: '45%', right: '45%' }, this.onFinishDeclaring);
-        this.finishDeclaring.hide();
-    }
-
     onStart(player: Player): void {
         // 509.1
-        this.messageLabel.show();
-        this.finishDeclaring.show();
-        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked)
-        // this.messageLabel.hide();
-        // this.finishDeclaring.hide();
+        this.message = "Declare blockers";
+        this.actions = [["Finish declaring", this.onFinishDeclaring]];
+        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked);
     }
     onEnd(player: Player): void {
-        this.messageLabel.hide(); // Temp
-        this.finishDeclaring.hide();
-        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked)
+        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked);
 
         for (const targeter of this.targeters) {
-            targeter.remove();
+            targeter.stop();
         }
     }
 
@@ -222,8 +210,8 @@ class DeclareBlockersStep implements Step {
                 event.card,
                 target => canBlockAttacker(event.card, target),
                 target => {
-                    CombatManager.blockingCreatures.set(event.card, target)
-                    uiEventManager.fire(new UIEvent_CardSelected(event.card))
+                    CombatManager.blockingCreatures.set(event.card, target);
+                    uiEventManager.fire(new UIEvent_CardSelected(event.card));
                 },
                 null
             );
@@ -238,11 +226,13 @@ class DeclareBlockersStep implements Step {
         game.activePlayerID = game.currentTurnPlayerID;
         // TODO: Pass priority
 
-        game.nextStep(true);
+        game.nextStep(game.options.allowAutoSkip);
     }
 }
 
 class CombatDamageStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
     onStart(player: Player): void {
         // 510.1
         // TODO: Calculate combat damage
@@ -264,6 +254,8 @@ class CombatDamageStep implements Step {
 }
 
 class EndOfCombatStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
     onStart(player: Player): void {
         // 511.1
 
@@ -271,10 +263,10 @@ class EndOfCombatStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {
-        for (let card of CombatManager.attackingCreatures.keys()) {
+        for (const card of CombatManager.attackingCreatures.keys()) {
             uiEventManager.fire(new UIEvent_CardDeselected(card));
         }
-        for (let card of CombatManager.blockingCreatures.keys()) {
+        for (const card of CombatManager.blockingCreatures.keys()) {
             uiEventManager.fire(new UIEvent_CardDeselected(card));
         }
 
@@ -288,6 +280,8 @@ class EndOfCombatStep implements Step {
 }
 
 class SecondMainStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
     onStart(player: Player) {
         // 505.6
 
@@ -303,6 +297,8 @@ class SecondMainStep implements Step {
 }
 
 class EndStep implements Step {
+    message: string = null;
+    actions: [string, () => void][] = [];
     onStart(player: Player) {
         // 513.1
 
@@ -340,30 +336,18 @@ export enum PhaseIndex {
 }
 
 export namespace Step {
-    export const Untap = new UntapStep();
-    export const Upkeep = new UpkeepStep();
-    export const Draw = new DrawStep();
-    export const Main = new MainStep();
-    export const BeginningOfCombat = new BeginningOfCombatStep();
-    export const DeclareAttackers = new DeclareAttackersStep();
-    export const DeclareBlockers = new DeclareBlockersStep();
-    export const CombatDamage = new CombatDamageStep();
-    export const EndOfCombat = new EndOfCombatStep();
-    export const SecondMain = new SecondMainStep();
-    export const End = new EndStep();
-
     export const all = [
-        Untap,
-        Upkeep,
-        Draw,
-        Main,
-        BeginningOfCombat,
-        DeclareAttackers,
-        DeclareBlockers,
-        CombatDamage,
-        EndOfCombat,
-        SecondMain,
-        End
+        new UntapStep(),
+        new UpkeepStep(),
+        new DrawStep(),
+        new MainStep(),
+        new BeginningOfCombatStep(),
+        new DeclareAttackersStep(),
+        new DeclareBlockersStep(),
+        new CombatDamageStep(),
+        new EndOfCombatStep(),
+        new SecondMainStep(),
+        new EndStep(),
     ];
 
     export const NUM_PHASES = 5;
@@ -409,7 +393,4 @@ export namespace Step {
             case PhaseIndex.End: return "End";
         }
     }
-}
-
-export class phaseStart {
 }

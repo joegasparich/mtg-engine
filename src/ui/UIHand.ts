@@ -1,5 +1,3 @@
-import * as PIXI from "pixi.js";
-
 import {Hand} from "../engine/Zone";
 import UICard, {CARD_WIDTH} from "./UICard";
 import {calculateCardPositionsRelativeToCenter} from "./drawUtility";

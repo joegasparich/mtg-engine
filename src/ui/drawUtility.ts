@@ -63,13 +63,6 @@ export function calculateCardPositionsRelativeToCenter(
     return positions;
 }
 
-import arrowTex from "../../assets/textures/arrow.png";
-export function createArrow(): PIXI.Sprite {
-    const sprite = new PIXI.Sprite();
-    PIXI.Assets.load(arrowTex).then(tex => sprite.texture = tex);
-    return sprite;
-}
-
 interface DrawArrowOptions {
     color?: number;
     lineWidth?: number;

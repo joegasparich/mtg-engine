@@ -1,6 +1,6 @@
 import {AbilityEffectDef_AddMana, AbilityEffectType, ActivatedAbilityDef, CardDef, CardType} from "../defs";
 import {Battlefield, Hand, Zone} from "./Zone";
-import {game} from "./root";
+import {game} from "./Game";
 import Player from "./Player";
 import {StepIndex} from "./Step";
 import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "./PlayerAction";

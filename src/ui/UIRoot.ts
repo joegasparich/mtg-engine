@@ -3,17 +3,25 @@ import * as PIXI from "pixi.js";
 import Player from "../engine/Player";
 import {UIPlayer} from "./UIPlayer";
 import DOMButton from "./dom/DOMButton";
-import {game, uiRoot} from "../engine/root";
+import Game, {game} from "../engine/Game";
 import DOMLabel from "./dom/DOMLabel";
 import gameEventManager, {
     GameEvent_GoToNextPhase,
-    GameEvent_GoToNextStep, GameEvent_GoToNextTurn,
+    GameEvent_GoToNextStep,
+    GameEvent_GoToNextTurn,
     GameEventType
 } from "../engine/events/GameEventManager";
 import {Step} from "../engine/Step";
 import Card from "../engine/Card";
 import UICard from "./UICard";
-import uiEventManager, {UIEvent_CardDeselected, UIEvent_CardSelected, UIEventType} from "./UIEventManager";
+import uiEventManager, {
+    UIEvent_CardClicked,
+    UIEvent_CardDeselected,
+    UIEvent_CardSelected, UIEvent_StartTargeting,
+    UIEventType
+} from "./UIEventManager";
+import {autobind} from "../utility/typeUtility";
+import {drawArrow} from "./drawUtility";
 
 export let pixi: PIXI.Application = null;
 
@@ -32,6 +40,61 @@ const playerRotations = [
     180
 ]
 
+class UITargeter {
+    arrow: PIXI.Graphics;
+    source: UICard;
+    target: UICard | null;
+
+    validateTarget: (card: Card) => boolean;
+    onTargeted: (card: Card) => void;
+    onCancelled: () => void;
+
+    constructor(card: Card, validateTarget: (card: Card) => boolean, onTargeted: (card: Card) => void, onCancelled: () => void | null) {
+        this.source = uiRoot.cardToUICard.get(card);
+        this.validateTarget = validateTarget;
+        this.onTargeted = onTargeted;
+        this.onCancelled = onCancelled;
+
+        this.arrow = new PIXI.Graphics();
+        this.arrow.eventMode = "none";
+        pixi.stage.addChild(this.arrow);
+
+        this.arrow.onRender = (renderer: PIXI.Renderer) => {
+            const p1 = this.source.getGlobalPosition();
+            const p2 = this.target ? this.target.getGlobalPosition() : uiRoot.mousePos;
+
+            drawArrow(this.arrow, p1, p2, {
+                color: 0xff0000,
+                lineWidth: 5,
+                arrowheadLength: 25,
+                arrowheadAngle: Math.PI / 6,
+                alpha: 0.8
+            });
+        }
+
+        uiEventManager.on(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+        pixi.stage.on('pointerup', event => {
+            if (event.button == 2) {
+                this.onCancelled?.();
+                this.remove();
+            }
+        });
+    }
+
+    @autobind
+    onCardClicked(card: Card) {
+        if (this.validateTarget(card)) {
+            this.target = uiRoot.cardToUICard.get(card);
+            this.onTargeted(card);
+        }
+    }
+
+    remove() {
+        pixi.stage.removeChild(this.arrow);
+        uiEventManager.off(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+    }
+}
+
 export default class UIRoot extends PIXI.Container {
     players: UIPlayer[] = [];
     playerToUIPlayer = new Map<Player, UIPlayer>();
@@ -40,13 +103,17 @@ export default class UIRoot extends PIXI.Container {
 
     mousePos = new PIXI.Point();
 
+    static init() {
+        uiRoot = new UIRoot();
+    }
+
     constructor() {
         super();
 
         // TODO: Probably need to clean these up
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
         const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
-        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep(true)));
+        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
         const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()))
         const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
 
@@ -62,6 +129,56 @@ export default class UIRoot extends PIXI.Container {
         uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.cardToUICard.get(event.card).setSelected(false));
 
         pixi.stage.addEventListener('pointermove', (e) => this.mousePos.copyFrom(e.global));
+
+        // TODO: Move this out
+        {
+            const stepMessageLabel = new DOMLabel("", { top: '0', left: '0', right: '0'});
+            stepMessageLabel.className = "message";
+            stepMessageLabel.hide();
+
+            // TODO: Multiple buttons
+            const stepActions = new DOMButton("", { top: '75px', left: '45%', right: '45%' }, null);
+            stepActions.hide();
+
+            gameEventManager.on(GameEventType.StepStart, event => {
+                const message = game.currentStep().message
+                if (message) {
+                    stepMessageLabel.text = message;
+                    stepMessageLabel.show();
+                }
+                const action = game.currentStep().actions[0];
+                if (action) {
+                    stepActions.text = action[0];
+                    stepActions.onClick = action[1];
+                    stepActions.show();
+                }
+            })
+
+            gameEventManager.on(GameEventType.StepEnd, event => {
+                stepMessageLabel.text = null;
+                stepMessageLabel.hide();
+
+                stepActions.text = null;
+                stepActions.onClick = null;
+                stepActions.hide();
+            })
+        }
+
+        // TODO: Move this out
+        {
+            uiEventManager.on(UIEventType.StartTargeting, (event: UIEvent_StartTargeting) => {
+                const targeter = new UITargeter(
+                    event.source,
+                    event.validateTarget,
+                    event.onTargeted,
+                    event.onCancelled,
+                );
+
+                event.onStopped = () => {
+                    targeter.remove();
+                }
+            })
+        }
     }
 
     onPlayerAdded(player: Player) {
@@ -89,3 +206,5 @@ export default class UIRoot extends PIXI.Container {
         this.cardToUICard.delete(uiCard.card);
     }
 }
+
+export let uiRoot: UIRoot;

@@ -1,4 +1,4 @@
-import {game} from "../root";
+import {game} from "../Game";
 
 export enum GameEventType {
     Log,
@@ -37,19 +37,15 @@ export class GameEvent_Simple extends GameEvent {
 }
 
 export class GameEvent_GoToNextStep extends GameEvent {
-    allowAutoSkip: boolean;
-
-    constructor(allowAutoSkip: boolean) {
+    constructor() {
         super();
 
         this.type = GameEventType.GoToNextStep;
         this.label = "Go to next turn";
-
-        this.allowAutoSkip = allowAutoSkip;
     }
 
     perform() {
-        game.nextStep(this.allowAutoSkip);
+        game.nextStep(game.options.allowAutoSkip);
     }
 }
 

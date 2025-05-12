@@ -1,7 +1,7 @@
 import { GameEvent_ChangeCardZone } from "./index";
 import Card from "../Card";
 import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
-import {game} from "../root";
+import {game} from "../Game";
 import Player from "../Player";
 
 export default class GameEvent_CastSpell extends GameEvent {

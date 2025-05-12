@@ -1,8 +1,8 @@
 import {PlayerAction} from "./PlayerAction";
 import {Battlefield, Hand, Library} from "./Zone";
 import Card from "./Card";
-import {cardData} from "./root";
 import {ManaAmount, ManaUtility} from "./mana";
+import {cardData} from "../index";
 
 export default class Player {
     id: number;
