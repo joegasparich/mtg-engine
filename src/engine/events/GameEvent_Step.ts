@@ -1,6 +1,65 @@
 import {GameEvent, GameEventType} from "./GameEventManager";
 import Player from "../Player";
 import {Step, StepIndex} from "../Step";
+import {game} from "../Game";
+
+export class GameEvent_GoToNextStep extends GameEvent {
+    constructor() {
+        super();
+
+        this.type = GameEventType.GoToNextStep;
+        this.label = "Go to next turn";
+    }
+
+    perform() {
+        game.nextStep(game.options.allowAutoSkip);
+    }
+}
+export class GameEvent_GoToStep extends GameEvent {
+    index: StepIndex;
+
+    constructor(index: StepIndex) {
+        super();
+
+        this.type = GameEventType.GoToStep;
+        this.label = `Go to ${Step.toString(index)}`;
+
+        this.index = index;
+    }
+
+    perform() {
+        do {
+            game.nextStep(false);
+        } while (game.currentStepIndex != this.index);
+    }
+}
+
+export class GameEvent_GoToNextPhase extends GameEvent {
+
+    constructor() {
+        super();
+
+        this.type = GameEventType.GoToNextPhase;
+        this.label = "Go to next turn";
+    }
+
+    perform() {
+        game.skipToNextPhase();
+    }
+}
+
+export class GameEvent_GoToNextTurn extends GameEvent {
+    constructor() {
+        super();
+
+        this.type = GameEventType.GoToNextTurn;
+        this.label = "Go to next turn";
+    }
+
+    perform() {
+        game.skipToNextTurn();
+    }
+}
 
 export class GameEvent_StepStart extends GameEvent {
     type = GameEventType.StepStart;

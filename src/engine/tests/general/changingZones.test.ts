@@ -4,9 +4,9 @@ import {cardData} from "../../../index";
 import Card from "../../Card";
 import gameEventManager from "../../events/GameEventManager";
 import {GameEvent_ChangeCardZone, GameEvent_DrawCard} from "../../events";
+import {FOREST, GRIZZLY_BEARS} from "../testData";
 import {expect} from "vitest";
-
-const FOREST = cardData.findIndex(c => c.name == "Forest");
+import {GameEvent_DestroyPermanent} from "../../events/GameEvent_DestroyPermanent";
 
 let player: Player;
 
@@ -21,7 +21,8 @@ test("should add card to library", () => {
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.library));
 
     expect(player.library.cards.length).toBe(1);
-    expect(player.library.cards[0].def).toBe(cardData[FOREST]);
+    expect(player.library.cards[0]).toBe(forest);
+    expect(forest.zone).toBe(player.library);
 });
 
 test("should add card to hand", () => {
@@ -29,7 +30,8 @@ test("should add card to hand", () => {
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.hand));
 
     expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[FOREST]);
+    expect(player.hand.cards[0]).toBe(forest);
+    expect(forest.zone).toBe(player.hand);
 });
 
 test("should add card to battlefield", () => {
@@ -37,7 +39,8 @@ test("should add card to battlefield", () => {
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
 
     expect(player.battlefield.cards.length).toBe(1);
-    expect(player.battlefield.cards[0].def).toBe(cardData[FOREST]);
+    expect(player.battlefield.cards[0]).toBe(forest);
+    expect(forest.zone).toBe(player.battlefield);
 });
 
 test("should draw card from library", () => {
@@ -48,5 +51,16 @@ test("should draw card from library", () => {
 
     expect(player.library.cards.length).toBe(0);
     expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[FOREST]);
+    expect(player.hand.cards[0]).toBe(forest);
+});
+
+test("should go to graveyard when destroyed", () => {
+    const bears = new Card(cardData[GRIZZLY_BEARS], player);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.battlefield));
+
+    gameEventManager.addEvent(new GameEvent_DestroyPermanent(bears));
+
+    expect(player.battlefield.cards.length).toBe(0);
+    expect(player.graveyard.cards.length).toBe(1);
+    expect(player.graveyard.cards[0]).toBe(bears);
 });

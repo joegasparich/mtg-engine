@@ -123,6 +123,12 @@ export default class Game {
     currentStep() {
         return Step.all[this.currentStepIndex];
     }
+
+    checkState() {
+        for (const player of this.players) {
+            player.checkState();
+        }
+    }
 }
 
 export let game: Game;

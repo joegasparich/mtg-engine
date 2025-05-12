@@ -6,6 +6,11 @@ import {StepIndex} from "./Step";
 import {PlayerAction, PlayerAction_ActivatedAbility, PlayerAction_PlayCard} from "./PlayerAction";
 import {activatedAbilitiesCosts} from "./workers";
 import {ManaAmount, ManaCost, ManaUtility} from "./mana";
+import gameEventManager from "./events/GameEventManager";
+import {GameEvent_ChangeCardZone} from "./events";
+import {GameEvent_DestroyPermanent} from "./events/GameEvent_DestroyPermanent";
+
+let idCounter = 0;
 
 export default class Card {
     // Ownership
@@ -13,28 +18,39 @@ export default class Card {
     controller: Player;
 
     readonly def: CardDef;
+    readonly id: number;
+
+    get logName () {return `${this.name} (${this.id})`;}
 
     // State
     zone: Zone;
     tapped = false;
+    damageTaken = 0;
 
     // Characteristics
     name: string;
     type: CardType;
     cost: ManaCost;
+    power: number;
+    toughness: number;
     activatedAbilities: ActivatedAbilityDef[] = [];
 
     constructor(cardDef: CardDef, owner: Player) {
+        this.id = idCounter++;
+
         this.def = cardDef;
         this.owner = owner;
         this.controller = owner;
 
-        this.copyFromDef(cardDef)
+        this.copyFromDef(cardDef);
     }
 
     copyFromDef(cardDef: CardDef) {
         this.name = cardDef.name;
         this.type = cardDef.type;
+
+        this.power = cardDef.power;
+        this.toughness = cardDef.toughness;
 
         if (cardDef.cost)
             this.cost = [...ManaUtility.parseManaString<ManaCost>(cardDef.cost)];
@@ -106,5 +122,28 @@ export default class Card {
             return false;
 
         return true;
+    }
+
+    checkState() {
+        // 704.5f
+        if (this.zone instanceof Battlefield && this.damageTaken >= this.toughness)
+            gameEventManager.addEvent(new GameEvent_DestroyPermanent(this));
+    }
+
+    destroy() {
+        if (!(this.zone instanceof Battlefield)) {
+            console.error(`${this.logName} was destroyed but was not on battlefield`);
+            return;
+        }
+
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(this, this.owner.graveyard));
+    }
+
+    onChangeZone() {
+        // Reset all state
+        this.damageTaken = 0;
+        this.tapped = false;
+
+        this.copyFromDef(this.def);
     }
 }

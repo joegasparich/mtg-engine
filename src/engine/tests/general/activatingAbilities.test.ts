@@ -6,9 +6,7 @@ import gameEventManager from "../../events/GameEventManager";
 import {GameEvent_ActivateAbility, GameEvent_ChangeCardZone} from "../../events";
 import ActivatedAbility from "../../ActivatedAbility";
 import {ManaColour} from "../../mana";
-
-const FOREST = cardData.findIndex(c => c.name == "Forest");
-const GRIZZLY_BEARS = cardData.findIndex(c => c.name == "Grizzly Bears");
+import {FOREST} from "../testData";
 
 let player: Player;
 

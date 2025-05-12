@@ -41,7 +41,7 @@ export async function startGame() {
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);
 
-    game.startGame();
+    game.startGame({allowAutoSkip: true});
 
     function playBears(player: Player) {
         const forestA = new Card(cardData[FOREST], player);
@@ -62,8 +62,6 @@ export async function startGame() {
         gameEventManager.addEvent(new GameEvent_ActivateAbility(tapForestB));
 
         gameEventManager.addEvent(new GameEvent_CastSpell(player, bears));
-
-        gameEventManager.addEvent(new GameEvent_CastSpell(player, forestB));
     }
 
     // Test

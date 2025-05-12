@@ -3,14 +3,9 @@ import * as PIXI from "pixi.js";
 import Player from "../engine/Player";
 import {UIPlayer} from "./UIPlayer";
 import DOMButton from "./dom/DOMButton";
-import Game, {game} from "../engine/Game";
+import {game} from "../engine/Game";
 import DOMLabel from "./dom/DOMLabel";
-import gameEventManager, {
-    GameEvent_GoToNextPhase,
-    GameEvent_GoToNextStep,
-    GameEvent_GoToNextTurn,
-    GameEventType
-} from "../engine/events/GameEventManager";
+import gameEventManager, { GameEventType } from "../engine/events/GameEventManager";
 import {Step} from "../engine/Step";
 import Card from "../engine/Card";
 import UICard from "./UICard";
@@ -22,6 +17,7 @@ import uiEventManager, {
 } from "./UIEventManager";
 import {autobind} from "../utility/typeUtility";
 import {drawArrow} from "./drawUtility";
+import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../engine/events";
 
 export let pixi: PIXI.Application = null;
 
@@ -34,11 +30,11 @@ pixi.stage.hitArea = pixi.screen;
 const playerPositions = [
     new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2),
     new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2),
-]
+];
 const playerRotations = [
     0,
     180
-]
+];
 
 class UITargeter {
     arrow: PIXI.Graphics;
@@ -70,7 +66,7 @@ class UITargeter {
                 arrowheadAngle: Math.PI / 6,
                 alpha: 0.8
             });
-        }
+        };
 
         uiEventManager.on(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
         pixi.stage.on('pointerup', event => {
@@ -114,7 +110,7 @@ export default class UIRoot extends PIXI.Container {
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
         const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
         const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
-        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()))
+        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()));
         const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
 
         gameEventManager.on(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
@@ -141,7 +137,7 @@ export default class UIRoot extends PIXI.Container {
             stepActions.hide();
 
             gameEventManager.on(GameEventType.StepStart, event => {
-                const message = game.currentStep().message
+                const message = game.currentStep().message;
                 if (message) {
                     stepMessageLabel.text = message;
                     stepMessageLabel.show();
@@ -152,7 +148,7 @@ export default class UIRoot extends PIXI.Container {
                     stepActions.onClick = action[1];
                     stepActions.show();
                 }
-            })
+            });
 
             gameEventManager.on(GameEventType.StepEnd, event => {
                 stepMessageLabel.text = null;
@@ -161,7 +157,7 @@ export default class UIRoot extends PIXI.Container {
                 stepActions.text = null;
                 stepActions.onClick = null;
                 stepActions.hide();
-            })
+            });
         }
 
         // TODO: Move this out
@@ -176,14 +172,14 @@ export default class UIRoot extends PIXI.Container {
 
                 event.onStopped = () => {
                     targeter.remove();
-                }
-            })
+                };
+            });
         }
     }
 
     onPlayerAdded(player: Player) {
         if (this.players.length >= playerPositions.length) {
-            console.log("Already at max players!!")
+            console.log("Already at max players!!");
             return;
         }
 

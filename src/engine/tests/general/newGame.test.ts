@@ -2,11 +2,7 @@ import Game, {game} from "../../Game";
 import {cardData} from "../../../index";
 import {expect} from "vitest";
 import {StepIndex} from "../../Step";
-
-const FOREST = cardData.findIndex(c => c.name == "Forest");
-const GRIZZLY_BEARS = cardData.findIndex(c => c.name == "Grizzly Bears");
-
-const BASIC_DECK = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS];
+import {BASIC_DECK, FOREST, GRIZZLY_BEARS} from "../testData";
 
 test("should start game and add player", () => {
     Game.init();

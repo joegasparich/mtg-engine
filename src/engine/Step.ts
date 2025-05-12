@@ -19,7 +19,7 @@ interface Step {
     canAutoSkip(player: Player): boolean;
 }
 
-class UntapStep implements Step {
+export class UntapStep implements Step {
     message: string = null;
     actions: [label: string, action: () => void][] = [];
 
@@ -41,7 +41,7 @@ class UntapStep implements Step {
     }
 }
 
-class UpkeepStep implements Step {
+export class UpkeepStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -58,7 +58,7 @@ class UpkeepStep implements Step {
     }
 }
 
-class DrawStep implements Step {
+export class DrawStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -79,7 +79,7 @@ class DrawStep implements Step {
     }
 }
 
-class MainStep implements Step {
+export class MainStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -97,7 +97,7 @@ class MainStep implements Step {
     }
 }
 
-class BeginningOfCombatStep implements Step {
+export class BeginningOfCombatStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -116,7 +116,7 @@ class BeginningOfCombatStep implements Step {
     }
 }
 
-class DeclareAttackersStep implements Step {
+export class DeclareAttackersStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -166,7 +166,7 @@ class DeclareAttackersStep implements Step {
     }
 }
 
-class DeclareBlockersStep implements Step {
+export class DeclareBlockersStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
 
@@ -230,18 +230,17 @@ class DeclareBlockersStep implements Step {
     }
 }
 
-class CombatDamageStep implements Step {
+export class CombatDamageStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
     onStart(player: Player): void {
-        // 510.1
-        // TODO: Calculate combat damage
+        // 510.1, 510.2
+        CombatManager.calculateAndAssignDamage();
 
-        // 510.2
-        // TODO: Assign combat damage
+        // TODO: This should happen when a player gets priority
+        game.checkState();
 
         // 510.3
-
         game.activePlayerID = game.currentTurnPlayerID;
         // TODO: Pass priority
     }
@@ -253,7 +252,7 @@ class CombatDamageStep implements Step {
     }
 }
 
-class EndOfCombatStep implements Step {
+export class EndOfCombatStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
     onStart(player: Player): void {
@@ -279,7 +278,7 @@ class EndOfCombatStep implements Step {
     }
 }
 
-class SecondMainStep implements Step {
+export class SecondMainStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
     onStart(player: Player) {
@@ -296,7 +295,7 @@ class SecondMainStep implements Step {
     }
 }
 
-class EndStep implements Step {
+export class EndStep implements Step {
     message: string = null;
     actions: [string, () => void][] = [];
     onStart(player: Player) {

@@ -11,7 +11,7 @@ export class Zone {
     cards: Card[] = [];
 
     onEnter(card: Card) {
-        this.cards.push(card)
+        this.cards.push(card);
     }
 
     onLeave(card: Card) {
@@ -20,7 +20,7 @@ export class Zone {
 }
 
 export class Library extends Zone {
-    name = "Library"
+    name = "Library";
 
     shuffle() {
         shuffleArray(this.cards);
@@ -37,6 +37,10 @@ export class Battlefield extends Zone {
 
 export class Hand extends Zone {
     name = "Hand";
+}
+
+export class Graveyard extends Zone {
+    name = "Graveyard";
 }
 
 export class Stack extends Zone {

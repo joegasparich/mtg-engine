@@ -1,8 +1,7 @@
-import {game} from "../Game";
-
 export enum GameEventType {
     Log,
     GoToNextStep,
+    GoToStep,
     GoToNextPhase,
     GoToNextTurn,
     TurnStart,
@@ -14,6 +13,7 @@ export enum GameEventType {
     TapCard,
     UntapCard,
     DrawCard,
+    DestroyPermanent,
 }
 
 export abstract class GameEvent {
@@ -33,46 +33,6 @@ export class GameEvent_Simple extends GameEvent {
 
         this.type = type;
         this.label = label;
-    }
-}
-
-export class GameEvent_GoToNextStep extends GameEvent {
-    constructor() {
-        super();
-
-        this.type = GameEventType.GoToNextStep;
-        this.label = "Go to next turn";
-    }
-
-    perform() {
-        game.nextStep(game.options.allowAutoSkip);
-    }
-}
-
-export class GameEvent_GoToNextPhase extends GameEvent {
-
-    constructor() {
-        super();
-
-        this.type = GameEventType.GoToNextPhase;
-        this.label = "Go to next turn";
-    }
-
-    perform() {
-        game.skipToNextPhase();
-    }
-}
-
-export class GameEvent_GoToNextTurn extends GameEvent {
-    constructor() {
-        super();
-
-        this.type = GameEventType.GoToNextTurn;
-        this.label = "Go to next turn";
-    }
-
-    perform() {
-        game.skipToNextTurn();
     }
 }
 

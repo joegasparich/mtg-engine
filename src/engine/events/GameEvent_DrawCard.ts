@@ -1,6 +1,6 @@
 import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
 import Player from "../Player";
-import { GameEvent_ChangeCardZone } from "./index";
+import GameEvent_ChangeCardZone from "./GameEvent_ChangeCardZone";
 
 export default class GameEvent_DrawCard extends GameEvent {
     type = GameEventType.DrawCard;
@@ -18,7 +18,7 @@ export default class GameEvent_DrawCard extends GameEvent {
     perform() {
         const card = this.player.library.getTopCard();
 
-        this.label = `Player ${this.player.id} drew ${card.name} from library`;
+        this.label = `Player ${this.player.id} drew ${card.logName} from library`;
 
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
     }

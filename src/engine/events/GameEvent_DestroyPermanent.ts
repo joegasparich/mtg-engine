@@ -1,20 +1,18 @@
 import Card from "../Card";
 import {GameEvent, GameEventType} from "./GameEventManager";
 
-export default class GameEvent_TapCard extends GameEvent {
-    type = GameEventType.TapCard;
-
+export class GameEvent_DestroyPermanent extends GameEvent {
     card: Card;
 
     constructor(card: Card) {
         super();
 
+        this.type = GameEventType.DestroyPermanent;
+        this.label = `Permanent ${card.logName} destroyed`;
         this.card = card;
-
-        this.label = `Card ${this.card.logName} was tapped`;
     }
 
     perform() {
-        this.card.tapped = true;
+        this.card.destroy();
     }
 }

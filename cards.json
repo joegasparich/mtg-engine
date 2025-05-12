@@ -20,9 +20,20 @@
     {
         "name": "Grizzly Bears",
         "image_url": "https://cards.scryfall.io/normal/front/4/0/409f9b88-f03e-40b6-9883-68c14c37c0de.jpg?156254673",
-        "oracle_text": "({T}: Add {G}.)",
+        "oracle_text": "",
         "type": "Creature",
-        "cost": "{1}{G}"
+        "cost": "{1}{G}",
+        "power": 2,
+        "toughness": 2
+    },
+    {
+        "name": "Mons's Goblin Raiders",
+        "image_url": "https://cards.scryfall.io/large/front/3/4/34ac4e28-1677-4f88-9b1a-7a32635f0ab2.jpg?1664925688",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{R}",
+        "power": 1,
+        "toughness": 1
     }
 ]
 

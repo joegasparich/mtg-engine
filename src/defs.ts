@@ -4,7 +4,9 @@ export interface CardDef {
     oracle_text: string,
     type: CardType,
     cost: string, // {3}{G}{G}
-    activated_abilities: ActivatedAbilityDef[]
+    activated_abilities: ActivatedAbilityDef[],
+    power: number,
+    toughness: number,
 }
 
 export enum CardType {

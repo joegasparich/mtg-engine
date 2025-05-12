@@ -1,8 +1,8 @@
-import { GameEvent_ChangeCardZone } from "./index";
 import Card from "../Card";
 import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
 import {game} from "../Game";
 import Player from "../Player";
+import GameEvent_ChangeCardZone from "./GameEvent_ChangeCardZone";
 
 export default class GameEvent_CastSpell extends GameEvent {
     type = GameEventType.CastSpell;
@@ -16,7 +16,7 @@ export default class GameEvent_CastSpell extends GameEvent {
         this.caster = caster;
         this.card = card;
 
-        this.label = `Player ${this.caster.id} cast ${this.card.name}`;
+        this.label = `Player ${this.caster.id} cast ${this.card.logName}`;
     }
 
     perform() {

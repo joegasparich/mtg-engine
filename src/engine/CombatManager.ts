@@ -72,11 +72,18 @@ export namespace CombatManager {
     }
 
     export function beingAttacked(player: Player) {
-        for (let card of attackingCreatures.keys()) {
+        for (const card of attackingCreatures.keys()) {
             if (attackingCreatures.get(card) == player)
                 return true;
         }
 
         return false;
+    }
+
+    export function calculateAndAssignDamage() {
+        for (const [blocker, attacker] of blockingCreatures) {
+            blocker.damageTaken = attacker.power;
+            attacker.damageTaken = blocker.power;
+        }
     }
 }

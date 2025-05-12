@@ -1,5 +1,5 @@
 import {PlayerAction} from "./PlayerAction";
-import {Battlefield, Hand, Library} from "./Zone";
+import {Battlefield, Graveyard, Hand, Library} from "./Zone";
 import Card from "./Card";
 import {ManaAmount, ManaUtility} from "./mana";
 import {cardData} from "../index";
@@ -13,13 +13,13 @@ export default class Player {
     library: Library = new Library();
     hand: Hand = new Hand();
     battlefield: Battlefield = new Battlefield();
-    // graveyard: Card[] = [];
+    graveyard: Graveyard = new Graveyard();
     // exile: Card[] = [];
 
     constructor(id: number, deck: number[]) {
         this.id = id;
         this.library.cards = deck.map(i => {
-            let card = new Card(cardData[i], this);
+            const card = new Card(cardData[i], this);
             card.zone = this.library;
             return card;
         });
@@ -69,5 +69,16 @@ export default class Player {
 
     performAction(action: PlayerAction) {
         action.perform(this);
+    }
+
+    checkState() {
+        // TODO: Check life and lose
+        for (const card of this.hand.cards) {
+            card.checkState();
+        }
+
+        for (const card of this.battlefield.cards) {
+            card.checkState();
+        }
     }
 }

@@ -1,22 +1,17 @@
 import Player from "../../Player";
 import Game, {game} from "../../Game";
-import {cardData} from "../../../index";
 import {StepIndex} from "../../Step";
-import gameEventManager, {GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../../events/GameEventManager";
-import {expect} from "vitest";
-
-const FOREST = cardData.findIndex(c => c.name == "Forest");
-const GRIZZLY_BEARS = cardData.findIndex(c => c.name == "Grizzly Bears");
+import gameEventManager from "../../events/GameEventManager";
+import {BASIC_DECK} from "../testData";
+import {GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../../events";
+import {GameEvent_GoToStep} from "../../events/GameEvent_Step";
 
 let player: Player;
-
-const landsDeck = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST];
-const basicDeck = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS];
 
 beforeEach(async () => {
     Game.init();
     game.players.length = 0;
-    player = game.addPlayer(basicDeck);
+    player = game.addPlayer(BASIC_DECK);
 });
 
 test("should do all steps", () => {
@@ -45,8 +40,19 @@ test("should do all steps", () => {
     expect(game.currentStepIndex).toBe(StepIndex.End);
 });
 
+test("should advance to specific step", () => {
+    game.startGame({allowAutoSkip: false});
+
+    const nextStepSpy = vi.spyOn(game, "nextStep");
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
+    expect(game.turnNumber).toBe(0);
+    expect(nextStepSpy).toHaveBeenCalledTimes(9);
+    expect(game.currentStepIndex).toBe(StepIndex.SecondMain);
+});
+
 test("should change turns", () => {
-    const playerTwo = game.addPlayer(basicDeck);
+    const playerTwo = game.addPlayer(BASIC_DECK);
 
     game.startGame({allowAutoSkip: false});
 

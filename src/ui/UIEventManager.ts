@@ -28,7 +28,7 @@ export class UIEvent_CardClicked extends UIEvent {
         super();
 
         this.type = UIEventType.CardClicked;
-        this.label = `Card ${card.name} clicked`;
+        this.label = `Card ${card.logName} clicked`;
         this.card = card;
     }
 }
@@ -40,7 +40,7 @@ export class UIEvent_CardSelected extends UIEvent {
         super();
 
         this.type = UIEventType.CardSelected;
-        this.label = `Card ${card.name} selected`;
+        this.label = `Card ${card.logName} selected`;
         this.card = card;
     }
 }
@@ -52,7 +52,7 @@ export class UIEvent_CardDeselected extends UIEvent {
         super();
 
         this.type = UIEventType.CardDeselected;
-        this.label = `Card ${card.name} deselected`;
+        this.label = `Card ${card.logName} deselected`;
         this.card = card;
     }
 }
@@ -69,7 +69,7 @@ export class UIEvent_StartTargeting extends UIEvent {
         super();
 
         this.type = UIEventType.StartTargeting;
-        this.label = `Card ${card.name} started targeting`;
+        this.label = `Card ${card.logName} started targeting`;
         this.source = card;
         this.validateTarget = validateTarget;
         this.onTargeted = onTargeted;

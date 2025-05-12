@@ -14,14 +14,15 @@ export default class GameEvent_ChangeCardZone extends GameEvent {
 
         this.card = card;
         this.oldZone = card.zone;
-        this.newZone = newZone
+        this.newZone = newZone;
 
-        this.label = `Card ${this.card.name} changed zones from ${this.card.zone?.name} to ${this.newZone.name}`;
+        this.label = `Card ${this.card.logName} changed zones from ${this.card.zone?.name} to ${this.newZone.name}`;
     }
 
     perform() {
         this.card.zone?.onLeave(this.card);
         this.card.zone = this.newZone;
+        this.card.onChangeZone();
         this.newZone.onEnter(this.card);
     }
 }
