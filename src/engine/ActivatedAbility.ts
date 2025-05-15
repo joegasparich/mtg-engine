@@ -3,8 +3,8 @@ import Card from "./Card";
 import gameEventManager from "./events/GameEventManager";
 import {GameEvent_ActivateAbility} from "./events";
 import Player from "./Player";
-import {ActivatedAbilityCosts} from "./workers/ActivatedAbilityCosts";
-import {AbilityEffects} from "./workers/AbilityEffects";
+import {ActivatedAbilityCosts} from "./abilities/ActivatedAbilityCosts";
+import {AbilityEffects} from "./abilities/AbilityEffects";
 
 export default class ActivatedAbility {
     owner: Player;

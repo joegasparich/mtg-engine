@@ -1,19 +1,19 @@
 import {ActivatedAbilityDef} from "../../defs";
 import Card from "../Card";
-import {AbilityEffects} from "../workers/AbilityEffects";
+import {AbilityEffects} from "../abilities/AbilityEffects";
 import Player from "../Player";
 import ActivatedAbility from "../ActivatedAbility";
+import {ActivatedAbilityCosts} from "../abilities/ActivatedAbilityCosts";
 import {PlayerAction} from "./PlayerAction";
-import {ActivatedAbilityCosts} from "../workers/ActivatedAbilityCosts";
 
-export class PlayerAction_ActivateAbility implements PlayerAction {
+export class PlayerAction_ActivateAbility extends PlayerAction {
     abilityDef: ActivatedAbilityDef;
-    card: Card;
     targets: null;
 
-    constructor(abilityDef: ActivatedAbilityDef, card: Card) {
+    constructor(card: Card, abilityDef: ActivatedAbilityDef) {
+        super(card);
+
         this.abilityDef = abilityDef;
-        this.card = card;
     }
 
     label() {

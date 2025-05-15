@@ -1,20 +1,20 @@
 import Card from "../Card";
 import {CombatManager} from "../CombatManager";
 import Player from "../Player";
-import {ActionTarget, PlayerAction} from "./PlayerAction";
+import {ActionTarget} from "./PlayerActionManager";
+import {PlayerAction} from "./PlayerAction";
 
-export class PlayerAction_DeclareBlocker implements PlayerAction {
-    creature: Card;
+export class PlayerAction_DeclareBlocker extends PlayerAction {
     targets: ActionTarget[];
 
-    constructor(blocker: Card) {
-        this.creature = blocker;
+    constructor(card: Card) {
+        super(card);
 
-        this.targets = CombatManager.potentialBlockTargetsFor(blocker);
+        this.targets = CombatManager.potentialBlockTargetsFor(card);
     }
 
     label() {
-        return `Declare ${this.creature.name} as a blocker`;
+        return `Declare ${this.card.name} as a blocker`;
     }
 
     perform(player: Player, targets?: ActionTarget[]) {
@@ -25,6 +25,6 @@ export class PlayerAction_DeclareBlocker implements PlayerAction {
 
         const target = targets[0] as Card;
 
-        CombatManager.blockingCreatures.set(this.creature, target);
+        CombatManager.blockingCreatures.set(this.card, target);
     }
 }

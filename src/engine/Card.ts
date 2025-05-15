@@ -2,7 +2,7 @@ import {
     AbilityEffectDef_AddMana,
     ActivatedAbilityDef,
     CardDef,
-    CardType,
+    CardType, Keyword, KeywordMap,
     StaticAbilityDef
 } from "../defs";
 import {Battlefield, Zone} from "./Zone";
@@ -11,9 +11,9 @@ import Player from "./Player";
 import {StepIndex} from "./Step";
 import {ManaAmount, ManaCost, ManaUtility} from "./mana";
 import gameEventManager from "./events/GameEventManager";
-import {GameEvent_ChangeCardZone} from "./events";
-import {GameEvent_DestroyPermanent} from "./events/GameEvent_DestroyPermanent";
-import {ActivatedAbilityCosts} from "./workers/ActivatedAbilityCosts";
+import {GameEvent_ChangeCardZone,GameEvent_DestroyPermanent} from "./events";
+import {ActivatedAbilityCosts} from "./abilities/ActivatedAbilityCosts";
+import {StaticAbilities, StaticAbility} from "./abilities/staticAbilities";
 
 let idCounter = 0;
 
@@ -39,7 +39,7 @@ export default class Card {
     power: number;
     toughness: number;
     activatedAbilities: ActivatedAbilityDef[] = [];
-    staticAbilities: StaticAbilityDef[] = [];
+    staticAbilities: StaticAbility[] = [];
 
     constructor(cardDef: CardDef, owner: Player) {
         this.id = idCounter++;
@@ -65,7 +65,7 @@ export default class Card {
             this.activatedAbilities = [...cardDef.activated_abilities];
 
         if (cardDef.static_abilities)
-            this.staticAbilities = [...cardDef.static_abilities];
+            cardDef.static_abilities.forEach(def => this.addStaticAbility(def));
     }
 
     public getPotentialMana(actor: Player): Readonly<ManaAmount> {
@@ -128,5 +128,17 @@ export default class Card {
         this.tapped = false;
 
         this.copyFromDef(this.def);
+    }
+
+    // Getters
+    hasKeyword(keyword: Keyword) {
+        return this.staticAbilities.find(a => a.keyword == keyword);
+    }
+
+    private addStaticAbility(def: StaticAbilityDef) {
+        const ability = new StaticAbilities[KeywordMap[def.keyword] ?? def.worker](this);
+        ability.keyword = def.keyword;
+
+        this.staticAbilities.push(ability);
     }
 }

@@ -12,8 +12,7 @@ import {game} from "../engine/Game";
 import {GlowFilter} from "pixi-filters";
 import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
 import {loadImageFromExternalUrl} from "../utility/imageUtility";
-import playerActionManager from "../engine/actions/PlayerAction";
-import {removeItem} from "../utility/arrayUtility";
+import playerActionManager from "../engine/actions/PlayerActionManager";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -22,16 +21,20 @@ const MIN_DRAG = 100; // ms
 export default class UICard extends PIXI.Sprite {
     public readonly card: Card;
 
-    private _selected = false;
-    public get selected() { return this._selected; }
-    public set selected(val: boolean) {
-        if (this._selected == val)
+    private hasAction: boolean;
+    private isSelected: boolean;
+
+    private _highlightColour?: number = null;
+    private get highlighted() { return this._highlightColour != null; }
+    private set highlightColour(val: number | null) {
+        if (this._highlightColour == val)
             return;
 
-        this._selected = val;
-        if (this._selected) {
+        this._highlightColour = val;
+        if (this._highlightColour) {
             this.filters = [
                 new GlowFilter({
+                    color: this._highlightColour,
                     distance: 20,
                     outerStrength: 2,
                     quality: 0.5
@@ -71,6 +74,14 @@ export default class UICard extends PIXI.Sprite {
     @autobind
     render(renderer: PIXI.Renderer) {
         // Called every frame
+        this.hasAction = playerActionManager.cardActionsForUI.get(this.card)?.length > 0;
+
+        if (this.isSelected)
+            this.highlightColour = 0x00FFFF;
+        else if (this.hasAction)
+            this.highlightColour = 0xFFFFFF;
+        else
+            this.highlightColour = null;
     }
 
     @autobind
@@ -89,7 +100,7 @@ export default class UICard extends PIXI.Sprite {
     }
 
     public setSelected(selected: boolean) {
-        this.selected = selected;
+        this.isSelected = selected;
     }
 
     private preDragPos: PIXI.Point;

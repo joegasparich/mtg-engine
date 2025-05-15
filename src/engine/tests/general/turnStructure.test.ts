@@ -3,8 +3,7 @@ import Game, {game} from "../../Game";
 import {StepIndex} from "../../Step";
 import gameEventManager from "../../events/GameEventManager";
 import {BASIC_DECK} from "../testData";
-import {GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../../events";
-import {GameEvent_GoToStep} from "../../events/GameEvent_Step";
+import {GameEvent_GoToNextStep, GameEvent_GoToNextTurn,GameEvent_GoToStep} from "../../events";
 
 let player: Player;
 

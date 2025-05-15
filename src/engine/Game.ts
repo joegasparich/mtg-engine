@@ -3,7 +3,8 @@ import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
 import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
 import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "./events";
-import playerActionManager from "./actions/PlayerAction";
+import playerActionManager from "./actions/PlayerActionManager";
+import {CombatManager} from "./CombatManager";
 
 class GameOptions {
     allowAutoSkip = false;
@@ -110,7 +111,7 @@ export default class Game {
         if (!this.activePlayer())
             return true;
 
-        if (!playerActionManager.hasAnyActions(this.activePlayer(), true, true))
+        if (!playerActionManager.playerHasActions(this.activePlayer(), true, true))
             return true;
 
         return false;
@@ -139,6 +140,10 @@ export default class Game {
         for (const player of this.players) {
             player.checkState();
         }
+    }
+
+    reset() {
+        CombatManager.reset();
     }
 }
 

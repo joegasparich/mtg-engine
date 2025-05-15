@@ -1,8 +1,8 @@
-import {PlayerAction} from "./actions/PlayerAction";
 import {Battlefield, Graveyard, Hand, Library} from "./Zone";
 import Card from "./Card";
 import {ManaAmount, ManaUtility} from "./mana";
 import {cardData} from "../index";
+import {PlayerAction} from "./actions/PlayerAction";
 
 export default class Player {
     id: number;
@@ -15,6 +15,14 @@ export default class Player {
     battlefield: Battlefield = new Battlefield();
     graveyard: Graveyard = new Graveyard();
     // exile: Card[] = [];
+
+    zones = [
+        this.library,
+        this.hand,
+        this.battlefield,
+        this.graveyard,
+        // this.exile
+    ];
 
     constructor(id: number, deck: number[]) {
         this.id = id;
@@ -29,11 +37,11 @@ export default class Player {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
         for (const card of this.hand.cards) {
-            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this))
+            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this));
         }
 
         for (const card of this.battlefield.cards) {
-            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this))
+            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this));
         }
 
         return potentialMana;

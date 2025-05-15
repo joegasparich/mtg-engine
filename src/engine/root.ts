@@ -35,10 +35,10 @@ export async function startGame() {
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 
-    // const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    // const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    const playerOne = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
-    const playerTwo = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
+    const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    // const playerOne = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
+    // const playerTwo = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
 
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);

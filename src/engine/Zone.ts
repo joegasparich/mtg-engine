@@ -4,7 +4,7 @@ import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
 import {GameEvent_ChangeCardZone} from "./events";
 import {shuffleArray} from "../utility/arrayUtility";
-import {AbilityEffects} from "./workers/AbilityEffects";
+import {AbilityEffects} from "./abilities/AbilityEffects";
 
 export class Zone {
     name: string;

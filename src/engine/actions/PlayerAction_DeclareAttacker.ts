@@ -1,21 +1,21 @@
 import Card from "../Card";
 import {CombatManager} from "../CombatManager";
 import Player from "../Player";
-import {ActionTarget, PlayerAction} from "./PlayerAction";
+import {ActionTarget} from "./PlayerActionManager";
 import {game} from "../Game";
+import {PlayerAction} from "./PlayerAction";
 
-export class PlayerAction_DeclareAttacker implements PlayerAction {
-    creature: Card;
+export class PlayerAction_DeclareAttacker extends PlayerAction {
     targets: ActionTarget[];
 
-    constructor(attacker: Card) {
-        this.creature = attacker;
+    constructor(card: Card) {
+        super(card);
 
         // this.targets = CombatManager.potentialAttackTargetsFor(attacker);
     }
 
     label() {
-        return `Declare ${this.creature.name} as an attacker`;
+        return `Declare ${this.card.name} as an attacker`;
     }
 
     perform(player: Player, targets?: ActionTarget[]) {
@@ -27,6 +27,6 @@ export class PlayerAction_DeclareAttacker implements PlayerAction {
         // // TODO: Target player or planeswalker
         // const target = targets[0] as Player;
 
-        CombatManager.attackingCreatures.set(this.creature, game.randomOpponent(player));
+        CombatManager.attackingCreatures.set(this.card, game.randomOpponent(player));
     }
 }

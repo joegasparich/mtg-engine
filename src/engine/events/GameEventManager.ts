@@ -1,4 +1,5 @@
 export enum GameEventType {
+    All,
     Log,
     GoToNextStep,
     GoToStep,
@@ -21,7 +22,7 @@ export abstract class GameEvent {
     label: string;
     callback: () => void;
 
-    perform() {};
+    perform() {}
     then(callback: () => void) {
         this.callback = callback;
     }
@@ -39,17 +40,17 @@ export class GameEvent_Simple extends GameEvent {
 type Listener = (event: GameEvent) => void;
 
 class GameEventManager {
-    private readonly listeners = new Map<GameEventType, Set<Listener>>();
+    private readonly listenersByType = new Map<GameEventType, Set<Listener>>();
 
     on(eventType: GameEventType, listener: Listener) {
-        if (!this.listeners.has(eventType))
-            this.listeners.set(eventType, new Set<Listener>());
+        if (!this.listenersByType.has(eventType))
+            this.listenersByType.set(eventType, new Set<Listener>());
 
-        this.listeners.get(eventType).add(listener);
+        this.listenersByType.get(eventType).add(listener);
     }
 
     off(eventType: GameEventType, listener: Listener) {
-        this.listeners.get(eventType).delete(listener);
+        this.listenersByType.get(eventType).delete(listener);
     }
 
     activeEvents: GameEvent[] = [];
@@ -87,7 +88,8 @@ class GameEventManager {
                 const event = events[i];
 
                 event.perform();
-                this.listeners.get(event.type)?.forEach(listener => listener(event));
+                this.listenersByType.get(event.type)?.forEach(listener => listener(event));
+                this.listenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
 
                 console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
                 event.callback?.();

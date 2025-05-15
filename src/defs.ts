@@ -23,6 +23,7 @@ export interface ActivatedAbilityDef {
 
 export interface StaticAbilityDef {
     keyword: Keyword,
+    worker: string // Class name
 }
 
 export interface AbilityEffectDef {
@@ -30,8 +31,14 @@ export interface AbilityEffectDef {
 }
 
 export enum Keyword {
-    Flying = "StaticAbility_Flying" // Class name
+    Flying = "Flying",
+    Reach = "Reach",
 }
+
+export const KeywordMap: Record<Keyword, string> = {
+    Flying: "StaticAbility_Flying", // Class name
+    Reach: ""
+};
 
 export interface AbilityEffectDef_AddMana extends AbilityEffectDef {
     mana: string, // {3}{G}{G}

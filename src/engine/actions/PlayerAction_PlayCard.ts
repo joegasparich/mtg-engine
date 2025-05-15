@@ -1,17 +1,12 @@
-import Card from "../Card";
 import Player from "../Player";
 import {ManaUtility} from "../mana";
 import gameEventManager from "../events/GameEventManager";
 import {GameEvent_CastSpell} from "../events";
+
 import {PlayerAction} from "./PlayerAction";
 
-export class PlayerAction_PlayCard implements PlayerAction {
-    card: Card;
+export class PlayerAction_PlayCard extends PlayerAction {
     targets: null;
-
-    constructor(card: Card) {
-        this.card = card;
-    }
 
     label() {
         return `Play ${this.card.name}`;
