@@ -5,8 +5,9 @@ import Card from "../../Card";
 import gameEventManager from "../../events/GameEventManager";
 import {GameEvent_CastSpell, GameEvent_ChangeCardZone} from "../../events";
 import {ManaColour} from "../../mana";
-import {PlayerAction_PlayCard} from "../../PlayerAction";
 import {FOREST, GRIZZLY_BEARS} from "../testData";
+
+import {PlayerActions} from "../../actions";
 
 let player: Player;
 
@@ -16,7 +17,7 @@ beforeEach(async () => {
     player = game.addPlayer([]);
 });
 
-test("should play land from hand", () => {
+test("should \"cast\" land from hand", () => {
     const forest = new Card(cardData[FOREST], player);
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.hand));
 
@@ -64,8 +65,7 @@ test("shouldn't play creature card from hand with insufficient mana", () => {
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
 
-    const action = new PlayerAction_PlayCard(bears);
-    action.perform(player);
+    (new PlayerActions.PlayCard(bears)).perform(player);
 
     // Check stack never resolved
     expect(cardEnteredStack).toHaveBeenCalledTimes(0);
@@ -90,8 +90,7 @@ test("should play creature card from hand with sufficient mana", () => {
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
 
-    const action = new PlayerAction_PlayCard(bears);
-    action.perform(player);
+    (new PlayerActions.PlayCard(bears)).perform(player);
 
     // Check stack resolved properly
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
@@ -119,8 +118,7 @@ test("should play creature card from hand with excess mana", () => {
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
 
-    const action = new PlayerAction_PlayCard(bears);
-    action.perform(player);
+    (new PlayerActions.PlayCard(bears)).perform(player);
 
     // Check stack resolved properly
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
@@ -149,8 +147,7 @@ test("should play creature card from hand with generic mana", () => {
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
 
-    const action = new PlayerAction_PlayCard(bears);
-    action.perform(player);
+    (new PlayerActions.PlayCard(bears)).perform(player);
 
     // Test stack resolved properly
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);

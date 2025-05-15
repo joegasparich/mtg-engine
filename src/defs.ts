@@ -4,9 +4,10 @@ export interface CardDef {
     oracle_text: string,
     type: CardType,
     cost: string, // {3}{G}{G}
-    activated_abilities: ActivatedAbilityDef[],
     power: number,
     toughness: number,
+    activated_abilities: ActivatedAbilityDef[],
+    static_abilities: StaticAbilityDef[],
 }
 
 export enum CardType {
@@ -14,22 +15,22 @@ export enum CardType {
     Creature = "Creature"
 }
 
-export enum ActivatedAbilityCostType {
-    Tap = "Tap"
-}
-
 export interface ActivatedAbilityDef {
-    cost: ActivatedAbilityCostType,
-    effects: AbilityEffectDef[],
+    cost: string, // Class name, might need to become defs
+    effects: AbilityEffectDef[], // Class names, might need to become defs
     manaAbility: boolean
 }
 
-export enum AbilityEffectType {
-    AddMana = "AbilityEffect_AddMana"
+export interface StaticAbilityDef {
+    keyword: Keyword,
 }
 
 export interface AbilityEffectDef {
-    type: AbilityEffectType,
+    worker: string; // Class name
+}
+
+export enum Keyword {
+    Flying = "StaticAbility_Flying" // Class name
 }
 
 export interface AbilityEffectDef_AddMana extends AbilityEffectDef {

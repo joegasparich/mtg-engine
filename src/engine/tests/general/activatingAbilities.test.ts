@@ -3,10 +3,10 @@ import Player from "../../Player";
 import Game, {game} from "../../Game";
 import Card from "../../Card";
 import gameEventManager from "../../events/GameEventManager";
-import {GameEvent_ActivateAbility, GameEvent_ChangeCardZone} from "../../events";
-import ActivatedAbility from "../../ActivatedAbility";
+import {GameEvent_ChangeCardZone} from "../../events";
 import {ManaColour} from "../../mana";
 import {FOREST} from "../testData";
+import {PlayerActions} from "../../actions";
 
 let player: Player;
 
@@ -20,15 +20,9 @@ test("land should tap for mana", () => {
     const forest = new Card(cardData[FOREST], player);
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
 
-    const tapForest = new ActivatedAbility(player, forest.activatedAbilities[0], forest);
-
     const abilityEnteredStack = vi.spyOn(game.stack, "abilityActivated");
 
-    // Check ability created properly
-    expect(tapForest.def).toBe(forest.activatedAbilities[0]);
-    expect(tapForest.card).toBe(forest);
-
-    gameEventManager.addEvent(new GameEvent_ActivateAbility(tapForest));
+    (new PlayerActions.ActivateAbility(forest.activatedAbilities[0], forest)).perform(player);
 
     // Check stack resolved properly
     expect(abilityEnteredStack).toHaveBeenCalledTimes(1);

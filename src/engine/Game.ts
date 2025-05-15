@@ -3,6 +3,7 @@ import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
 import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
 import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "./events";
+import playerActionManager from "./actions/PlayerAction";
 
 class GameOptions {
     allowAutoSkip = false;
@@ -105,9 +106,19 @@ export default class Game {
             this.nextStep(false);
         } while (this.currentStepIndex != nextPhaseStep);
     }
+    canAutoSkip() {
+        if (!this.activePlayer())
+            return true;
+
+        if (!playerActionManager.hasAnyActions(this.activePlayer(), true, true))
+            return true;
+
+        return false;
+    }
     checkAutoSkip() {
         // Automatically advance step if there are no actions
-        if (Step.all[this.currentStepIndex].canAutoSkip(this.currentTurnPlayer()))
+        // TODO: Priority
+        if (this.canAutoSkip())
             this.nextStep(true);
     }
 

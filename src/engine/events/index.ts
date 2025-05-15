@@ -1,24 +1,9 @@
-import {GameEvent, GameEvent_Simple} from "./GameEventManager";
-import {GameEvent_StepStart, GameEvent_StepEnd, GameEvent_GoToNextStep, GameEvent_GoToNextPhase, GameEvent_GoToNextTurn} from "./GameEvent_Step";
-import GameEvent_CastSpell from "./GameEvent_CastSpell";
-import GameEvent_ChangeCardZone from "./GameEvent_ChangeCardZone";
-import GameEvent_ActivateAbility from "./GameEvent_ActivateAbility";
-import GameEvent_TapCard from "./GameEvent_TapCard";
-import GameEvent_UntapCard from "./GameEvent_UntapCard";
-import GameEvent_DrawCard from "./GameEvent_DrawCard";
-
-export {
-    GameEvent,
-    GameEvent_Simple,
-    GameEvent_StepStart,
-    GameEvent_StepEnd,
-    GameEvent_CastSpell,
-    GameEvent_TapCard,
-    GameEvent_UntapCard,
-    GameEvent_ChangeCardZone,
-    GameEvent_ActivateAbility,
-    GameEvent_DrawCard,
-    GameEvent_GoToNextStep,
-    GameEvent_GoToNextPhase,
-    GameEvent_GoToNextTurn,
-};
+export * from "./GameEvent_Step";
+export * from "./GameEventManager";
+export * from "./GameEvent_TapCard";
+export * from "./GameEvent_DrawCard";
+export * from "./GameEvent_CastSpell";
+export * from "./GameEvent_UntapCard";
+export * from "./GameEvent_ChangeCardZone";
+export * from "./GameEvent_ActivateAbility";
+export * from "./GameEvent_DestroyPermanent";

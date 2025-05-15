@@ -12,7 +12,7 @@ import UICard from "./UICard";
 import uiEventManager, {
     UIEvent_CardClicked,
     UIEvent_CardDeselected,
-    UIEvent_CardSelected, UIEvent_StartTargeting,
+    UIEvent_CardSelected,
     UIEventType
 } from "./UIEventManager";
 import {autobind} from "../utility/typeUtility";
@@ -36,17 +36,17 @@ const playerRotations = [
     180
 ];
 
-class UITargeter {
+export class UITargeter {
     arrow: PIXI.Graphics;
     source: UICard;
     target: UICard | null;
 
-    validateTarget: (card: Card) => boolean;
-    onTargeted: (card: Card) => void;
+    validateTarget: (card: UICard) => boolean;
+    onTargeted: (card: UICard) => void;
     onCancelled: () => void;
 
-    constructor(card: Card, validateTarget: (card: Card) => boolean, onTargeted: (card: Card) => void, onCancelled: () => void | null) {
-        this.source = uiRoot.cardToUICard.get(card);
+    constructor(card: UICard, validateTarget: (card: UICard) => boolean, onTargeted: (card: UICard) => void, onCancelled: () => void | null) {
+        this.source = card;
         this.validateTarget = validateTarget;
         this.onTargeted = onTargeted;
         this.onCancelled = onCancelled;
@@ -79,9 +79,11 @@ class UITargeter {
 
     @autobind
     onCardClicked(card: Card) {
-        if (this.validateTarget(card)) {
-            this.target = uiRoot.cardToUICard.get(card);
-            this.onTargeted(card);
+        const uiCard = uiRoot.cardToUICard.get(card);
+
+        if (this.validateTarget(uiCard)) {
+            this.target = uiCard;
+            this.onTargeted(uiCard);
         }
     }
 
@@ -142,7 +144,7 @@ export default class UIRoot extends PIXI.Container {
                     stepMessageLabel.text = message;
                     stepMessageLabel.show();
                 }
-                const action = game.currentStep().actions[0];
+                const action = game.currentStep().buttons[0];
                 if (action) {
                     stepActions.text = action[0];
                     stepActions.onClick = action[1];
@@ -157,22 +159,6 @@ export default class UIRoot extends PIXI.Container {
                 stepActions.text = null;
                 stepActions.onClick = null;
                 stepActions.hide();
-            });
-        }
-
-        // TODO: Move this out
-        {
-            uiEventManager.on(UIEventType.StartTargeting, (event: UIEvent_StartTargeting) => {
-                const targeter = new UITargeter(
-                    event.source,
-                    event.validateTarget,
-                    event.onTargeted,
-                    event.onCancelled,
-                );
-
-                event.onStopped = () => {
-                    targeter.remove();
-                };
             });
         }
     }

@@ -4,7 +4,6 @@ export enum UIEventType {
     CardClicked,
     CardSelected,
     CardDeselected,
-    StartTargeting,
 }
 
 export abstract class UIEvent {
@@ -54,30 +53,6 @@ export class UIEvent_CardDeselected extends UIEvent {
         this.type = UIEventType.CardDeselected;
         this.label = `Card ${card.logName} deselected`;
         this.card = card;
-    }
-}
-
-export class UIEvent_StartTargeting extends UIEvent {
-    source: Card;
-
-    validateTarget: (card: Card) => boolean;
-    onTargeted: (card: Card) => void;
-    onCancelled: () => void;
-    onStopped: () => void;
-
-    constructor(card: Card, validateTarget: (card: Card) => boolean, onTargeted: (card: Card) => void, onCancelled: () => void | null) {
-        super();
-
-        this.type = UIEventType.StartTargeting;
-        this.label = `Card ${card.logName} started targeting`;
-        this.source = card;
-        this.validateTarget = validateTarget;
-        this.onTargeted = onTargeted;
-        this.onCancelled = onCancelled;
-    }
-
-    stop() {
-        this.onStopped?.();
     }
 }
 

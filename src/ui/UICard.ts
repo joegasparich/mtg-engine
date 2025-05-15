@@ -6,12 +6,14 @@ import Card from "../engine/Card";
 import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
 import {autobind} from "../utility/typeUtility";
 import {GameEvent_TapCard, GameEvent_UntapCard} from "../engine/events";
-import {pixi, uiRoot} from "./UIRoot";
+import {pixi, uiRoot, UITargeter} from "./UIRoot";
 import {game} from "../engine/Game";
 
 import {GlowFilter} from "pixi-filters";
-import uiEventManager, {UIEvent_CardClicked, UIEvent_StartTargeting} from "./UIEventManager";
+import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
 import {loadImageFromExternalUrl} from "../utility/imageUtility";
+import playerActionManager from "../engine/actions/PlayerAction";
+import {removeItem} from "../utility/arrayUtility";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -21,7 +23,7 @@ export default class UICard extends PIXI.Sprite {
     public readonly card: Card;
 
     private _selected = false;
-    public get selected() { return this._selected };
+    public get selected() { return this._selected; }
     public set selected(val: boolean) {
         if (this._selected == val)
             return;
@@ -34,7 +36,7 @@ export default class UICard extends PIXI.Sprite {
                     outerStrength: 2,
                     quality: 0.5
                 })
-            ]
+            ];
         } else {
             this.filters = [];
         }
@@ -47,7 +49,7 @@ export default class UICard extends PIXI.Sprite {
 
         uiRoot.registerCard(this);
 
-        loadImageFromExternalUrl(card.def.image_url).then(tex => this.texture = tex)
+        loadImageFromExternalUrl(card.def.image_url).then(tex => this.texture = tex);
         this.width = CARD_WIDTH;
         this.height = CARD_HEIGHT;
         this.anchor = new PIXI.Point(0.5, 0.5);
@@ -60,8 +62,8 @@ export default class UICard extends PIXI.Sprite {
         pixi.stage.on('pointerup', this.globalMouseUp);
         pixi.stage.on('pointerupoutside', this.globalMouseUp);
 
-        gameEventManager.on(GameEventType.TapCard, this.onCardTapped)
-        gameEventManager.on(GameEventType.UntapCard, this.onCardUntapped)
+        gameEventManager.on(GameEventType.TapCard, this.onCardTapped);
+        gameEventManager.on(GameEventType.UntapCard, this.onCardUntapped);
 
         this.onRender = this.render;
     }
@@ -119,15 +121,30 @@ export default class UICard extends PIXI.Sprite {
                 this.position = this.preDragPos;
 
             if (!this.hasDragged) {
-                uiEventManager.fire(new UIEvent_CardClicked(this.card))
+                uiEventManager.fire(new UIEvent_CardClicked(this.card));
             }
         }
         if (event.button == 2) {
-            const actions = this.card.getActions(game.activePlayer());
+            // const player = game.activePlayer(); // TODO: Uncomment this once priority is in
+            const player = this.card.controller;
+
+            const actions = playerActionManager.getCardActions(this.card, player, false);
 
             if (actions.length > 0) {
                 showCustomContextMenu(event.global, actions.map(a => a.label()), index => {
-                    game.activePlayer().performAction(actions[index]);
+                    const action = actions[index];
+
+                    if (action.targets && action.targets.length > 0) {
+                        // TODO: Multitargeting
+                        new UITargeter(
+                            this,
+                            uiCard => action.targets.includes(uiCard.card),
+                            uiCard => action.perform(game.activePlayer(), [uiCard.card]),
+                            null
+                        );
+                    } else {
+                        action.perform(game.activePlayer());
+                    }
                 }, event);
             }
         }

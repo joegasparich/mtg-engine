@@ -1,4 +1,4 @@
-import {PlayerAction} from "./PlayerAction";
+import {PlayerAction} from "./actions/PlayerAction";
 import {Battlefield, Graveyard, Hand, Library} from "./Zone";
 import Card from "./Card";
 import {ManaAmount, ManaUtility} from "./mana";
@@ -25,34 +25,6 @@ export default class Player {
         });
     }
 
-    getActions(factorInPotentialMana = false): PlayerAction[] {
-        const actions: PlayerAction[] = [];
-
-        const originalMana: Readonly<ManaAmount> = [...this.manaPool];
-        if (factorInPotentialMana)
-            ManaUtility.AddMana(this.manaPool, this.getPotentialMana());
-
-        for (const card of this.hand.cards) {
-            actions.push(...card.getActions(this, true));
-        }
-
-        for (const card of this.battlefield.cards) {
-            actions.push(...card.getActions(this, true));
-        }
-
-        if (factorInPotentialMana) {
-            this.manaPool = [...originalMana];
-        }
-
-        return actions;
-    }
-
-    hasAnyActions() {
-        // TODO: We don't care about mana abilities unless there is something to pay for
-
-        return this.getActions(true).length > 0;
-    }
-
     getPotentialMana(): Readonly<ManaAmount> {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
@@ -65,10 +37,6 @@ export default class Player {
         }
 
         return potentialMana;
-    }
-
-    performAction(action: PlayerAction) {
-        action.perform(this);
     }
 
     checkState() {

@@ -1,15 +1,87 @@
 [
     {
+        "name": "Plains",
+        "image_url": "https://cards.scryfall.io/large/front/1/2/12cff32a-a365-43ee-a196-8ce32b3bb9fd.jpg?1743205092",
+        "oracle_text": "({T}: Add {W}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{W}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Island",
+        "image_url": "https://cards.scryfall.io/large/front/1/f/1ff6acc9-581c-468f-894d-41f725da7f33.jpg?1743205101",
+        "oracle_text": "({T}: Add {U}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{U}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Swamp",
+        "image_url": "https://cards.scryfall.io/large/front/f/0/f0bfdb9e-318f-4acd-9fbd-41b98a8875d6.jpg?1743205109",
+        "oracle_text": "({T}: Add {B}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{B}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Mountain",
+        "image_url": "https://cards.scryfall.io/large/front/b/f/bfa10a88-12e0-4b79-80bb-6f4620277e20.jpg?1743205117",
+        "oracle_text": "({T}: Add {R}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{R}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
         "name": "Forest",
-        "image_url": "https://cards.scryfall.io/normal/front/8/1/8100bceb-ffba-487a-bb45-4fe2a156a8dc.jpg?1743205126",
+        "image_url": "https://cards.scryfall.io/large/front/8/1/8100bceb-ffba-487a-bb45-4fe2a156a8dc.jpg?1743205126",
         "oracle_text": "({T}: Add {G}.)",
         "type": "Land",
         "activated_abilities": [
             {
-                "cost": "Tap",
+                "cost": "ActivatedAbilityCost_Tap",
                 "effects": [
                     {
-                        "type": "AbilityEffect_AddMana",
+                        "worker": "AbilityEffect_AddMana",
                         "mana": "{G}"
                     }
                 ],
@@ -34,6 +106,20 @@
         "cost": "{R}",
         "power": 1,
         "toughness": 1
+    },
+    {
+        "name": "Air Elemental",
+        "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{3}{U}{U}",
+        "power": 4,
+        "toughness": 4,
+        "static_abilities": [
+            {
+                "keyword": "Flying"
+            }
+        ]
     }
 ]
 

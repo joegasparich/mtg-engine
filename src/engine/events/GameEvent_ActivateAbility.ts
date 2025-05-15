@@ -1,9 +1,9 @@
 import ActivatedAbility from "../ActivatedAbility";
-import {activatedAbilitiesCosts} from "../workers";
 import {GameEvent, GameEventType} from "./GameEventManager";
 import {game} from "../Game";
+import {ActivatedAbilityCosts} from "../workers/ActivatedAbilityCosts";
 
-export default class GameEvent_ActivateAbility extends GameEvent {
+export class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;
 
     ability: ActivatedAbility;
@@ -18,7 +18,7 @@ export default class GameEvent_ActivateAbility extends GameEvent {
 
     perform() {
         // Pay cost
-        activatedAbilitiesCosts.get(this.ability.def.cost).pay(this.ability.card, this.ability.owner);
+        ActivatedAbilityCosts.get(this.ability.def.cost).pay(this.ability.card, this.ability.owner);
 
         // Add ability to stack
         game.stack.abilityActivated(this.ability);

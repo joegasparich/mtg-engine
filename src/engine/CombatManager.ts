@@ -2,6 +2,7 @@ import Card from "./Card";
 import {CardType} from "../defs";
 import {Battlefield} from "./Zone";
 import Player from "./Player";
+import {game} from "./Game";
 
 export namespace CombatManager {
     export let attackingPlayer: Player;
@@ -85,5 +86,20 @@ export namespace CombatManager {
             blocker.damageTaken = attacker.power;
             attacker.damageTaken = blocker.power;
         }
+    }
+
+    export function potentialAttackTargetsFor(attacker: Card): Player[] {
+        return game.players.filter(p => p != attacker.controller);
+    }
+
+    export function potentialBlockTargetsFor(blocker: Card): Card[] {
+        const blockTargets: Card[] = [];
+
+        for (const attacker of attackingCreatures.keys()) {
+            if (canBlockAttacker(blocker, attacker))
+                blockTargets.push(attacker);
+        }
+
+        return blockTargets;
     }
 }

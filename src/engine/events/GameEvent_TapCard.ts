@@ -1,7 +1,7 @@
 import Card from "../Card";
 import {GameEvent, GameEventType} from "./GameEventManager";
 
-export default class GameEvent_TapCard extends GameEvent {
+export class GameEvent_TapCard extends GameEvent {
     type = GameEventType.TapCard;
 
     card: Card;

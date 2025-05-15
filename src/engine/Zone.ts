@@ -2,9 +2,9 @@ import Card from "./Card";
 import {CardType} from "../defs";
 import gameEventManager from "./events/GameEventManager";
 import ActivatedAbility from "./ActivatedAbility";
-import {abilityEffects} from "./workers";
 import {GameEvent_ChangeCardZone} from "./events";
 import {shuffleArray} from "../utility/arrayUtility";
+import {AbilityEffects} from "./workers/AbilityEffects";
 
 export class Zone {
     name: string;
@@ -90,7 +90,7 @@ export class Stack extends Zone {
 
     resolveAbility(ability: ActivatedAbility) {
         for (const effect of ability.def.effects) {
-            abilityEffects.get(effect.type).perform(effect, ability.card, ability.owner)
+            AbilityEffects.get(effect.worker).perform(effect, ability.card, ability.owner);
         }
     }
 }

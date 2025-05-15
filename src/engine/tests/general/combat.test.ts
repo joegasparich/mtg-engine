@@ -7,7 +7,7 @@ import {GameEvent_ChangeCardZone, GameEvent_GoToNextStep} from "../../events";
 import {BASIC_DECK, GRIZZLY_BEARS, MONS_GOBLIN_RAIDERS} from "../testData";
 import {GameEvent_GoToStep} from "../../events/GameEvent_Step";
 import {StepIndex} from "../../Step";
-import {CombatManager} from "../../CombatManager";
+import {PlayerActions} from "../../actions";
 
 let playerA: Player;
 let playerB: Player;
@@ -30,9 +30,9 @@ test("should trade", () => {
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
-    CombatManager.attackingCreatures.set(bearsA, playerB);
+    (new PlayerActions.DeclareAttacker(bearsA).perform(playerA, [playerB]));
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
-    CombatManager.blockingCreatures.set(bearsB, bearsA);
+    (new PlayerActions.DeclareBlocker(bearsB).perform(playerB, [bearsA]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
     expect(bearsADestroyed).toBeCalledTimes(1);
@@ -52,9 +52,9 @@ test("attacker should win", () => {
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
-    CombatManager.attackingCreatures.set(bears, playerB);
+    (new PlayerActions.DeclareAttacker(bears).perform(playerA, [playerB]));
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
-    CombatManager.blockingCreatures.set(goblins, bears);
+    (new PlayerActions.DeclareBlocker(goblins).perform(playerB, [bears]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
     expect(bearsDestroyed).toBeCalledTimes(0);
@@ -74,9 +74,9 @@ test("blocker should win", () => {
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
-    CombatManager.attackingCreatures.set(goblins, playerB);
+    (new PlayerActions.DeclareAttacker(goblins).perform(playerA, [playerB]));
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
-    CombatManager.blockingCreatures.set(bears, goblins);
+    (new PlayerActions.DeclareBlocker(bears).perform(playerB, [goblins]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
     expect(goblinsDestroyed).toBeCalledTimes(1);

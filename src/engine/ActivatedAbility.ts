@@ -1,9 +1,10 @@
 import {ActivatedAbilityDef} from "../defs";
 import Card from "./Card";
-import {abilityEffects, activatedAbilitiesCosts} from "./workers";
 import gameEventManager from "./events/GameEventManager";
 import {GameEvent_ActivateAbility} from "./events";
 import Player from "./Player";
+import {ActivatedAbilityCosts} from "./workers/ActivatedAbilityCosts";
+import {AbilityEffects} from "./workers/AbilityEffects";
 
 export default class ActivatedAbility {
     owner: Player;
@@ -18,12 +19,12 @@ export default class ActivatedAbility {
     }
 
     label() {
-        return `${this.def.cost}: ${this.def.effects.map(e => abilityEffects.get(e.type).label(e, this.card)).join(", ")}`
+        return `${this.def.cost}: ${this.def.effects.map(effectDef => AbilityEffects.get(effectDef.worker).label(effectDef, this.card)).join(", ")}`;
     }
 
     perform() {
-        if (!activatedAbilitiesCosts.get(this.def.cost).payable(this.card, this.owner)) {
-            console.log("Attempted to trigger unpayable ability")
+        if (!ActivatedAbilityCosts.get(this.def.cost).payable(this.card, this.owner)) {
+            console.log("Attempted to trigger unpayable ability");
             return;
         }
 

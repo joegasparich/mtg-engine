@@ -1,27 +1,22 @@
 import Player from "./Player";
 import gameEventManager from "./events/GameEventManager";
 import {autobind} from "../utility/typeUtility";
-import uiEventManager, {
-    UIEvent_CardClicked, UIEvent_CardDeselected, UIEvent_CardSelected, UIEvent_StartTargeting,
-    UIEventType
-} from "../ui/UIEventManager";
+import uiEventManager, { UIEvent_CardDeselected } from "../ui/UIEventManager";
 import {CombatManager} from "./CombatManager";
 import {game} from "./Game";
 import {GameEvent_DrawCard, GameEvent_TapCard, GameEvent_UntapCard} from "./events";
-import canBlockAttacker = CombatManager.canBlockAttacker;
 
 interface Step {
     message: string | null;
-    actions: [string, (() => void)][]
+    buttons: [string, (() => void)][]
 
     onStart(player: Player): void;
     onEnd(player: Player): void;
-    canAutoSkip(player: Player): boolean;
 }
 
 export class UntapStep implements Step {
     message: string = null;
-    actions: [label: string, action: () => void][] = [];
+    buttons: [label: string, action: () => void][] = [];
 
     onStart(player: Player): void {
         // Does not give priority: 502.4
@@ -35,15 +30,11 @@ export class UntapStep implements Step {
     }
 
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player): boolean {
-        return true;
-    }
 }
 
 export class UpkeepStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 503.1
@@ -51,16 +42,11 @@ export class UpkeepStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player) {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class DrawStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 504.1
@@ -72,16 +58,11 @@ export class DrawStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class MainStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 505.6
@@ -90,16 +71,11 @@ export class MainStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class BeginningOfCombatStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         CombatManager.attackingPlayer = game.currentTurnPlayer();
@@ -109,46 +85,18 @@ export class BeginningOfCombatStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class DeclareAttackersStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 508.1
         this.message = "Declare attackers";
-        this.actions = [["Finish declaring", this.onFinishDeclaring]];
-        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked);
+        this.buttons = [["Finish declaring", this.onFinishDeclaring]];
     }
-    onEnd(player: Player): void {
-        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked);
-    }
-
-    canAutoSkip(player: Player): boolean {
-        if (CombatManager.hasAnyAttackers(player))
-            return false;
-
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
-
-    @autobind
-    onCardClicked(event: UIEvent_CardClicked) {
-        if (CombatManager.attackingCreatures.has(event.card)) {
-            CombatManager.attackingCreatures.delete(event.card);
-            uiEventManager.fire(new UIEvent_CardDeselected(event.card));
-        }
-        else if (CombatManager.canAttack(event.card)) {
-            CombatManager.attackingCreatures.set(event.card, game.randomOpponent(game.currentTurnPlayer())); // TODO: Target player or planeswalker
-            uiEventManager.fire(new UIEvent_CardSelected(event.card));
-        }
-    }
+    onEnd(player: Player): void {}
 
     @autobind
     onFinishDeclaring() {
@@ -158,7 +106,6 @@ export class DeclareAttackersStep implements Step {
         }
 
         // 508.2
-
         game.activePlayerID = game.currentTurnPlayerID;
         // TODO: Pass priority
 
@@ -168,56 +115,19 @@ export class DeclareAttackersStep implements Step {
 
 export class DeclareBlockersStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
-
-    targeters: UIEvent_StartTargeting[] = [];
+    buttons: [string, () => void][] = [];
 
     onStart(player: Player): void {
         // 509.1
         this.message = "Declare blockers";
-        this.actions = [["Finish declaring", this.onFinishDeclaring]];
-        uiEventManager.on(UIEventType.CardClicked, this.onCardClicked);
+        this.buttons = [["Finish declaring", this.onFinishDeclaring]];
+
+        // TODO: Remove once priority is in
+        if (game.players.length > 1)
+            game.activePlayerID = game.randomOpponent(player).id;
     }
     onEnd(player: Player): void {
-        uiEventManager.off(UIEventType.CardClicked, this.onCardClicked);
-
-        for (const targeter of this.targeters) {
-            targeter.stop();
-        }
-    }
-
-    canAutoSkip(player: Player): boolean {
-        for (const p of game.players) {
-            if (!CombatManager.beingAttacked(p))
-                continue;
-
-            if (CombatManager.hasAnyBlockers(p))
-                return false;
-        }
-
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
-
-    @autobind
-    onCardClicked(event: UIEvent_CardClicked) {
-        if (CombatManager.blockingCreatures.has(event.card)) {
-            CombatManager.blockingCreatures.delete(event.card);
-            uiEventManager.fire(new UIEvent_CardDeselected(event.card));
-        }
-        else if (CombatManager.canBlock(event.card)) {
-            const targeter = new UIEvent_StartTargeting(
-                event.card,
-                target => canBlockAttacker(event.card, target),
-                target => {
-                    CombatManager.blockingCreatures.set(event.card, target);
-                    uiEventManager.fire(new UIEvent_CardSelected(event.card));
-                },
-                null
-            );
-            this.targeters.push(targeter);
-            uiEventManager.fire(targeter);
-        }
+        game.activePlayerID = game.currentTurnPlayerID;
     }
 
     @autobind
@@ -232,7 +142,7 @@ export class DeclareBlockersStep implements Step {
 
 export class CombatDamageStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
     onStart(player: Player): void {
         // 510.1, 510.2
         CombatManager.calculateAndAssignDamage();
@@ -245,16 +155,11 @@ export class CombatDamageStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class EndOfCombatStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
     onStart(player: Player): void {
         // 511.1
 
@@ -271,16 +176,11 @@ export class EndOfCombatStep implements Step {
 
         CombatManager.reset();
     }
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class SecondMainStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
     onStart(player: Player) {
         // 505.6
 
@@ -288,16 +188,11 @@ export class SecondMainStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player) {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export class EndStep implements Step {
     message: string = null;
-    actions: [string, () => void][] = [];
+    buttons: [string, () => void][] = [];
     onStart(player: Player) {
         // 513.1
 
@@ -305,11 +200,6 @@ export class EndStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player) {}
-
-    canAutoSkip(player: Player): boolean {
-        // TODO: Check all players in priority order
-        return !player.hasAnyActions();
-    }
 }
 
 export enum StepIndex {

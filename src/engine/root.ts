@@ -9,6 +9,7 @@ import Card from "./Card";
 import ActivatedAbility from "./ActivatedAbility";
 import Player from "./Player";
 import {cardData} from "../index";
+import {randInt} from "../utility/randomUtility";
 
 declare global {
     interface Window {
@@ -17,11 +18,10 @@ declare global {
     }
 }
 
-const playerOneDeck = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
-const playerTwoDeck = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
-
-const FOREST = 0;
-const BEARS = 1;
+const FOREST = 4;
+const MOUNTAIN = 3;
+const BEARS = 5;
+const GOBLINS = 6;
 
 export async function startGame() {
     Game.init();
@@ -35,8 +35,10 @@ export async function startGame() {
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 
-    const playerOne = game.addPlayer(playerOneDeck);
-    const playerTwo = game.addPlayer(playerTwoDeck);
+    // const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    // const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    const playerOne = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
+    const playerTwo = game.addPlayer([MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
 
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);
@@ -64,10 +66,10 @@ export async function startGame() {
         gameEventManager.addEvent(new GameEvent_CastSpell(player, bears));
     }
 
-    // Test
-    playBears(playerOne);
-    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    playBears(playerTwo);
+    // // Test
+    // playBears(playerOne);
+    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    // playBears(playerTwo);
 }
 
 function tick(time: PIXI.Ticker) {

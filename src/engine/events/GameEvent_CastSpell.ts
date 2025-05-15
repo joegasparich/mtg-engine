@@ -2,9 +2,9 @@ import Card from "../Card";
 import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
 import {game} from "../Game";
 import Player from "../Player";
-import GameEvent_ChangeCardZone from "./GameEvent_ChangeCardZone";
+import {GameEvent_ChangeCardZone} from "./GameEvent_ChangeCardZone";
 
-export default class GameEvent_CastSpell extends GameEvent {
+export class GameEvent_CastSpell extends GameEvent {
     type = GameEventType.CastSpell;
 
     caster: Player;

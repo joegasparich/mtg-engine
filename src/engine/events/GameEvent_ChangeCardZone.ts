@@ -2,7 +2,7 @@ import Card from "../Card";
 import {Zone} from "../Zone";
 import {GameEvent, GameEventType} from "./GameEventManager";
 
-export default class GameEvent_ChangeCardZone extends GameEvent {
+export class GameEvent_ChangeCardZone extends GameEvent {
     type = GameEventType.ChangeCardZone;
 
     card: Card;
