@@ -1,14 +1,13 @@
-import Card from "../Card";
-import Player from "../Player";
-import {ManaAmount, ManaUtility} from "../mana";
-import {Battlefield, Hand} from "../Zone";
-import {ActivatedAbilityCosts} from "../abilities/ActivatedAbilityCosts";
-import {PlayerActions} from "./index";
-import {game} from "../Game";
-import {StepIndex} from "../Step";
-import {CombatManager} from "../CombatManager";
-import gameEventManager, {GameEventType} from "../events/GameEventManager";
-import {PlayerAction} from "./PlayerAction";
+import {PlayerAction} from "@engine/actions/PlayerAction";
+import Card from "@engine/Card";
+import Player from "@engine/Player";
+import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
+import {game} from "@engine/Game";
+import {ManaAmount, ManaUtility} from "@engine/mana";
+import {Battlefield, Hand} from "@engine/Zone";
+import {PlayerActions} from "@engine/actions/index";
+import {StepIndex} from "@engine/Step";
+import {CombatManager} from "@engine/CombatManager";
 
 export type ActionTarget = Card | Player;
 export enum ActionListenerResult {
@@ -89,12 +88,12 @@ class PlayerActionManager {
         }
 
         if (card.zone instanceof Battlefield) {
-            for (const abilityDef of card.activatedAbilities) {
-                if (ignoreManaAbilities && abilityDef.manaAbility)
+            for (const ability of card.abilities) {
+                if (ignoreManaAbilities && ability.def.isManaAbility)
                     continue;
 
-                if (card.canActivate(abilityDef) && ActivatedAbilityCosts.get(abilityDef.cost).payable(card, actor)) {
-                    cardActions.push(new PlayerActions.ActivateAbility(card, abilityDef));
+                if (card.canActivate(ability)) {
+                    cardActions.push(new PlayerActions.ActivateAbility(card, ability));
                 }
             }
 

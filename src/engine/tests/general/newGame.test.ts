@@ -1,20 +1,7 @@
-import Game, {game} from "../../Game";
-import {cardData} from "../../../index";
-import {expect} from "vitest";
-import {StepIndex} from "../../Step";
-import {BASIC_DECK, FOREST, GRIZZLY_BEARS} from "../testData";
-import Card from "../../Card";
-
-import testJSON from "../../../../test.json";
-import {AbilityDef, makeAbility} from "../../Ability";
-
-test("temp", () => {
-    Game.init();
-    const player = game.addPlayer([]);
-    const forest = new Card(cardData[FOREST], player);
-
-    makeAbility(testJSON.abilities[0], forest);
-});
+import Game, {game} from "@engine/Game";
+import {cardData} from "~/index";
+import {BASIC_DECK, FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
+import {StepIndex} from "@engine/Step";
 
 test("should start game and add player", () => {
     Game.init();

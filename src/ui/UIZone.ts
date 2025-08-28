@@ -1,10 +1,11 @@
 import * as PIXI from "pixi.js";
-import {Zone} from "../engine/Zone";
-import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
-import {autobind} from "../utility/typeUtility";
-import {GameEvent_ChangeCardZone} from "../engine/events";
-import UICard from "./UICard";
-import {uiRoot} from "./UIRoot";
+
+import UICard from "@ui/UICard";
+import {Zone} from "@engine/Zone";
+import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
+import {autobind} from "@utility/typeUtility";
+import {GameEvent_ChangeCardZone} from "@engine/events";
+import {uiRoot} from "@ui/UIRoot";
 
 export class UIZone extends PIXI.Container {
     zone: Zone;

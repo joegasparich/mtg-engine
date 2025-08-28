@@ -19,8 +19,11 @@ export enum CardType {
     Artifact = "Artifact",
 }
 
-export type AbilityDef = Record<ClassName, object> & {
+export type AbilityDef = {
+    activateString: string;
     keyword: Keyword;
+    isManaAbility: boolean;
+    parts: Record<ClassName, object>
 };
 
 export enum Keyword {

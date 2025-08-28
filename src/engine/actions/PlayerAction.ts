@@ -1,6 +1,6 @@
-import Card from "../Card";
-import Player from "../Player";
-import {ActionTarget} from "./PlayerActionManager";
+import {ActionTarget} from "@engine/actions/PlayerActionManager";
+import Card from "@engine/Card";
+import Player from "@engine/Player";
 
 export abstract class PlayerAction {
     card: Card;

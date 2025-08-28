@@ -5,7 +5,7 @@
   "description": "My Electron application description",
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "electron-forge start -- --remote-debugging-port=9222",
+    "start": "electron-forge start -- --remote-debugging-port=9223",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
@@ -33,6 +33,7 @@
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "35.2.0",
     "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.31.0",
     "rollup": "^4.49.0",
     "ts-node": "^10.9.2",

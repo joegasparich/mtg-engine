@@ -1,8 +1,7 @@
-import {Battlefield, Graveyard, Hand, Library} from "./Zone";
-import Card from "./Card";
-import {ManaAmount, ManaUtility} from "./mana";
-import {cardData} from "../index";
-import {PlayerAction} from "./actions/PlayerAction";
+import {Battlefield, Graveyard, Hand, Library} from "@engine/Zone";
+import {ManaAmount, ManaUtility} from "@engine/mana";
+import Card from "@engine/Card";
+import {cardData} from "~/index";
 
 export default class Player {
     id: number;

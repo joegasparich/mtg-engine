@@ -1,14 +1,12 @@
 import * as PIXI from 'pixi.js';
 
-import Game, {game} from "./Game";
-import {CardDef} from "../defs";
-import UIRoot, {uiRoot} from "../ui/UIRoot";
-import gameEventManager from "./events/GameEventManager";
-import {GameEvent_ActivateAbility, GameEvent_CastSpell, GameEvent_ChangeCardZone, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "./events";
-import Card from "./Card";
-import Player from "./Player";
-import {cardData} from "../index";
-import {randInt} from "../utility/randomUtility";
+import Game, {game} from "@engine/Game";
+import {CardDef} from "~/defs";
+import UIRoot, {uiRoot} from "@ui/UIRoot";
+import {cardData} from "~/index";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_GoToNextStep} from "@engine/events";
+import {randInt} from "@utility/randomUtility";
 
 declare global {
     interface Window {
@@ -17,6 +15,7 @@ declare global {
     }
 }
 
+const PLAINS = 0;
 const ISLAND = 1;
 const MOUNTAIN = 3;
 const FOREST = 4;
@@ -36,10 +35,10 @@ export async function startGame() {
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 
-    // const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    // const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    const playerOne = game.addPlayer([ISLAND, ISLAND, ISLAND, ISLAND, ISLAND, RECALL, RECALL, RECALL, RECALL, RECALL, ISLAND, ISLAND, ISLAND, ISLAND, ISLAND, RECALL, RECALL, RECALL, RECALL, RECALL]);
-    const playerTwo = game.addPlayer([ISLAND, ISLAND, ISLAND, ISLAND, ISLAND, RECALL, RECALL, RECALL, RECALL, RECALL, ISLAND, ISLAND, ISLAND, ISLAND, ISLAND, RECALL, RECALL, RECALL, RECALL, RECALL]);
+    const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    // const playerOne = game.addPlayer([PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS]);
+    // const playerTwo = game.addPlayer([PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS]);
 
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);

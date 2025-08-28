@@ -1,19 +1,17 @@
-import Player from "../Player";
-import {ManaUtility} from "../mana";
-import gameEventManager from "../events/GameEventManager";
-import {GameEvent_CastSpell} from "../events";
-import {PlayerAction} from "./PlayerAction";
-import Card from "../Card";
-import {TargetWorkers} from "../abilities/TargetWorkers";
-import {game} from "../Game";
-import {ActionTarget} from "./PlayerActionManager";
+import {PlayerAction} from "@engine/actions/PlayerAction";
+import Card from "@engine/Card";
+import Player from "@engine/Player";
+import {ActionTarget} from "@engine/actions/PlayerActionManager";
+import {ManaUtility} from "@engine/mana";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_CastSpell} from "@engine/events";
 
 export class PlayerAction_PlayCard extends PlayerAction {
     constructor(card: Card) {
         super(card);
 
-        if (card.spellAbility?.targetWorker)
-            this.targets = TargetWorkers.get(card.spellAbility.targetWorker).getValidTargets(card, game.activePlayer());
+        // if (card.spellAbility?.targetWorker)
+        //     this.targets = TargetWorkers.get(card.spellAbility.targetWorker).getValidTargets(card, game.activePlayer());
     }
 
     label() {

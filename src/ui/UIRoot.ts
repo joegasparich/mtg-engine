@@ -1,24 +1,24 @@
 import * as PIXI from "pixi.js";
 
-import Player from "../engine/Player";
-import {UIPlayer} from "./UIPlayer";
-import DOMButton from "./dom/DOMButton";
-import {game} from "../engine/Game";
-import DOMLabel from "./dom/DOMLabel";
-import gameEventManager, { GameEventType } from "../engine/events/GameEventManager";
-import {Step} from "../engine/Step";
-import Card from "../engine/Card";
-import UICard from "./UICard";
+import UICard from "@ui/UICard";
+import {UIPlayer} from "@ui/UIPlayer";
+import {ActionTarget} from "@engine/actions";
+import {drawArrow} from "@ui/drawUtility";
 import uiEventManager, {
     UIEvent_CardClicked,
     UIEvent_CardDeselected,
     UIEvent_CardSelected,
     UIEventType
-} from "./UIEventManager";
-import {autobind} from "../utility/typeUtility";
-import {drawArrow} from "./drawUtility";
-import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../engine/events";
-import {ActionTarget} from "../engine/actions";
+} from "@ui/UIEventManager";
+import {game} from "@engine/Game";
+import {autobind} from "@utility/typeUtility";
+import Card from "@engine/Card";
+import Player from "@engine/Player";
+import DOMLabel from "@ui/dom/DOMLabel";
+import DOMButton from "@ui/dom/DOMButton";
+import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
+import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "@engine/events";
+import {Step} from "@engine/Step";
 
 export let pixi: PIXI.Application = null;
 

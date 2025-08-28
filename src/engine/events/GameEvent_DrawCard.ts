@@ -1,6 +1,6 @@
-import gameEventManager, {GameEvent, GameEventType} from "./GameEventManager";
-import Player from "../Player";
-import {GameEvent_ChangeCardZone} from "./GameEvent_ChangeCardZone";
+import gameEventManager, {GameEvent, GameEventType} from "@engine/events/GameEventManager";
+import Player from "@engine/Player";
+import {GameEvent_ChangeCardZone} from "@engine/events/GameEvent_ChangeCardZone";
 
 export class GameEvent_DrawCard extends GameEvent {
     type = GameEventType.DrawCard;

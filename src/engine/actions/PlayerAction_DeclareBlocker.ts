@@ -1,8 +1,8 @@
-import Card from "../Card";
-import {CombatManager} from "../CombatManager";
-import Player from "../Player";
-import {ActionTarget} from "./PlayerActionManager";
-import {PlayerAction} from "./PlayerAction";
+import {PlayerAction} from "@engine/actions/PlayerAction";
+import Card from "@engine/Card";
+import {CombatManager} from "@engine/CombatManager";
+import Player from "@engine/Player";
+import {ActionTarget} from "@engine/actions/PlayerActionManager";
 
 export class PlayerAction_DeclareBlocker extends PlayerAction {
     constructor(card: Card) {

@@ -1,10 +1,10 @@
-import {cardData} from "../../../index";
-import Player from "../../Player";
-import Game, {game} from "../../Game";
-import Card from "../../Card";
-import gameEventManager from "../../events/GameEventManager";
-import {GameEvent_ActivateAbility, GameEvent_ChangeCardZone} from "../../events";
-import {ManaColour} from "../../mana";
+import Player from "@engine/Player";
+import {cardData} from "~/index";
+import Game, {game} from "@engine/Game";
+import Card from "@engine/Card";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_ActivateAbility, GameEvent_ChangeCardZone} from "@engine/events";
+import {ManaColour} from "@engine/mana";
 
 const FOREST = cardData.findIndex(c => c.name == "Forest");
 
@@ -20,7 +20,7 @@ test("forest should tap for green mana", () => {
     const forest = new Card(cardData[FOREST], player);
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
 
-    gameEventManager.addEvent(new GameEvent_ActivateAbility(player, forest, forest.activatedAbilities[0]));
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(player, forest, forest.abilities[0]));
 
     // Check mana added
     expect(player.manaPool[ManaColour.G]).toBe(1);

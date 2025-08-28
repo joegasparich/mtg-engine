@@ -1,9 +1,8 @@
-import {Hand} from "../engine/Zone";
-import UICard, {CARD_WIDTH} from "./UICard";
-import {calculateCardPositionsRelativeToCenter} from "./drawUtility";
-import {pixi} from "./UIRoot";
-import {UIZone} from "./UIZone";
-
+import {calculateCardPositionsRelativeToCenter} from "@ui/drawUtility";
+import {UIZone} from "@ui/UIZone";
+import {Hand} from "@engine/Zone";
+import UICard, {CARD_WIDTH} from "@ui/UICard";
+import {pixi} from "@ui/UIRoot";
 
 export class UIHand extends UIZone {
     hand: Hand;

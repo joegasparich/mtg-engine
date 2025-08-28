@@ -1,5 +1,5 @@
-import Card from "./Card";
-import {shuffleArray} from "../utility/arrayUtility";
+import Card from "@engine/Card";
+import {shuffleArray} from "@utility/arrayUtility";
 
 export class Zone {
     name: string;
@@ -22,7 +22,7 @@ export class Library extends Zone {
     }
 
     getTopCard(): Card {
-        return this.cards.at(-1);
+        return this.cards[-1];
     }
     getTopXCards(x: number): Card[] {
         return this.cards.slice(-x);

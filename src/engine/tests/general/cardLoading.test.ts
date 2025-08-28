@@ -1,9 +1,8 @@
-import Card from "../../Card";
-import {cardData} from "../../../index";
-import {FOREST, GRIZZLY_BEARS} from "../testData";
-import Game, {game} from "../../Game";
-import Player from "../../Player";
-import {expect} from "vitest";
+import Player from "@engine/Player";
+import Game, {game} from "@engine/Game";
+import {cardData} from "~/index";
+import {FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
+import Card from "@engine/Card";
 
 let player: Player;
 
@@ -21,7 +20,7 @@ test("should load land correctly", () => {
     expect(card.name).toBe(def.name);
     expect(card.type).toBe(def.type);
     expect(card.cost).toBe(undefined);
-    expect(card.activatedAbilities).toEqual(def.activated_abilities);
+    expect(card.abilities[0].def).toEqual(def.abilities[0]);
 
     expect(card.owner).toBe(player);
 });
@@ -34,7 +33,7 @@ test("should load simple creature correctly", () => {
     expect(card.name).toBe(def.name);
     expect(card.type).toBe(def.type);
     expect(card.cost).toEqual([0, 0, 0, 0, 1, 0, 1]);
-    expect(card.activatedAbilities).toEqual([]);
+    expect(card.abilities).toEqual([]);
     expect(card.power).toBe(def.power);
     expect(card.toughness).toBe(def.toughness);
 

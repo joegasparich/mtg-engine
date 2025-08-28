@@ -1,12 +1,10 @@
-import Game, {game} from "../../Game";
-import Player from "../../Player";
-import {cardData} from "../../../index";
-import Card from "../../Card";
-import gameEventManager from "../../events/GameEventManager";
-import {GameEvent_ChangeCardZone, GameEvent_DrawCard} from "../../events";
-import {FOREST, GRIZZLY_BEARS} from "../testData";
-import {expect} from "vitest";
-import {GameEvent_DestroyPermanent} from "../../events/GameEvent_DestroyPermanent";
+import Game, {game} from "@engine/Game";
+import Player from "@engine/Player";
+import Card from "@engine/Card";
+import {cardData} from "~/index";
+import {FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_ChangeCardZone, GameEvent_DestroyPermanent, GameEvent_DrawCard} from "@engine/events";
 
 let player: Player;
 

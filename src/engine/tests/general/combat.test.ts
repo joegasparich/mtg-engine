@@ -1,13 +1,13 @@
-import {cardData} from "../../../index";
-import Player from "../../Player";
-import Game, {game} from "../../Game";
-import Card from "../../Card";
-import gameEventManager from "../../events/GameEventManager";
-import {GameEvent_ChangeCardZone, GameEvent_GoToNextStep,GameEvent_GoToStep} from "../../events";
-import {AIR_ELEMENTAL, BASIC_DECK, GRIZZLY_BEARS, MONS_GOBLIN_RAIDERS} from "../testData";
-import {StepIndex} from "../../Step";
-import {PlayerActions} from "../../actions";
-import playerActionManager from "../../actions/PlayerActionManager";
+import Game, {game} from "@engine/Game";
+import Player from "@engine/Player";
+import {AIR_ELEMENTAL, BASIC_DECK, GRIZZLY_BEARS, MONS_GOBLIN_RAIDERS} from "@engine/tests/testData";
+import Card from "@engine/Card";
+import {cardData} from "~/index";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_ChangeCardZone, GameEvent_GoToNextStep, GameEvent_GoToStep} from "@engine/events";
+import {StepIndex} from "@engine/Step";
+import {PlayerActions} from "@engine/actions";
+import playerActionManager from "@engine/actions/PlayerActionManager";
 
 let playerA: Player;
 let playerB: Player;

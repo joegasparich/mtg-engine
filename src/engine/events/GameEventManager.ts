@@ -41,6 +41,7 @@ type Listener = (event: GameEvent) => void;
 
 class GameEventManager {
     private readonly listenersByType = new Map<GameEventType, Set<Listener>>();
+    private readonly eventsResolvedCallback: (() => void)[] = [];
 
     on(eventType: GameEventType, listener: Listener) {
         if (!this.listenersByType.has(eventType))
@@ -57,17 +58,25 @@ class GameEventManager {
     performingEvents: boolean;
 
     addEvent(event: GameEvent) {
-        // return new Promise((res, rej) => {
-        //     event.then(() => res());
-            this.activeEvents.push(event);
-            this.checkForEffects();
-            this.performAllEvents();
-        // });
+        this.activeEvents.push(event);
+        this.checkForEffects();
+        this.performAllEvents();
+
+        if (!this.performingEvents && this.eventsResolvedCallback.length > 0) {
+            for (const callback of this.eventsResolvedCallback) {
+                callback();
+            }
+            this.eventsResolvedCallback.length = 0;
+        }
     }
     addEvents(events: GameEvent[]) {
         this.activeEvents.push(...events);
         this.checkForEffects();
         this.performAllEvents();
+    }
+
+    onResolved(callback: () => void) {
+        this.eventsResolvedCallback.push(callback);
     }
 
     checkForEffects() {

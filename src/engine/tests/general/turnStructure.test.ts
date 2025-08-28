@@ -1,9 +1,9 @@
-import Player from "../../Player";
-import Game, {game} from "../../Game";
-import {StepIndex} from "../../Step";
-import gameEventManager from "../../events/GameEventManager";
-import {BASIC_DECK} from "../testData";
-import {GameEvent_GoToNextStep, GameEvent_GoToNextTurn,GameEvent_GoToStep} from "../../events";
+import Game, {game} from "@engine/Game";
+import Player from "@engine/Player";
+import {BASIC_DECK} from "@engine/tests/testData";
+import {StepIndex} from "@engine/Step";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_GoToNextStep, GameEvent_GoToNextTurn, GameEvent_GoToStep} from "@engine/events";
 
 let player: Player;
 

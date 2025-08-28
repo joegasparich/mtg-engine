@@ -1,9 +1,9 @@
-import {GameEvent, GameEventType} from "./GameEventManager";
-import {game} from "../Game";
-import Card from "../Card";
-import Player from "../Player";
-import {ActionTarget} from "../actions";
-import {Ability} from "../Ability";
+import {GameEvent, GameEventType} from "@engine/events/GameEventManager";
+import Player from "@engine/Player";
+import Card from "@engine/Card";
+import {Ability} from "@engine/abilities";
+import {ActionTarget} from "@engine/actions";
+import {game} from "@engine/Game";
 
 export class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;
@@ -26,7 +26,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
     }
 
     perform() {
-        if (!this.ability.activated || !this.ability.canActivate(this.card)) {
+        if (!this.ability.activatable || !this.ability.canActivate(this.card)) {
             console.log("Attempted to trigger unpayable or non-activated ability");
             return;
         }
@@ -35,7 +35,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
         this.ability.payCost(this.card);
 
         // Add ability to stack
-        game.stack.abilityActivated(this.player, this.ability, this.targets);
+        game.stack.abilityActivated(this.player, this.ability);//, this.targets);
 
         // TODO: pass priority
         game.stack.resolveAll();

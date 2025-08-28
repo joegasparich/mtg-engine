@@ -1,8 +1,8 @@
-import Card from "./Card";
-import {CardType} from "../defs";
-import {Battlefield} from "./Zone";
-import Player from "./Player";
-import {game} from "./Game";
+import Card from "@engine/Card";
+import Player from "@engine/Player";
+import {Battlefield} from "@engine/Zone";
+import {CardType} from "~/defs";
+import {game} from "@engine/Game";
 
 export namespace CombatManager {
     export let attackingPlayer: Player;

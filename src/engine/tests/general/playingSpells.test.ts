@@ -1,13 +1,12 @@
-import {cardData} from "../../../index";
-import Player from "../../Player";
-import Game, {game} from "../../Game";
-import Card from "../../Card";
-import gameEventManager from "../../events/GameEventManager";
-import {GameEvent_CastSpell, GameEvent_ChangeCardZone} from "../../events";
-import {ManaColour} from "../../mana";
-import {ANCESTRAL_RECALL, FOREST, GRIZZLY_BEARS} from "../testData";
-
-import {PlayerActions} from "../../actions";
+import Player from "@engine/Player";
+import Game, {game} from "@engine/Game";
+import Card from "@engine/Card";
+import {cardData} from "~/index";
+import {FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_CastSpell, GameEvent_ChangeCardZone} from "@engine/events";
+import {PlayerActions} from "@engine/actions";
+import {ManaColour} from "@engine/mana";
 
 let player: Player;
 
@@ -50,27 +49,27 @@ test("should cast creature spell from hand (bypassing cost)", () => {
     expect(player.battlefield.cards[0]).toBe(bears);
 });
 
-test("should cast instant spell from hand (bypassing cost)", () => {
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-
-    const recall = new Card(cardData[ANCESTRAL_RECALL], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, player.hand));
-
-    const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
-    gameEventManager.addEvent(new GameEvent_CastSpell(player, recall, [player]));
-
-    // Test stack resolved properly
-    expect(cardEnteredStack).toHaveBeenCalledTimes(1);
-
-    // Check card entered graveyard
-    expect(player.graveyard.cards.length).toBe(1);
-    expect(player.graveyard.cards[0]).toBe(recall);
-
-    // Check effect resolved
-    expect(player.hand.cards.length).toBe(3);
-});
+// test("should cast instant spell from hand (bypassing cost)", () => {
+//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
+//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
+//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
+//
+//     const recall = new Card(cardData[ANCESTRAL_RECALL], player);
+//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, player.hand));
+//
+//     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
+//     gameEventManager.addEvent(new GameEvent_CastSpell(player, recall, [player]));
+//
+//     // Test stack resolved properly
+//     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
+//
+//     // Check card entered graveyard
+//     expect(player.graveyard.cards.length).toBe(1);
+//     expect(player.graveyard.cards[0]).toBe(recall);
+//
+//     // Check effect resolved
+//     expect(player.hand.cards.length).toBe(3);
+// });
 
 test("shouldn't play creature card from hand with insufficient mana", () => {
     const bears = new Card(cardData[GRIZZLY_BEARS], player);

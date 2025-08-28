@@ -1,4 +1,4 @@
-import {cardData} from "../../index";
+import {cardData} from "~/index";
 
 export const FOREST = cardData.findIndex(c => c.name == "Forest");
 export const GRIZZLY_BEARS = cardData.findIndex(c => c.name == "Grizzly Bears");

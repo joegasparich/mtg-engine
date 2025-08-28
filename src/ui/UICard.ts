@@ -1,19 +1,18 @@
 import * as PIXI from "pixi.js";
 
-import {Battlefield} from "../engine/Zone";
-import {showCustomContextMenu} from "./contextMenu";
-import Card from "../engine/Card";
-import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
-import {autobind} from "../utility/typeUtility";
-import {GameEvent_TapCard, GameEvent_UntapCard} from "../engine/events";
-import {pixi, TargetType, uiRoot, UITargeter} from "./UIRoot";
-import {game} from "../engine/Game";
-
+import Card from "@engine/Card";
 import {GlowFilter} from "pixi-filters";
-import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
-import {loadImageFromExternalUrl} from "../utility/imageUtility";
-import playerActionManager from "../engine/actions/PlayerActionManager";
-import Player from "../engine/Player";
+import {pixi, TargetType, uiRoot, UITargeter} from "@ui/UIRoot";
+import {loadImageFromExternalUrl} from "@utility/imageUtility";
+import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
+import {autobind} from "@utility/typeUtility";
+import playerActionManager from "@engine/actions/PlayerActionManager";
+import {GameEvent_TapCard, GameEvent_UntapCard} from "@engine/events";
+import {Battlefield} from "@engine/Zone";
+import uiEventManager, {UIEvent_CardClicked} from "@ui/UIEventManager";
+import {showCustomContextMenu} from "@ui/contextMenu";
+import Player from "@engine/Player";
+import {game} from "@engine/Game";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;

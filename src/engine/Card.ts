@@ -1,15 +1,12 @@
-import {
-    CardDef,
-    CardType, Keyword,
-} from "../defs";
-import {Battlefield, Zone} from "./Zone";
-import {game} from "./Game";
-import Player from "./Player";
-import {StepIndex} from "./Step";
-import {ManaAmount, ManaCost, ManaUtility} from "./mana";
-import gameEventManager from "./events/GameEventManager";
-import {GameEvent_ChangeCardZone,GameEvent_DestroyPermanent} from "./events";
-import {Ability, makeAbility} from "./Ability";
+import {Battlefield, Zone} from "@engine/Zone";
+import Player from "@engine/Player";
+import {CardDef, CardType, Keyword} from "~/defs";
+import {ManaAmount, ManaCost, ManaUtility} from "@engine/mana";
+import {Ability, makeAbility} from "@engine/abilities";
+import {game} from "@engine/Game";
+import {StepIndex} from "@engine/Step";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_ChangeCardZone, GameEvent_DestroyPermanent} from "@engine/events";
 
 let idCounter = 0;
 
@@ -34,7 +31,7 @@ export default class Card {
     cost: ManaCost;
     power: number;
     toughness: number;
-    abilities: Ability[];
+    abilities: Ability[] = [];
 
     constructor(cardDef: CardDef, owner: Player) {
         this.id = idCounter++;
@@ -66,7 +63,7 @@ export default class Card {
 
         if (this.zone instanceof Battlefield) {
             for (const ability of this.abilities) {
-                if (ability.activated && ability.canActivate(this))
+                if (ability.activatable && ability.canActivate(this))
                     ManaUtility.addMana(potentialMana, ability.getPotentialMana());
             }
         }
@@ -88,7 +85,8 @@ export default class Card {
         if (game.activePlayer() != this.controller)
             return false;
 
-        if (!ability.activated)
+        if (!ability.activatable)
+            return false;
 
         return ability.canActivate(this);
     }

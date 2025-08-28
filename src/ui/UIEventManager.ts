@@ -1,4 +1,4 @@
-import Card from "../engine/Card";
+import Card from "@engine/Card";
 
 export enum UIEventType {
     CardClicked,

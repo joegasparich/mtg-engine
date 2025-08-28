@@ -1,10 +1,10 @@
-import Player from "./Player";
-import gameEventManager from "./events/GameEventManager";
-import {autobind} from "../utility/typeUtility";
-import uiEventManager, { UIEvent_CardDeselected } from "../ui/UIEventManager";
-import {CombatManager} from "./CombatManager";
-import {game} from "./Game";
-import {GameEvent_DrawCard, GameEvent_TapCard, GameEvent_UntapCard} from "./events";
+import Player from "@engine/Player";
+import {game} from "@engine/Game";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_DrawCard, GameEvent_TapCard, GameEvent_UntapCard} from "@engine/events";
+import {CombatManager} from "@engine/CombatManager";
+import {autobind} from "@utility/typeUtility";
+import uiEventManager, {UIEvent_CardDeselected} from "@ui/UIEventManager";
 
 interface Step {
     message: string | null;

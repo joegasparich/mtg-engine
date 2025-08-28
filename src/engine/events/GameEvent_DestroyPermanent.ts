@@ -1,5 +1,5 @@
-import Card from "../Card";
-import {GameEvent, GameEventType} from "./GameEventManager";
+import {GameEvent, GameEventType} from "@engine/events/GameEventManager";
+import Card from "@engine/Card";
 
 export class GameEvent_DestroyPermanent extends GameEvent {
     card: Card;

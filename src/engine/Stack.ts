@@ -1,11 +1,11 @@
-import Card from "./Card";
-import {CardType} from "../defs";
-import gameEventManager from "./events/GameEventManager";
-import {GameEvent_ChangeCardZone} from "./events";
-import {ActionTarget} from "./actions";
-import Player from "./Player";
-import {Zone} from "./Zone";
-import {Ability} from "./Ability";
+import Player from "@engine/Player";
+import Card from "@engine/Card";
+import {ActionTarget} from "@engine/actions";
+import {Zone} from "@engine/Zone";
+import {Ability} from "@engine/abilities";
+import gameEventManager from "@engine/events/GameEventManager";
+import {GameEvent_ChangeCardZone} from "@engine/events";
+import {CardType} from "~/defs";
 
 export class Spell {
     owner: Player;
@@ -34,6 +34,7 @@ export class Spell {
 // }
 
 export class Stack extends Zone {
+    name = "Stack";
     stack: (Spell | Ability)[] = [];
 
     spellCast(caster: Player, card: Card, targets?: ActionTarget[]) {
