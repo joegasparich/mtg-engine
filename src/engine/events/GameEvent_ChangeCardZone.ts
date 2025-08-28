@@ -20,9 +20,10 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     }
 
     perform() {
+        this.card.preChangeZone();
         this.card.zone?.onLeave(this.card);
         this.card.zone = this.newZone;
-        this.card.onChangeZone();
+        this.card.postChangeZone();
         this.newZone.onEnter(this.card);
     }
 }

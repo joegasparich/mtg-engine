@@ -1,6 +1,6 @@
 import Player from "@engine/Player";
 import {Stack} from "@engine/Stack";
-import gameEventManager, {GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
+import gameEventManager, {GameEvent_Log, GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
 import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "@engine/events";
 import {Step, StepIndex} from "@engine/Step";
 import playerActionManager from "@engine/actions/PlayerActionManager";
@@ -48,7 +48,7 @@ export default class Game {
     startGame(options?: GameOptions) {
         this.options = options ?? new GameOptions();
 
-        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.Log, "Game started"));
+        gameEventManager.addEvent(new GameEvent_Log(GameEventType.Log, "Game started"));
 
         // Shuffle libraries
         for (const player of this.players) {

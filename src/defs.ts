@@ -20,18 +20,13 @@ export enum CardType {
 }
 
 export type AbilityDef = {
-    activateString: string;
-    keyword: Keyword;
-    isManaAbility: boolean;
+    activateString?: string;
+    keyword?: Keyword;
+    isManaAbility?: boolean;
     parts: Record<ClassName, object>
 };
 
 export enum Keyword {
-    Flying = "Flying",
-    Reach = "Reach",
+    Flying = "flying",
+    Reach = "reach",
 }
-
-export const KeywordMap: Record<Keyword, ClassName> = {
-    Flying: "StaticAbility_Flying",
-    Reach: ""
-};

@@ -1,7 +1,8 @@
-import {AbilityPart_Effect, GrammarKey, resolveAbilityGrammar} from "@engine/abilities";
-import {RegisterAbilityPart} from "@engine/abilities/registry";
 import Player from "@engine/Player";
 import {ManaUtility} from "@engine/mana";
+import { AbilityPart_Effect } from "./AbilityPart_Effect";
+import { RegisterAbilityPart } from "../../registry";
+import {GrammarKey, resolveAbilityGrammar} from "../..";
 
 @RegisterAbilityPart
 export class AbilityPart_Effect_AddMana extends AbilityPart_Effect {

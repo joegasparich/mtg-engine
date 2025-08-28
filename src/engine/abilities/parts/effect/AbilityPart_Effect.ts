@@ -1,4 +1,4 @@
-import {AbilityPart} from "@engine/abilities";
+import { AbilityPart } from "../AbilityPart";
 
 export abstract class AbilityPart_Effect extends AbilityPart {
     inSignal = "default";

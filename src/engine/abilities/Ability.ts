@@ -1,9 +1,10 @@
 import {AbilityDef} from "~/defs";
 import {AbilityPart} from "@engine/abilities/parts/AbilityPart";
-import {AbilityPart_Activate, AbilityPart_Effect_AddMana, SlateVar} from "@engine/abilities/index";
 import {ActionTarget} from "@engine/actions";
 import Card from "@engine/Card";
 import {ManaAmount, ManaUtility} from "@engine/mana";
+import {AbilityPart_Activate, AbilityPart_Effect_AddMana, SlateVar} from "@engine/abilities/index";
+import {Zone} from "@engine/Zone";
 
 // This class assumes that once its parts are set up it won't change
 // For caching purposes
@@ -11,9 +12,11 @@ export class Ability {
     def: AbilityDef;
     parts: AbilityPart[] = [];
     slate: Record<SlateVar | string, ActionTarget> = {};
+    card: Card;
 
     constructor(card: Card) {
         this.slate["THIS"] = card;
+        this.card = card;
     }
 
     addPart(part: AbilityPart) {
@@ -26,7 +29,7 @@ export class Ability {
     }
 
     cleanup() {
-        this.parts.forEach(part => part.cleanup());
+        this.parts.forEach(part => part.cleanup(this));
     }
 
     //-- Getters --//

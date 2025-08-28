@@ -26,7 +26,10 @@ class PlayerActionManager {
 
     constructor() {
         // Perf Warning: This might end up being too intensive, might need to cache
-        gameEventManager.on(GameEventType.All, () => {
+        gameEventManager.onPerformed(GameEventType.All, (event) => {
+            if (!event.isAction)
+                return;
+
             const player = game.activePlayer();
 
             if (!player)

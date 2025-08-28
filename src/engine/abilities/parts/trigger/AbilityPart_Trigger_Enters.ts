@@ -1,10 +1,11 @@
-import {RegisterAbilityPart} from "@engine/abilities/registry";
-import {Ability, AbilityPart_Trigger, GrammarKey} from "@engine/abilities";
 import {CardType} from "~/defs";
 import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
 import {autobind} from "@utility/typeUtility";
 import {GameEvent_ChangeCardZone} from "@engine/events";
 import {Battlefield} from "@engine/Zone";
+import { AbilityPart_Trigger } from "./AbilityPart_Trigger";
+import {Ability, GrammarKey} from "../..";
+import { RegisterAbilityPart } from "../../registry";
 
 @RegisterAbilityPart
 class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
@@ -14,11 +15,11 @@ class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
     setup(ability: Ability) {
         super.setup(ability);
 
-        gameEventManager.on(GameEventType.ChangeCardZone, this.onCardChangedZone);
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
     }
 
     cleanup() {
-        gameEventManager.off(GameEventType.ChangeCardZone, this.onCardChangedZone);
+        gameEventManager.offPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
     }
 
     @autobind

@@ -15,7 +15,7 @@ export class UIZone extends PIXI.Container {
 
         this.zone = zone;
 
-        gameEventManager.on(GameEventType.ChangeCardZone, this.onCardChangedZone)
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone)
     }
 
     @autobind

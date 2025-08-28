@@ -1,3 +1,5 @@
+import Card from "@engine/Card";
+
 export enum GameEventType {
     All,
     Log,
@@ -14,12 +16,13 @@ export enum GameEventType {
     TapCard,
     UntapCard,
     DrawCard,
-    DestroyPermanent,
+    DestroyPermanent
 }
 
 export abstract class GameEvent {
     type: GameEventType;
     label: string;
+    isAction = true;
     callback: () => void;
 
     perform() {}
@@ -29,6 +32,17 @@ export abstract class GameEvent {
 }
 
 export class GameEvent_Simple extends GameEvent {
+    constructor(type: GameEventType, label: string,) {
+        super();
+
+        this.type = type;
+        this.label = label;
+    }
+}
+
+export class GameEvent_Log extends GameEvent {
+    isAction = false;
+
     constructor(type: GameEventType, label: string) {
         super();
 
@@ -38,20 +52,33 @@ export class GameEvent_Simple extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
+type CheckListener = (event: GameEvent) => boolean;
 
 class GameEventManager {
-    private readonly listenersByType = new Map<GameEventType, Set<Listener>>();
+    private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
+    private readonly eventCheckListenersByType = new Map<GameEventType, Set<CheckListener>>();
     private readonly eventsResolvedCallback: (() => void)[] = [];
 
-    on(eventType: GameEventType, listener: Listener) {
-        if (!this.listenersByType.has(eventType))
-            this.listenersByType.set(eventType, new Set<Listener>());
+    onPerformed(eventType: GameEventType, listener: Listener) {
+        if (!this.eventPerformedListenersByType.has(eventType))
+            this.eventPerformedListenersByType.set(eventType, new Set<Listener>());
 
-        this.listenersByType.get(eventType).add(listener);
+        this.eventPerformedListenersByType.get(eventType).add(listener);
     }
 
-    off(eventType: GameEventType, listener: Listener) {
-        this.listenersByType.get(eventType).delete(listener);
+    offPerformed(eventType: GameEventType, listener: Listener) {
+        this.eventPerformedListenersByType.get(eventType).delete(listener);
+    }
+
+    onCheck(eventType: GameEventType, listener: CheckListener) {
+        if (!this.eventCheckListenersByType.has(eventType))
+            this.eventCheckListenersByType.set(eventType, new Set<CheckListener>());
+
+        this.eventCheckListenersByType.get(eventType).add(listener);
+    }
+
+    offCheck(eventType: GameEventType, listener: CheckListener) {
+        this.eventCheckListenersByType.get(eventType).delete(listener);
     }
 
     activeEvents: GameEvent[] = [];
@@ -69,6 +96,7 @@ class GameEventManager {
             this.eventsResolvedCallback.length = 0;
         }
     }
+
     addEvents(events: GameEvent[]) {
         this.activeEvents.push(...events);
         this.checkForEffects();
@@ -80,7 +108,18 @@ class GameEventManager {
     }
 
     checkForEffects() {
-        // This is where various effects can modify or remove events
+        this.activeEvents.filter(event => {
+            for (const listener of this.eventCheckListenersByType.get(event.type) ?? []) {
+                if (!listener(event))
+                    return false;
+            }
+            for (const listener of this.eventCheckListenersByType.get(GameEventType.All) ?? []) {
+                if (!listener(event))
+                    return false;
+            }
+
+            return true;
+        });
     }
 
     performAllEvents() {
@@ -100,8 +139,8 @@ class GameEventManager {
                 const event = events[i];
 
                 event.perform();
-                this.listenersByType.get(event.type)?.forEach(listener => listener(event));
-                this.listenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
+                this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
+                this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
 
                 console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
                 event.callback?.();

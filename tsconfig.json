@@ -22,7 +22,10 @@
         "resolveJsonModule": true,
         "useDefineForClassFields": false,
         "types": [
+            "vite/client",
             "vitest/globals",
         ]
-    }
+    },
+    "include": ["src"],
+    "exclude": ["node_modules", "dist"]
 }

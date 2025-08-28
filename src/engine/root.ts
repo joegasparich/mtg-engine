@@ -3,10 +3,18 @@ import * as PIXI from 'pixi.js';
 import Game, {game} from "@engine/Game";
 import {CardDef} from "~/defs";
 import UIRoot, {uiRoot} from "@ui/UIRoot";
-import {cardData} from "~/index";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_GoToNextStep} from "@engine/events";
-import {randInt} from "@utility/randomUtility";
+import {
+    GameEvent_ActivateAbility,
+    GameEvent_CastSpell,
+    GameEvent_ChangeCardZone,
+    GameEvent_GoToNextStep,
+    GameEvent_GoToNextTurn,
+    GameEvent_GoToStep
+} from "@engine/events";
+import {cardData} from "~/index";
+import Card from "@engine/Card";
+import {StepIndex} from "@engine/Step";
 
 declare global {
     interface Window {
@@ -21,6 +29,7 @@ const MOUNTAIN = 3;
 const FOREST = 4;
 const BEARS = 5;
 const GOBLINS = 6;
+const ELEMENTAL = 7;
 const RECALL = 8;
 
 export async function startGame() {
@@ -35,41 +44,43 @@ export async function startGame() {
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 
-    const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    // const playerOne = game.addPlayer([PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS]);
-    // const playerTwo = game.addPlayer([PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS, PLAINS]);
+    // const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    // const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
+    const playerOne = game.addPlayer([ISLAND, ISLAND, ISLAND, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, ELEMENTAL, ELEMENTAL, ELEMENTAL, ELEMENTAL, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
+    const playerTwo = game.addPlayer([ISLAND, ISLAND, ISLAND, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, ELEMENTAL, ELEMENTAL, ELEMENTAL, ELEMENTAL, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
 
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);
 
     game.startGame({allowAutoSkip: true});
 
-    // function playBears(player: Player) {
-    //     const forestA = new Card(cardData[FOREST], player);
-    //     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forestA, player.hand));
-    //     gameEventManager.addEvent(new GameEvent_CastSpell(player, forestA));
-    //
-    //     const forestB = new Card(cardData[FOREST], player);
-    //     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forestB, player.hand));
-    //     gameEventManager.addEvent(new GameEvent_CastSpell(player, forestB));
-    //
-    //     const bears = new Card(cardData[BEARS], player);
-    //     gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
-    //
-    //     const tapForestA = new Ability(player, forestA.activatedAbilities[0], forestA);
-    //     gameEventManager.addEvent(new GameEvent_ActivateAbility(tapForestA));
-    //
-    //     const tapForestB = new Ability(player, forestB.activatedAbilities[0], forestB);
-    //     gameEventManager.addEvent(new GameEvent_ActivateAbility(tapForestB));
-    //
-    //     gameEventManager.addEvent(new GameEvent_CastSpell(player, bears));
-    // }
+    // Combat Test
+    const island = new Card(cardData[ISLAND], playerOne);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(island, playerOne.hand));
+    gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, island));
 
-    // // Test
-    // playBears(playerOne);
-    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    // playBears(playerTwo);
+    const elemental = new Card(cardData[ELEMENTAL], playerOne);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerOne.hand));
+
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(playerOne, island, island.abilities[0]));
+
+    gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, elemental));
+
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+
+    const mountain = new Card(cardData[MOUNTAIN], playerTwo);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, playerTwo.hand));
+    gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, mountain));
+
+    const goblin = new Card(cardData[GOBLINS], playerTwo);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblin, playerTwo.hand));
+
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(playerTwo, mountain, mountain.abilities[0]));
+
+    gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, goblin));
+
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
 }
 
 function tick(time: PIXI.Ticker) {

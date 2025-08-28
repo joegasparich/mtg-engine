@@ -1,5 +1,5 @@
 import Card from "@engine/Card";
-import {AbilityPart} from "@engine/abilities";
+import { AbilityPart } from "../AbilityPart";
 
 export abstract class AbilityPart_Activate extends AbilityPart {
     outSignal = "default";

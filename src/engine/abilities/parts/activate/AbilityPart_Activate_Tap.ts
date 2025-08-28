@@ -1,8 +1,8 @@
 import Card from "@engine/Card";
 import gameEventManager from "@engine/events/GameEventManager";
-import {AbilityPart_Activate} from "@engine/abilities";
-import {RegisterAbilityPart} from "@engine/abilities/registry";
 import {GameEvent_TapCard} from "@engine/events";
+import { AbilityPart_Activate } from "./AbilityPart_Activate";
+import { RegisterAbilityPart } from "../../registry";
 
 @RegisterAbilityPart
 class AbilityPart_Activate_Tap extends AbilityPart_Activate {

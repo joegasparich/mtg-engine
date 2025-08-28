@@ -65,8 +65,8 @@ export default class UICard extends PIXI.Sprite {
         pixi.stage.on('pointerup', this.globalMouseUp);
         pixi.stage.on('pointerupoutside', this.globalMouseUp);
 
-        gameEventManager.on(GameEventType.TapCard, this.onCardTapped);
-        gameEventManager.on(GameEventType.UntapCard, this.onCardUntapped);
+        gameEventManager.onPerformed(GameEventType.TapCard, this.onCardTapped);
+        gameEventManager.onPerformed(GameEventType.UntapCard, this.onCardUntapped);
 
         this.onRender = this.render;
     }

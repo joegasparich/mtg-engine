@@ -1,7 +1,12 @@
 import DOMElement, {DOMPosition} from "./DOMElement";
 
 export default class DOMButton extends DOMElement {
-    onClick: () => any;
+    set onClick(value: () => any) {
+        this._onClick = value;
+        this.element.removeEventListener('click', this._onClick);
+        this.element.addEventListener('click', this._onClick);
+    }
+    private _onClick: () => any;
 
     get text(): string { return this.element.textContent; }
     set text(val: string) { this.element.textContent = val; }
@@ -15,12 +20,12 @@ export default class DOMButton extends DOMElement {
 
         this.text = text;
 
-        this.onClick = onClick;
-        this.element.addEventListener('click', this.onClick);
+        this._onClick = onClick;
+        this.element.addEventListener('click', this._onClick);
     }
 
     override destroy() {
-        this.element.removeEventListener('click', this.onClick);
+        this.element.removeEventListener('click', this._onClick);
 
         super.destroy();
     }

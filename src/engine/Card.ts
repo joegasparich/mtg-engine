@@ -106,7 +106,11 @@ export default class Card {
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(this, this.owner.graveyard));
     }
 
-    onChangeZone() {
+    preChangeZone() {
+        this.abilities.forEach(a => a.cleanup());
+    }
+
+    postChangeZone() {
         // Reset all state
         this.damageTaken = 0;
         this.tapped = false;

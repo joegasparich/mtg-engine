@@ -1,7 +1,14 @@
 {
     "flying": {
-        "parts": [
-            "AbilityPart_Flying"
-        ]
+        "keyword": "flying",
+        "parts": {
+            "AbilityPart_Flying": {}
+        }
+    },
+    "reach": {
+        "keyword": "reach",
+        "parts": {
+            "AbilityPart_Reach": {}
+        }
     }
 }

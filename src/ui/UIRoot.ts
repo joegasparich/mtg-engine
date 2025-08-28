@@ -163,8 +163,8 @@ export default class UIRoot extends PIXI.Container {
         const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()));
         const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
 
-        gameEventManager.on(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
-        gameEventManager.on(GameEventType.StepStart, () => {
+        gameEventManager.onPerformed(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
+        gameEventManager.onPerformed(GameEventType.StepStart, () => {
             currentStepLabel.text = Step.toString(game.currentStepIndex);
 
             const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
@@ -186,7 +186,7 @@ export default class UIRoot extends PIXI.Container {
             const stepActions = new DOMButton("", { top: '75px', left: '45%', right: '45%' }, null);
             stepActions.hide();
 
-            gameEventManager.on(GameEventType.StepStart, event => {
+            gameEventManager.onPerformed(GameEventType.StepStart, event => {
                 const message = game.currentStep().message;
                 if (message) {
                     stepMessageLabel.text = message;
@@ -200,7 +200,7 @@ export default class UIRoot extends PIXI.Container {
                 }
             });
 
-            gameEventManager.on(GameEventType.StepEnd, event => {
+            gameEventManager.onPerformed(GameEventType.StepEnd, event => {
                 stepMessageLabel.text = null;
                 stepMessageLabel.hide();
 
