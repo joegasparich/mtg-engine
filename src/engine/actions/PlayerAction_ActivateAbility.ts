@@ -1,28 +1,25 @@
-import {ActivatedAbilityDef} from "../../defs";
 import Card from "../Card";
-import {AbilityEffects} from "../abilities/AbilityEffects";
 import Player from "../Player";
-import ActivatedAbility from "../ActivatedAbility";
-import {ActivatedAbilityCosts} from "../abilities/ActivatedAbilityCosts";
 import {PlayerAction} from "./PlayerAction";
+import gameEventManager from "../events/GameEventManager";
+import {GameEvent_ActivateAbility} from "../events";
+import {Ability} from "../Ability";
 
 export class PlayerAction_ActivateAbility extends PlayerAction {
-    abilityDef: ActivatedAbilityDef;
-    targets: null;
+    ability: Ability;
+    targets: null; // TODO
 
-    constructor(card: Card, abilityDef: ActivatedAbilityDef) {
+    constructor(card: Card, ability: Ability) {
         super(card);
 
-        this.abilityDef = abilityDef;
+        this.ability = ability;
     }
 
     label() {
-        return `${ActivatedAbilityCosts.get(this.abilityDef.cost).label}: ${this.abilityDef.effects.map(e => AbilityEffects.get(e.worker).label(e, this.card)).join(", ")}`;
+        return "";//`${ActivatedAbilityCosts.get(this.abilityDef.cost).label}: ${this.abilityDef.effects.map(e => AbilityEffects.get(e.worker).label(e)).join(", ")}`;
     }
 
     perform(player: Player) {
-        const ability = new ActivatedAbility(player, this.abilityDef, this.card);
-
-        ability.perform();
+        gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.card, this.ability, this.targets));
     }
 }

@@ -37,11 +37,11 @@ export default class Player {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
         for (const card of this.hand.cards) {
-            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this));
+            ManaUtility.addMana(potentialMana, card.getPotentialMana(this));
         }
 
         for (const card of this.battlefield.cards) {
-            ManaUtility.AddMana(potentialMana, card.getPotentialMana(this));
+            ManaUtility.addMana(potentialMana, card.getPotentialMana(this));
         }
 
         return potentialMana;

@@ -9,4 +9,4 @@ export default defineConfig({
             input: 'src/electron/main.ts',
         },
     },
-})
+});

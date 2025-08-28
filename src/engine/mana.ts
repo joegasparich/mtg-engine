@@ -23,7 +23,7 @@ export type Mana = ManaAmount | ManaCost;
 export namespace ManaUtility {
     const manaStringCache = new Map<string, Mana>()
 
-    export function AddMana(pool: Mana, added: Readonly<Mana>) {
+    export function addMana(pool: Mana, added: Readonly<Mana>) {
         for (let i = 0; i < 6; i++) {
             pool[i] += added[i];
         }

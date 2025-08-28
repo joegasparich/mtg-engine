@@ -1,10 +1,5 @@
 import Card from "./Card";
-import {CardType} from "../defs";
-import gameEventManager from "./events/GameEventManager";
-import ActivatedAbility from "./ActivatedAbility";
-import {GameEvent_ChangeCardZone} from "./events";
 import {shuffleArray} from "../utility/arrayUtility";
-import {AbilityEffects} from "./abilities/AbilityEffects";
 
 export class Zone {
     name: string;
@@ -29,6 +24,9 @@ export class Library extends Zone {
     getTopCard(): Card {
         return this.cards.at(-1);
     }
+    getTopXCards(x: number): Card[] {
+        return this.cards.slice(-x);
+    }
 }
 
 export class Battlefield extends Zone {
@@ -41,56 +39,4 @@ export class Hand extends Zone {
 
 export class Graveyard extends Zone {
     name = "Graveyard";
-}
-
-export class Stack extends Zone {
-    stack: (Card | ActivatedAbility)[] = [];
-
-    constructor() {
-        super();
-
-        this.name = "Stack";
-    }
-
-    override onEnter(card: Card) {
-        super.onEnter(card);
-
-        this.stack.push(card);
-    }
-
-    abilityActivated(ability: ActivatedAbility) {
-        this.stack.push(ability);
-    }
-
-    resolveAll() {
-        // gameEventManager.addEvent(new GameEvent_SimpleEvent(GameEventType.Log, "Stack Resolving"));
-
-        while (this.stack.length > 0) {
-            const spellOrAbility = this.stack.pop();
-
-            if (spellOrAbility instanceof Card)
-                this.resolveSpell(spellOrAbility);
-            else if (spellOrAbility instanceof ActivatedAbility)
-                this.resolveAbility(spellOrAbility);
-        }
-
-        // gameEventManager.addEvent(new GameEvent_SimpleEvent(GameEventType.Log, "Stack Resolved"));
-    }
-
-    resolveSpell(spell: Card) {
-        switch (spell.type) {
-            case CardType.Land:
-            case CardType.Creature:
-                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.controller.battlefield));
-                break;
-            default:
-                break;
-        }
-    }
-
-    resolveAbility(ability: ActivatedAbility) {
-        for (const effect of ability.def.effects) {
-            AbilityEffects.get(effect.worker).perform(effect, ability.card, ability.owner);
-        }
-    }
 }

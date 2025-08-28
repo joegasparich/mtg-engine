@@ -3,6 +3,18 @@ import {cardData} from "../../../index";
 import {expect} from "vitest";
 import {StepIndex} from "../../Step";
 import {BASIC_DECK, FOREST, GRIZZLY_BEARS} from "../testData";
+import Card from "../../Card";
+
+import testJSON from "../../../../test.json";
+import {AbilityDef, makeAbility} from "../../Ability";
+
+test("temp", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const forest = new Card(cardData[FOREST], player);
+
+    makeAbility(testJSON.abilities[0], forest);
+});
 
 test("should start game and add player", () => {
     Game.init();
@@ -59,11 +71,11 @@ test("should load deck", () => {
 });
 
 const SEVEN_FORESTS = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST];
-test("should draw 7 cards", () => {
+test("should draw 7 cards", async () => {
     Game.init();
     const player = game.addPlayer(SEVEN_FORESTS);
 
-    game.startGame();
+    await game.startGame();
 
     // Check we drew exactly seven cards
     expect(player.hand.cards.length).toBe(7);

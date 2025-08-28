@@ -1,10 +1,10 @@
 import Player from "./Player";
-import {Stack} from "./Zone";
 import {Step, StepIndex} from "./Step";
 import gameEventManager, {GameEvent_Simple, GameEventType} from "./events/GameEventManager";
 import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "./events";
 import playerActionManager from "./actions/PlayerActionManager";
 import {CombatManager} from "./CombatManager";
+import {Stack} from "./Stack";
 
 class GameOptions {
     allowAutoSkip = false;
@@ -56,10 +56,8 @@ export default class Game {
         }
 
         // Draw 7
-        for (let i = 0; i < 7; i++) {
-            for (const player of this.players) {
-                gameEventManager.addEvent(new GameEvent_DrawCard(player));
-            }
+        for (const player of this.players) {
+            gameEventManager.addEvent(new GameEvent_DrawCard(player, 7));
         }
 
         this.currentTurnPlayerID = 0;

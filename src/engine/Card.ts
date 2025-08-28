@@ -1,9 +1,6 @@
 import {
-    AbilityEffectDef_AddMana,
-    ActivatedAbilityDef,
     CardDef,
-    CardType, Keyword, KeywordMap,
-    StaticAbilityDef
+    CardType, Keyword,
 } from "../defs";
 import {Battlefield, Zone} from "./Zone";
 import {game} from "./Game";
@@ -12,8 +9,7 @@ import {StepIndex} from "./Step";
 import {ManaAmount, ManaCost, ManaUtility} from "./mana";
 import gameEventManager from "./events/GameEventManager";
 import {GameEvent_ChangeCardZone,GameEvent_DestroyPermanent} from "./events";
-import {ActivatedAbilityCosts} from "./abilities/ActivatedAbilityCosts";
-import {StaticAbilities, StaticAbility} from "./abilities/staticAbilities";
+import {Ability, makeAbility} from "./Ability";
 
 let idCounter = 0;
 
@@ -38,8 +34,7 @@ export default class Card {
     cost: ManaCost;
     power: number;
     toughness: number;
-    activatedAbilities: ActivatedAbilityDef[] = [];
-    staticAbilities: StaticAbility[] = [];
+    abilities: Ability[];
 
     constructor(cardDef: CardDef, owner: Player) {
         this.id = idCounter++;
@@ -61,11 +56,8 @@ export default class Card {
         if (cardDef.cost)
             this.cost = [...ManaUtility.parseManaString<ManaCost>(cardDef.cost)];
 
-        if (cardDef.activated_abilities)
-            this.activatedAbilities = [...cardDef.activated_abilities];
-
-        if (cardDef.static_abilities)
-            cardDef.static_abilities.forEach(def => this.addStaticAbility(def));
+        if (cardDef.abilities)
+            this.abilities = cardDef.abilities.map(def => makeAbility(def, this));
     }
 
     public getPotentialMana(actor: Player): Readonly<ManaAmount> {
@@ -73,17 +65,9 @@ export default class Card {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
         if (this.zone instanceof Battlefield) {
-            for (const abilityDef of this.activatedAbilities) {
-                if (this.canActivate(abilityDef) && ActivatedAbilityCosts.get(abilityDef.cost).payable(this, actor)) {
-                    for (const effect of abilityDef.effects) {
-                        if (effect.worker == "AbilityEffect_AddMana") { // TODO: Improve? DefOf?
-                            ManaUtility.AddMana(
-                                potentialMana,
-                                ManaUtility.parseManaString<ManaAmount>((effect as AbilityEffectDef_AddMana).mana)
-                            );
-                        }
-                    }
-                }
+            for (const ability of this.abilities) {
+                if (ability.activated && ability.canActivate(this))
+                    ManaUtility.addMana(potentialMana, ability.getPotentialMana());
             }
         }
 
@@ -100,11 +84,13 @@ export default class Card {
         return true;
     }
 
-    canActivate(abilityDef: ActivatedAbilityDef) {
+    canActivate(ability: Ability) {
         if (game.activePlayer() != this.controller)
             return false;
 
-        return true;
+        if (!ability.activated)
+
+        return ability.canActivate(this);
     }
 
     checkState() {
@@ -132,13 +118,6 @@ export default class Card {
 
     // Getters
     hasKeyword(keyword: Keyword) {
-        return this.staticAbilities.find(a => a.keyword == keyword);
-    }
-
-    private addStaticAbility(def: StaticAbilityDef) {
-        const ability = new StaticAbilities[KeywordMap[def.keyword] ?? def.worker](this);
-        ability.keyword = def.keyword;
-
-        this.staticAbilities.push(ability);
+        return this.abilities.some(a => a.def.keyword === keyword);
     }
 }

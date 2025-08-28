@@ -6,13 +6,14 @@ import Card from "../engine/Card";
 import gameEventManager, {GameEventType} from "../engine/events/GameEventManager";
 import {autobind} from "../utility/typeUtility";
 import {GameEvent_TapCard, GameEvent_UntapCard} from "../engine/events";
-import {pixi, uiRoot, UITargeter} from "./UIRoot";
+import {pixi, TargetType, uiRoot, UITargeter} from "./UIRoot";
 import {game} from "../engine/Game";
 
 import {GlowFilter} from "pixi-filters";
 import uiEventManager, {UIEvent_CardClicked} from "./UIEventManager";
 import {loadImageFromExternalUrl} from "../utility/imageUtility";
 import playerActionManager from "../engine/actions/PlayerActionManager";
+import Player from "../engine/Player";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -145,12 +146,24 @@ export default class UICard extends PIXI.Sprite {
                 showCustomContextMenu(event.global, actions.map(a => a.label()), index => {
                     const action = actions[index];
 
+
                     if (action.targets && action.targets.length > 0) {
+                        let targetType = TargetType.None;
+
+                        if (action.targets.some(t => t instanceof Card))
+                            targetType |= TargetType.Card;
+                        if (action.targets.some(t => t instanceof Player))
+                            targetType |= TargetType.Player;
+
                         // TODO: Multitargeting
-                        new UITargeter(
+                        const targeter = new UITargeter(
                             this,
-                            uiCard => action.targets.includes(uiCard.card),
-                            uiCard => action.perform(game.activePlayer(), [uiCard.card]),
+                            targetType,
+                            target => action.targets.includes(target),
+                            target => {
+                                action.perform(game.activePlayer(), [target]);
+                                targeter.remove();
+                            },
                             null
                         );
                     } else {

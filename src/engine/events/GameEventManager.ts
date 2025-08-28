@@ -57,9 +57,12 @@ class GameEventManager {
     performingEvents: boolean;
 
     addEvent(event: GameEvent) {
-        this.activeEvents.push(event);
-        this.checkForEffects();
-        this.performAllEvents();
+        // return new Promise((res, rej) => {
+        //     event.then(() => res());
+            this.activeEvents.push(event);
+            this.checkForEffects();
+            this.performAllEvents();
+        // });
     }
     addEvents(events: GameEvent[]) {
         this.activeEvents.push(...events);

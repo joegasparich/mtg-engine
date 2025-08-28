@@ -3,10 +3,9 @@ import * as PIXI from "pixi.js";
 import Player from "../engine/Player";
 import {UIHand} from "./UIHand";
 import {UIBattlefield} from "./UIBattlefield";
-import {pixi} from "./UIRoot";
 
 export class UIPlayer extends PIXI.Container {
-    player: Player
+    player: Player;
 
     hand: UIHand;
     battlefield: UIBattlefield;
@@ -23,6 +22,6 @@ export class UIPlayer extends PIXI.Container {
 
         this.addChild(this.battlefield);
         this.addChild(this.hand);
-        this.hand.position = new PIXI.Point(0, pixi.screen.height/2 - 30);
+        this.hand.position = new PIXI.Point(0, 0);
     }
 }

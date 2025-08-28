@@ -6,20 +6,23 @@ export class GameEvent_DrawCard extends GameEvent {
     type = GameEventType.DrawCard;
 
     player: Player;
+    count: number;
 
-    constructor(player: Player) {
+    constructor(player: Player, count = 1) {
         super();
 
         this.player = player;
+        this.count = count;
 
         this.label = `Player ${this.player.id} drawing card from library`;
     }
 
     perform() {
-        const card = this.player.library.getTopCard();
+        const cards = this.player.library.getTopXCards(this.count);
+        for (const card of cards) {
+            this.label = `Player ${this.player.id} drew ${card.logName} from library`;
 
-        this.label = `Player ${this.player.id} drew ${card.logName} from library`;
-
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
+            gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
+        }
     }
 }

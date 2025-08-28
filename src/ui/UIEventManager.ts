@@ -69,7 +69,7 @@ class UIEventManager {
     }
 
     off(eventType: UIEventType, listener: Listener) {
-        this.listeners.get(eventType).delete(listener);
+        this.listeners.get(eventType)?.delete(listener);
     }
 
     fire(event: UIEvent) {

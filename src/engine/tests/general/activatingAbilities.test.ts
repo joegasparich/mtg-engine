@@ -22,7 +22,7 @@ test("land should tap for mana", () => {
 
     const abilityEnteredStack = vi.spyOn(game.stack, "abilityActivated");
 
-    (new PlayerActions.ActivateAbility(forest, forest.activatedAbilities[0])).perform(player);
+    (new PlayerActions.ActivateAbility(forest, forest.abilities[0])).perform(player);
 
     // Check stack resolved properly
     expect(abilityEnteredStack).toHaveBeenCalledTimes(1);

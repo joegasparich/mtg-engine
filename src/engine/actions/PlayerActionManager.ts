@@ -42,7 +42,7 @@ class PlayerActionManager {
 
         const originalMana: Readonly<ManaAmount> = [...actor.manaPool];
         if (factorInPotentialMana)
-            ManaUtility.AddMana(actor.manaPool, actor.getPotentialMana());
+            ManaUtility.addMana(actor.manaPool, actor.getPotentialMana());
 
         for (const zone of actor.zones) {
             for (const card of zone.cards) {

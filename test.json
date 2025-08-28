@@ -1,0 +1,163 @@
+{
+    "name": "Ankh of Mishra",
+    "image_url": "https://cards.scryfall.io/large/front/8/4/84baed73-7efd-4688-9658-480b1cebc6c4.jpg?1664926285",
+    "oracle_text": "Whenever a land enters the battlefield, Ankh of Mishra deals 2 damage to that land's controller.",
+    "type": "Artifact",
+    "cost": "{2}",
+    "abilities": [
+        {
+            "AbilityPart_Trigger_Enters": {
+                "type": "Land",
+                "storeAs": "LAND"
+            },
+            "AbilityPart_Effect_DealDamage":
+            {
+                "source": "THIS",
+                "amount": 2,
+                "target": "LAND.controller"
+            }
+        }
+    ]
+}
+[
+    {
+        "name": "Plains",
+        "image_url": "https://cards.scryfall.io/large/front/1/2/12cff32a-a365-43ee-a196-8ce32b3bb9fd.jpg?1743205092",
+        "oracle_text": "({T}: Add {W}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{W}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Island",
+        "image_url": "https://cards.scryfall.io/large/front/1/f/1ff6acc9-581c-468f-894d-41f725da7f33.jpg?1743205101",
+        "oracle_text": "({T}: Add {U}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{U}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Swamp",
+        "image_url": "https://cards.scryfall.io/large/front/f/0/f0bfdb9e-318f-4acd-9fbd-41b98a8875d6.jpg?1743205109",
+        "oracle_text": "({T}: Add {B}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{B}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Mountain",
+        "image_url": "https://cards.scryfall.io/large/front/b/f/bfa10a88-12e0-4b79-80bb-6f4620277e20.jpg?1743205117",
+        "oracle_text": "({T}: Add {R}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{R}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Forest",
+        "image_url": "https://cards.scryfall.io/large/front/8/1/8100bceb-ffba-487a-bb45-4fe2a156a8dc.jpg?1743205126",
+        "oracle_text": "({T}: Add {G}.)",
+        "type": "Land",
+        "activated_abilities": [
+            {
+                "cost": "ActivatedAbilityCost_Tap",
+                "effects": [
+                    {
+                        "worker": "AbilityEffect_AddMana",
+                        "mana": "{G}"
+                    }
+                ],
+                "manaAbility": true
+            }
+        ]
+    },
+    {
+        "name": "Grizzly Bears",
+        "image_url": "https://cards.scryfall.io/normal/front/4/0/409f9b88-f03e-40b6-9883-68c14c37c0de.jpg?156254673",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{1}{G}",
+        "power": 2,
+        "toughness": 2
+    },
+    {
+        "name": "Mons's Goblin Raiders",
+        "image_url": "https://cards.scryfall.io/large/front/3/4/34ac4e28-1677-4f88-9b1a-7a32635f0ab2.jpg?1664925688",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{R}",
+        "power": 1,
+        "toughness": 1
+    },
+
+    {
+        "name": "Air Elemental",
+        "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
+        "oracle_text": "Flying",
+        "type": "Creature",
+        "cost": "{3}{U}{U}",
+        "power": 4,
+        "toughness": 4,
+        "static_abilities": [
+            {
+                "keyword": "Flying"
+            }
+        ]
+    },
+    {
+        "name": "Ancestral Recall",
+        "image_url": "https://cards.scryfall.io/large/front/7/1/71283e4c-efd9-4a96-991c-6bbb169b99e7.jpg?1664924695",
+        "oracle_text": "Target player draws three cards.",
+        "type": "Instant",
+        "cost": "{U}",
+        "spell_ability": {
+            "targetWorker": "TargetWorker_Player",
+            "effects": [
+                {
+                    "worker": "AbilityEffect_DrawCards",
+                    "count": 3
+                }
+            ]
+        }
+    }
+]
+

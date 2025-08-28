@@ -5,8 +5,6 @@ import {ActionTarget} from "./PlayerActionManager";
 import {PlayerAction} from "./PlayerAction";
 
 export class PlayerAction_DeclareBlocker extends PlayerAction {
-    targets: ActionTarget[];
-
     constructor(card: Card) {
         super(card);
 

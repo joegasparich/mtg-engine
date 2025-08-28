@@ -18,6 +18,7 @@ import uiEventManager, {
 import {autobind} from "../utility/typeUtility";
 import {drawArrow} from "./drawUtility";
 import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "../engine/events";
+import {ActionTarget} from "../engine/actions";
 
 export let pixi: PIXI.Application = null;
 
@@ -28,25 +29,38 @@ pixi.stage.eventMode = 'static';
 pixi.stage.hitArea = pixi.screen;
 
 const playerPositions = [
-    new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2),
-    new PIXI.Point(pixi.screen.width/2, pixi.screen.height/2),
+    new PIXI.Point(pixi.screen.width/2, pixi.screen.height),
+    new PIXI.Point(pixi.screen.width/2, 0),
 ];
 const playerRotations = [
     0,
     180
 ];
 
-export class UITargeter {
-    arrow: PIXI.Graphics;
-    source: UICard;
-    target: UICard | null;
+export enum TargetType {
+    None = 0,
+    Player = 1 << 0,
+    Card = 1 << 1,
+}
 
-    validateTarget: (card: UICard) => boolean;
-    onTargeted: (card: UICard) => void;
+type UITarget = UICard | UIPlayer;
+
+export class UITargeter {
+    source: UICard;
+    targetType: TargetType;
+
+    target: UITarget;
+
+    arrow: PIXI.Graphics;
+    playerAreas: PIXI.Graphics[] = [];
+
+    validateTarget: (target: ActionTarget) => boolean;
+    onTargeted: (target: ActionTarget) => void;
     onCancelled: () => void;
 
-    constructor(card: UICard, validateTarget: (card: UICard) => boolean, onTargeted: (card: UICard) => void, onCancelled: () => void | null) {
-        this.source = card;
+    constructor(source: UICard, targetType: TargetType, validateTarget: (target: ActionTarget) => boolean, onTargeted: (target: ActionTarget) => void, onCancelled: () => void | null) {
+        this.source = source;
+        this.targetType = targetType;
         this.validateTarget = validateTarget;
         this.onTargeted = onTargeted;
         this.onCancelled = onCancelled;
@@ -68,7 +82,21 @@ export class UITargeter {
             });
         };
 
-        uiEventManager.on(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+        if ((targetType & TargetType.Card) != 0)
+            uiEventManager.on(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+
+        if ((targetType & TargetType.Player) != 0) {
+            for (const player of game.players) {
+                const area = new PIXI.Graphics();
+                area.rect(-50, -50, 100, 100);
+                area.fill(0xde3249);
+                area.eventMode = "static";
+                area.on('pointerup', this.onPlayerAreaClicked);
+                this.playerAreas.push(area);
+                uiRoot.playerToUIPlayer.get(player).addChild(area);
+            }
+        }
+
         pixi.stage.on('pointerup', event => {
             if (event.button == 2) {
                 this.onCancelled?.();
@@ -81,15 +109,35 @@ export class UITargeter {
     onCardClicked(card: Card) {
         const uiCard = uiRoot.cardToUICard.get(card);
 
-        if (this.validateTarget(uiCard)) {
+        if (this.validateTarget(uiCard.card)) {
             this.target = uiCard;
-            this.onTargeted(uiCard);
+            this.onTargeted(uiCard.card);
+        }
+    }
+
+    @autobind
+    onPlayerAreaClicked(event: PIXI.FederatedPointerEvent) {
+        const uiPlayer = event.target.parent as UIPlayer;
+
+        if (this.validateTarget(uiPlayer.player)) {
+            this.target = uiPlayer;
+            this.onTargeted(uiPlayer.player);
         }
     }
 
     remove() {
         pixi.stage.removeChild(this.arrow);
-        uiEventManager.off(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+
+        if ((this.targetType & TargetType.Player) != 0) {
+            for (const area of this.playerAreas) {
+                area.parent.removeChild(area);
+            }
+
+            this.playerAreas.length = 0;
+        }
+
+        if ((this.targetType & TargetType.Card) != 0)
+            uiEventManager.off(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
     }
 }
 
