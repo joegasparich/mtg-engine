@@ -1,5 +1,4 @@
 import {Ability} from "@engine/abilities";
-import {Zone} from "@engine/Zone";
 
 export abstract class AbilityPart {
     ability: Ability;
@@ -8,9 +7,7 @@ export abstract class AbilityPart {
         this.ability = ability;
     }
 
-    cleanup(ability: Ability) {
-    }
+    cleanup(ability: Ability) {}
 
-    onSignalFired(signal: string) {
-    }
+    onSignalFired(signal: string) {}
 }

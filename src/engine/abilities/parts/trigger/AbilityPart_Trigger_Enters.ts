@@ -31,7 +31,7 @@ class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
             return;
 
         if (this.storeAs)
-            this.ability.slate[this.storeAs] = event.card;
+            this.ability.slate[this.storeAs] = [event.card];
 
         this.onTrigger();
     }

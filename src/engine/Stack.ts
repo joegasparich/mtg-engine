@@ -2,7 +2,7 @@ import Player from "@engine/Player";
 import Card from "@engine/Card";
 import {ActionTarget} from "@engine/actions";
 import {Zone} from "@engine/Zone";
-import {Ability} from "@engine/abilities";
+import {Ability, HardcodedSignals} from "@engine/abilities";
 import gameEventManager from "@engine/events/GameEventManager";
 import {GameEvent_ChangeCardZone} from "@engine/events";
 import {CardType} from "~/defs";
@@ -11,12 +11,10 @@ export class Spell {
     owner: Player;
 
     card: Card;
-    targets: ActionTarget[];
 
-    constructor(owner: Player, card: Card, targets: ActionTarget[]) {
+    constructor(owner: Player, card: Card) {
         this.owner = owner;
         this.card = card;
-        this.targets = targets;
     }
 }
 
@@ -37,9 +35,9 @@ export class Stack extends Zone {
     name = "Stack";
     stack: (Spell | Ability)[] = [];
 
-    spellCast(caster: Player, card: Card, targets?: ActionTarget[]) {
+    spellCast(caster: Player, card: Card) {
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this));
-        this.stack.push(new Spell(caster, card, targets));
+        this.stack.push(new Spell(caster, card));
     }
 
     abilityActivated(caster: Player, ability: Ability) {
@@ -76,6 +74,9 @@ export class Stack extends Zone {
                 // for (const effect of spell.card.spellAbility.effects) {
                 //     AbilityEffects.get(effect.worker).perform(effect, spell.targets, spell.owner);
                 // }
+                for (const ability of spell.card.abilities) {
+                    ability.fireSignal(HardcodedSignals.Resolve);
+                }
                 gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.graveyard));
                 break;
             default:
@@ -84,6 +85,6 @@ export class Stack extends Zone {
     }
 
     resolveAbility(ability: Ability) {
-        ability.resolve();
+        ability.resolveActivation();
     }
 }

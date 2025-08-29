@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 
 import UICard from "@ui/UICard";
 import {UIPlayer} from "@ui/UIPlayer";
-import {ActionTarget} from "@engine/actions";
+import {ActionTarget, TargetType} from "@engine/actions";
 import {drawArrow} from "@ui/drawUtility";
 import uiEventManager, {
     UIEvent_CardClicked,
@@ -19,6 +19,7 @@ import DOMButton from "@ui/dom/DOMButton";
 import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
 import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "@engine/events";
 import {Step} from "@engine/Step";
+import {GameEvent_StartTargeting} from "@engine/events/GameEvent_StartTargeting";
 
 export let pixi: PIXI.Application = null;
 
@@ -37,31 +38,27 @@ const playerRotations = [
     180
 ];
 
-export enum TargetType {
-    None = 0,
-    Player = 1 << 0,
-    Card = 1 << 1,
-}
-
 type UITarget = UICard | UIPlayer;
 
 export class UITargeter {
     source: UICard;
     targetType: TargetType;
+    count: number;
 
     target: UITarget;
 
     arrow: PIXI.Graphics;
     playerAreas: PIXI.Graphics[] = [];
 
-    validateTarget: (target: ActionTarget) => boolean;
-    onTargeted: (target: ActionTarget) => void;
+    validateTargets: (targets: ActionTarget[]) => boolean;
+    onTargeted: (targets: ActionTarget[]) => void;
     onCancelled: () => void;
 
-    constructor(source: UICard, targetType: TargetType, validateTarget: (target: ActionTarget) => boolean, onTargeted: (target: ActionTarget) => void, onCancelled: () => void | null) {
+    constructor(source: UICard, targetType: TargetType, count: number, validateTargets: (target: ActionTarget[]) => boolean, onTargeted: (targets: ActionTarget[]) => void, onCancelled: () => void | null) {
         this.source = source;
         this.targetType = targetType;
-        this.validateTarget = validateTarget;
+        this.count = count;
+        this.validateTargets = validateTargets;
         this.onTargeted = onTargeted;
         this.onCancelled = onCancelled;
 
@@ -70,7 +67,7 @@ export class UITargeter {
         pixi.stage.addChild(this.arrow);
 
         this.arrow.onRender = (renderer: PIXI.Renderer) => {
-            const p1 = this.source.getGlobalPosition();
+            const p1 = this.source?.getGlobalPosition() ?? new PIXI.Point(pixi.screen.width / 2, pixi.screen.height / 2);
             const p2 = this.target ? this.target.getGlobalPosition() : uiRoot.mousePos;
 
             drawArrow(this.arrow, p1, p2, {
@@ -109,9 +106,10 @@ export class UITargeter {
     onCardClicked(card: Card) {
         const uiCard = uiRoot.cardToUICard.get(card);
 
-        if (this.validateTarget(uiCard.card)) {
+        // TODO: Handle multi-targeting
+        if (this.validateTargets([uiCard.card])) {
             this.target = uiCard;
-            this.onTargeted(uiCard.card);
+            this.onTargeted([uiCard.card]);
         }
     }
 
@@ -119,9 +117,10 @@ export class UITargeter {
     onPlayerAreaClicked(event: PIXI.FederatedPointerEvent) {
         const uiPlayer = event.target.parent as UIPlayer;
 
-        if (this.validateTarget(uiPlayer.player)) {
+        // TODO: Handle multi-targeting
+        if (this.validateTargets([uiPlayer.player])) {
             this.target = uiPlayer;
-            this.onTargeted(uiPlayer.player);
+            this.onTargeted([uiPlayer.player]);
         }
     }
 
@@ -155,6 +154,20 @@ export default class UIRoot extends PIXI.Container {
 
     constructor() {
         super();
+
+        gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
+            const targeter = new UITargeter(
+                null, // TODO: display played spell
+                event.targeter.targetType,
+                event.targeter.count,
+                event.targeter.validateTargets,
+                targets => {
+                    event.targeter.onTargeted(targets);
+                    targeter.remove();
+                },
+                null
+            );
+        });
 
         // TODO: Probably need to clean these up
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });

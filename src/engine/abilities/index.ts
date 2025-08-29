@@ -1,4 +1,4 @@
-import {Ability} from ".";
+import {Ability, AbilityPart_Activate} from ".";
 import {AbilityDef} from "~/defs";
 import Card from "@engine/Card";
 import {ActionTarget} from "@engine/actions";
@@ -18,6 +18,9 @@ import.meta.glob("./parts/**/*.ts", { eager: true });
 
 export type GrammarKey = string;
 export type SlateVar = "THIS"
+export const HardcodedSignals = {
+    Resolve: "RESOLVE"
+};
 
 export function makeAbility(def: AbilityDef, card: Card): Ability {
     const ability = new Ability(card);
@@ -27,6 +30,8 @@ export function makeAbility(def: AbilityDef, card: Card): Ability {
     if (def.keyword)
         ability.def = keywordData[def.keyword];
 
+    let hasActivatePart = false;
+
     for (const className in ability.def.parts) {
         const ctor = AbilityParts[className];
         if (!ctor)
@@ -34,6 +39,14 @@ export function makeAbility(def: AbilityDef, card: Card): Ability {
 
         const part = new ctor();
         Object.assign(part, ability.def.parts[className]);
+
+        if (part instanceof AbilityPart_Activate) {
+            if (hasActivatePart)
+                throw new Error(`Ability on ${card.def.name} has multiple activate parts`);
+
+            hasActivatePart = true;
+        }
+
         ability.addPart(part);
     }
 
@@ -43,11 +56,12 @@ export function makeAbility(def: AbilityDef, card: Card): Ability {
 export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): ActionTarget {
     const parts = key.split(".");
 
-    let result = null;
+    let result: ActionTarget = null;
 
+    // TODO: Handle multiple targets in slate
     for (const part of parts) {
         if (ability.slate[part])
-            result = ability.slate[part];
+            result = ability.slate[part][0];
         else if (part === "controller")
             result = (result as Card)?.controller;
         else if (part === "owner")

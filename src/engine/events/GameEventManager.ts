@@ -16,7 +16,8 @@ export enum GameEventType {
     TapCard,
     UntapCard,
     DrawCard,
-    DestroyPermanent
+    DestroyPermanent,
+    StartTargeting,
 }
 
 export abstract class GameEvent {

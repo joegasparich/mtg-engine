@@ -4,18 +4,17 @@ import {ActionTarget} from "@engine/actions";
 import Card from "@engine/Card";
 import {ManaAmount, ManaUtility} from "@engine/mana";
 import {AbilityPart_Activate, AbilityPart_Effect_AddMana, SlateVar} from "@engine/abilities/index";
-import {Zone} from "@engine/Zone";
 
 // This class assumes that once its parts are set up it won't change
 // For caching purposes
 export class Ability {
     def: AbilityDef;
     parts: AbilityPart[] = [];
-    slate: Record<SlateVar | string, ActionTarget> = {};
+    slate: Record<SlateVar | string, ActionTarget[]> = {};
     card: Card;
 
     constructor(card: Card) {
-        this.slate["THIS"] = card;
+        this.slate["THIS"] = [ card ];
         this.card = card;
     }
 
@@ -38,21 +37,15 @@ export class Ability {
     get activatable() { return this._activatable ??= this.parts.some(p => p instanceof AbilityPart_Activate); }
 
     canActivate(card: Card): boolean {
-        return this.parts
-            .filter(p => p instanceof AbilityPart_Activate)
-            .every((p: AbilityPart_Activate) => p.canActivate(card));
+        return this.parts.find(p => p instanceof AbilityPart_Activate).canActivate(card);
     }
 
-    payCost(card: Card) {
-        return this.parts
-            .filter(p => p instanceof AbilityPart_Activate)
-            .every((p: AbilityPart_Activate) => p.payCost(card));
+    payActivationCost(card: Card) {
+        return this.parts.find(p => p instanceof AbilityPart_Activate).payCost(card);
     }
 
-    resolve() {
-        return this.parts
-            .filter(p => p instanceof AbilityPart_Activate)
-            .every((p: AbilityPart_Activate) => p.resolve());
+    resolveActivation() {
+        return this.parts.find(p => p instanceof AbilityPart_Activate).resolve();
     }
 
     getPotentialMana(): ManaAmount {

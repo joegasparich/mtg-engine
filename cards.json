@@ -125,5 +125,27 @@
                 "keyword": "flying"
             }
         ]
+    },
+    {
+        "name": "Ancestral Recall",
+        "image_url": "https://cards.scryfall.io/large/front/7/1/71283e4c-efd9-4a96-991c-6bbb169b99e7.jpg?1664924695",
+        "oracle_text": "Target player draws three cards.",
+        "type": "Instant",
+        "cost": "{U}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "inSignal": "RESOLVE",
+                        "saveAs": "TARGET_PLAYER",
+                        "validTargets": ["Player"]
+                    },
+                    "AbilityPart_Effect_DrawCards": {
+                        "target": "TARGET_PLAYER",
+                        "count": 3
+                    }
+                }
+            }
+        ]
     }
 ]

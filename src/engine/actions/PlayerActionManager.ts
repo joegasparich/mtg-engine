@@ -8,6 +8,23 @@ import {Battlefield, Hand} from "@engine/Zone";
 import {PlayerActions} from "@engine/actions/index";
 import {StepIndex} from "@engine/Step";
 import {CombatManager} from "@engine/CombatManager";
+import {GameEvent_StartTargeting} from "@engine/events/GameEvent_StartTargeting";
+
+export enum TargetType {
+    None = 0,
+    Player = 1 << 0,
+    Card = 1 << 1,
+}
+export enum TargetTypeKeys {
+    None = "None",
+    Player = "Player",
+    Card = "Card"
+}
+export const TargetTypesMap: Record<TargetTypeKeys, TargetType> = {
+    None: TargetType.None,
+    Player: TargetType.Player,
+    Card: TargetType.Card
+};
 
 export type ActionTarget = Card | Player;
 export enum ActionListenerResult {
@@ -17,6 +34,14 @@ export enum ActionListenerResult {
     // TODO: Replace? Clone? Add?
 }
 type ActionListener = (action: PlayerAction) => ActionListenerResult;
+export type Targeter = {
+    targetType: TargetType;
+    count: number;
+    validateTargets?: (targets: ActionTarget[]) => boolean;
+    onTargeted: (targets: ActionTarget[]) => void;
+    cancellable: boolean;
+    onCancelled?: () => void | null;
+}
 
 class PlayerActionManager {
     private actionListeners = new Map<string, Set<ActionListener>>();
@@ -116,6 +141,7 @@ class PlayerActionManager {
     //     return this.getCardActions(card, actor, ignoreManaAbilities).length > 0;
     // }
 
+    // TODO: I'm pretty sure we want to unify this with GameEvents
     checkForEffects(actions: Map<Card, PlayerAction[]>) {
         for (const card of actions.keys()) {
             for (let i = actions.get(card).length - 1; i >= 0; i--){
@@ -143,6 +169,24 @@ class PlayerActionManager {
 
     off(actionType: string, listener: ActionListener) {
         this.actionListeners.get(actionType).delete(listener);
+    }
+
+    startTargeting(targetTypes: TargetTypeKeys[], count: number,
+                   validateTargets: (targets: ActionTarget[]) => boolean,
+                   onTargeted: (targets: ActionTarget[]) => void,
+                   cancellable= false, onCancelled: () => void | null = null) {
+        const targetType = targetTypes.reduce((a, b) => a | TargetTypesMap[b], TargetType.None);
+
+        const targeter: Targeter = {
+            targetType,
+            count,
+            validateTargets,
+            onTargeted,
+            cancellable,
+            onCancelled
+        };
+
+        gameEventManager.addEvent(new GameEvent_StartTargeting(targeter));
     }
 }
 

@@ -2,11 +2,11 @@ import * as PIXI from "pixi.js";
 
 import Card from "@engine/Card";
 import {GlowFilter} from "pixi-filters";
-import {pixi, TargetType, uiRoot, UITargeter} from "@ui/UIRoot";
+import {pixi, uiRoot, UITargeter} from "@ui/UIRoot";
 import {loadImageFromExternalUrl} from "@utility/imageUtility";
 import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
 import {autobind} from "@utility/typeUtility";
-import playerActionManager from "@engine/actions/PlayerActionManager";
+import playerActionManager, {TargetType} from "@engine/actions/PlayerActionManager";
 import {GameEvent_TapCard, GameEvent_UntapCard} from "@engine/events";
 import {Battlefield} from "@engine/Zone";
 import uiEventManager, {UIEvent_CardClicked} from "@ui/UIEventManager";
@@ -158,9 +158,10 @@ export default class UICard extends PIXI.Sprite {
                         const targeter = new UITargeter(
                             this,
                             targetType,
-                            target => action.targets.includes(target),
-                            target => {
-                                action.perform(game.activePlayer(), [target]);
+                            1,
+                            targets => action.targets.includes(targets[0]),
+                            targets => {
+                                action.perform(game.activePlayer(), [targets[0]]);
                                 targeter.remove();
                             },
                             null

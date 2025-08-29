@@ -32,7 +32,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
         }
 
         // Pay cost
-        this.ability.payCost(this.card);
+        this.ability.payActivationCost(this.card);
 
         // Add ability to stack
         game.stack.abilityActivated(this.player, this.ability);//, this.targets);
