@@ -7,7 +7,6 @@ import {GameEvent_ActivateAbility} from "@engine/events";
 
 export class PlayerAction_ActivateAbility extends PlayerAction {
     ability: Ability;
-    targets: null; // TODO
 
     constructor(card: Card, ability: Ability) {
         super(card);
@@ -20,6 +19,6 @@ export class PlayerAction_ActivateAbility extends PlayerAction {
     }
 
     perform(player: Player) {
-        gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.card, this.ability, this.targets));
+        gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.card, this.ability));
     }
 }

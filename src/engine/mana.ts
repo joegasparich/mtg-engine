@@ -83,4 +83,8 @@ export namespace ManaUtility {
                 return true;
         }
     }
+
+    export function asGeneric(mana: Readonly<ManaAmount>): number {
+        return mana.reduce((a, b) => a + b, 0);
+    }
 }

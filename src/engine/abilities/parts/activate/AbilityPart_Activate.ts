@@ -4,11 +4,11 @@ import { AbilityPart } from "../AbilityPart";
 export abstract class AbilityPart_Activate extends AbilityPart {
     outSignal = "default";
 
-    canActivate(card: Card): boolean {
+    canActivate(): boolean {
         return false;
     }
 
-    payCost(card: Card) {
+    payCost() {
     }
 
     resolve() {

@@ -139,7 +139,7 @@ export default class UICard extends PIXI.Sprite {
             // const player = game.activePlayer(); // TODO: Uncomment this once priority is in
             const player = this.card.controller;
 
-            const actions = playerActionManager.getCardActions(this.card, player, false);
+            const actions = playerActionManager.getCardActions(this.card, player);
 
             if (actions.length > 0) {
                 showCustomContextMenu(event.global, actions.map(a => a.label()), index => {

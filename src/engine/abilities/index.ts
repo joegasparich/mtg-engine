@@ -19,7 +19,7 @@ import.meta.glob("./parts/**/*.ts", { eager: true });
 export type GrammarKey = string;
 export type SlateVar = "THIS"
 export const HardcodedSignals = {
-    Resolve: "RESOLVE"
+    SpellResolve: "SPELL_RESOLVE"
 };
 
 export function makeAbility(def: AbilityDef, card: Card): Ability {

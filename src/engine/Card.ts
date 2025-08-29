@@ -63,7 +63,7 @@ export default class Card {
 
         if (this.zone instanceof Battlefield) {
             for (const ability of this.abilities) {
-                if (ability.activatable && ability.canActivate(this))
+                if (ability.activatable && ability.canActivate())
                     ManaUtility.addMana(potentialMana, ability.getPotentialMana());
             }
         }
@@ -88,7 +88,7 @@ export default class Card {
         if (!ability.activatable)
             return false;
 
-        return ability.canActivate(this);
+        return ability.canActivate();
     }
 
     checkState() {

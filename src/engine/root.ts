@@ -60,28 +60,28 @@ export async function startGame() {
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(island, playerOne.hand));
     gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, island));
 
-    const elemental = new Card(cardData[ELEMENTAL], playerOne);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerOne.hand));
-
-    gameEventManager.addEvent(new GameEvent_ActivateAbility(playerOne, island, island.abilities[0]));
-
-    gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, elemental));
-
-    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-
-    const mountain = new Card(cardData[MOUNTAIN], playerTwo);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, playerTwo.hand));
-    gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, mountain));
-
-    const goblin = new Card(cardData[GOBLINS], playerTwo);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblin, playerTwo.hand));
-
-    gameEventManager.addEvent(new GameEvent_ActivateAbility(playerTwo, mountain, mountain.abilities[0]));
-
-    gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, goblin));
-
-    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    // const elemental = new Card(cardData[ELEMENTAL], playerOne);
+    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerOne.hand));
+    //
+    // gameEventManager.addEvent(new GameEvent_ActivateAbility(playerOne, island, island.abilities[0]));
+    //
+    // gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, elemental));
+    //
+    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    //
+    // const mountain = new Card(cardData[MOUNTAIN], playerTwo);
+    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, playerTwo.hand));
+    // gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, mountain));
+    //
+    // const goblin = new Card(cardData[GOBLINS], playerTwo);
+    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblin, playerTwo.hand));
+    //
+    // gameEventManager.addEvent(new GameEvent_ActivateAbility(playerTwo, mountain, mountain.abilities[0]));
+    //
+    // gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, goblin));
+    //
+    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    // gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
 }
 
 function tick(time: PIXI.Ticker) {

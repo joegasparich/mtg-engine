@@ -75,7 +75,7 @@ export class Stack extends Zone {
                 //     AbilityEffects.get(effect.worker).perform(effect, spell.targets, spell.owner);
                 // }
                 for (const ability of spell.card.abilities) {
-                    ability.fireSignal(HardcodedSignals.Resolve);
+                    ability.fireSignal(HardcodedSignals.SpellResolve);
                 }
                 gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.graveyard));
                 break;

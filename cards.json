@@ -117,7 +117,7 @@
         "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
         "oracle_text": "",
         "type": "Creature",
-        "cost": "{U}",
+        "cost": "{3}{U}{U}",
         "power": 4,
         "toughness": 4,
         "abilities": [
@@ -136,7 +136,7 @@
             {
                 "parts": {
                     "AbilityPart_Target": {
-                        "inSignal": "RESOLVE",
+                        "inSignal": "SPELL_RESOLVE",
                         "saveAs": "TARGET_PLAYER",
                         "validTargets": ["Player"]
                     },
@@ -148,4 +148,7 @@
             }
         ]
     }
+
+
+
 ]
