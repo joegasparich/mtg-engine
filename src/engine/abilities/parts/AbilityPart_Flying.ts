@@ -2,12 +2,11 @@ import {RegisterAbilityPart} from "@engine/abilities/registry";
 import {autobind} from "@utility/typeUtility";
 import {Keyword} from "~/defs";
 import {Battlefield} from "@engine/Zone";
-import {ActionListenerResult, PlayerAction_DeclareBlocker} from "@engine/actions";
-import playerActionManager from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
-import {removeItem} from "@utility/arrayUtility";
-import { AbilityPart } from "./AbilityPart";
-import { Ability } from "../Ability";
+import {removeIf} from "@utility/arrayUtility";
+import {AbilityPart} from "./AbilityPart";
+import {Ability} from "../Ability";
+import gameEventManager, {GameEvent, GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
 
 @RegisterAbilityPart
 class AbilityPart_Flying extends AbilityPart {
@@ -17,23 +16,29 @@ class AbilityPart_Flying extends AbilityPart {
         if (!(ability.card.zone instanceof Battlefield))
             return;
 
-        playerActionManager.on(PlayerAction_DeclareBlocker.name, this.onDeclareBlocker);
+        gameEventManager.onCheck(this.checkForEffects);
     }
 
     cleanup(ability: Ability) {
         if (!(ability.card.zone instanceof Battlefield))
             return;
 
-        playerActionManager.off(PlayerAction_DeclareBlocker.name, this.onDeclareBlocker);
+        gameEventManager.offCheck(this.checkForEffects);
     }
 
     @autobind
-    onDeclareBlocker(action: PlayerAction_DeclareBlocker): ActionListenerResult {
-        if (action.targets.includes(this.ability.card) && !this.canBlockFlying(action.card))
-            removeItem(action.targets, this.ability.card);
+    checkForEffects(events: GameEvent[]) {
+        removeIf(events, (event) => {
+            if (event.type != GameEventType.DeclareBlocker)
+                return false;
 
-        if (action.targets.length == 0)
-            return ActionListenerResult.Remove;
+            const blockerEvent = event as GameEvent_Simple;
+
+            if (blockerEvent.cardB !== this.ability.card)
+                return false;
+
+            return !this.canBlockFlying(blockerEvent.cardA);
+        });
     }
 
     canBlockFlying(blocker: Card) {

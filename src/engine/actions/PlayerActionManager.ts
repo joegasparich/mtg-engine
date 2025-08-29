@@ -27,13 +27,6 @@ export const TargetTypesMap: Record<TargetTypeKeys, TargetType> = {
 };
 
 export type ActionTarget = Card | Player;
-export enum ActionListenerResult {
-    OK,
-    Modified,
-    Remove,
-    // TODO: Replace? Clone? Add?
-}
-type ActionListener = (action: PlayerAction) => ActionListenerResult;
 export type Targeter = {
     targetType: TargetType;
     count: number;
@@ -44,8 +37,6 @@ export type Targeter = {
 }
 
 class PlayerActionManager {
-    private actionListeners = new Map<string, Set<ActionListener>>();
-
     // TODO: Maybe move to UI file
     public cardActionsForUI = new Map<Card, PlayerAction[]>();
 
@@ -85,8 +76,6 @@ class PlayerActionManager {
         if (factorInPotentialMana)
             actor.manaPool = [...originalMana];
 
-        this.checkForEffects(actions);
-
         return actions;
     }
 
@@ -97,8 +86,6 @@ class PlayerActionManager {
     public getCardActions(card: Card, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
         const actions = new Map<Card, PlayerAction[]>();
         actions.set(card, this.getCardActionsNoEffects(card, actor, ignoreManaAbilities));
-
-        this.checkForEffects(actions);
 
         return actions.get(card);
     }
@@ -129,7 +116,7 @@ class PlayerActionManager {
                 cardActions.push(new PlayerActions.DeclareAttacker(card));
             }
 
-            if (game.currentStepIndex == StepIndex.DeclareBlockers && CombatManager.canBlock(card)) {
+            if (game.currentStepIndex == StepIndex.DeclareBlockers && CombatManager.canBlockAnyAttackers(card)) {
                 cardActions.push(new PlayerActions.DeclareBlocker(card));
             }
         }
@@ -140,36 +127,6 @@ class PlayerActionManager {
     // public cardHasActions(card: Card, actor: Player, ignoreManaAbilities = false) {
     //     return this.getCardActions(card, actor, ignoreManaAbilities).length > 0;
     // }
-
-    // TODO: I'm pretty sure we want to unify this with GameEvents
-    checkForEffects(actions: Map<Card, PlayerAction[]>) {
-        for (const card of actions.keys()) {
-            for (let i = actions.get(card).length - 1; i >= 0; i--){
-                const action = actions.get(card)[i];
-                const type = action.constructor.name;
-
-                if (!this.actionListeners.has(type))
-                    continue;
-
-                for (const listener of this.actionListeners.get(type)) {
-                    const result = listener(action);
-                    if (result == ActionListenerResult.Remove)
-                        actions.get(card).splice(i, 1);
-                }
-            }
-        }
-    }
-
-    on(actionType: string, listener: ActionListener) {
-        if (!this.actionListeners.has(actionType))
-            this.actionListeners.set(actionType, new Set<ActionListener>());
-
-        this.actionListeners.get(actionType).add(listener);
-    }
-
-    off(actionType: string, listener: ActionListener) {
-        this.actionListeners.get(actionType).delete(listener);
-    }
 
     startTargeting(targetTypes: TargetTypeKeys[], count: number,
                    validateTargets: (targets: ActionTarget[]) => boolean,

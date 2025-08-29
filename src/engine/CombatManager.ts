@@ -3,6 +3,7 @@ import Player from "@engine/Player";
 import {Battlefield} from "@engine/Zone";
 import {CardType} from "~/defs";
 import {game} from "@engine/Game";
+import gameEventManager, {GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
 
 export namespace CombatManager {
     export let attackingPlayer: Player;
@@ -47,8 +48,23 @@ export namespace CombatManager {
         return true;
     }
 
+    export function canBlockAnyAttackers(card: Card) {
+        if (!canBlock(card))
+            return false;
+
+        for (const attacker of attackingCreatures.keys()) {
+            if (canBlockAttacker(card, attacker))
+                return true;
+        }
+
+        return false;
+    }
+
     export function canBlockAttacker(blocker: Card, attacker: Card) {
         if (!attackingCreatures.has(attacker))
+            return false;
+
+        if (!gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareBlocker, "", blocker, attacker)))
             return false;
 
         return canBlock(blocker);
@@ -65,7 +81,7 @@ export namespace CombatManager {
 
     export function hasAnyBlockers(player: Player): boolean {
         for (const card of player.battlefield.cards) {
-            if (canBlock(card))
+            if (canBlockAnyAttackers(card))
                 return true;
         }
 

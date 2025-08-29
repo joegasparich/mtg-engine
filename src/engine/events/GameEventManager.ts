@@ -17,6 +17,8 @@ export enum GameEventType {
     UntapCard,
     DrawCard,
     DestroyPermanent,
+    DeclareAttacker,
+    DeclareBlocker,
     StartTargeting,
 }
 
@@ -33,11 +35,16 @@ export abstract class GameEvent {
 }
 
 export class GameEvent_Simple extends GameEvent {
-    constructor(type: GameEventType, label: string,) {
+    cardA?: Card;
+    cardB?: Card;
+
+    constructor(type: GameEventType, label: string, cardA?: Card, cardB?: Card) {
         super();
 
         this.type = type;
         this.label = label;
+        this.cardA = cardA;
+        this.cardB = cardB;
     }
 }
 
@@ -53,11 +60,11 @@ export class GameEvent_Log extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
-type CheckListener = (event: GameEvent) => boolean;
+type CheckListener = (events: GameEvent[]) => void;
 
 class GameEventManager {
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
-    private readonly eventCheckListenersByType = new Map<GameEventType, Set<CheckListener>>();
+    private readonly eventCheckListeners = new Set<CheckListener>();
     private readonly eventsResolvedCallback: (() => void)[] = [];
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -71,15 +78,12 @@ class GameEventManager {
         this.eventPerformedListenersByType.get(eventType).delete(listener);
     }
 
-    onCheck(eventType: GameEventType, listener: CheckListener) {
-        if (!this.eventCheckListenersByType.has(eventType))
-            this.eventCheckListenersByType.set(eventType, new Set<CheckListener>());
-
-        this.eventCheckListenersByType.get(eventType).add(listener);
+    onCheck(listener: CheckListener) {
+        this.eventCheckListeners.add(listener);
     }
 
-    offCheck(eventType: GameEventType, listener: CheckListener) {
-        this.eventCheckListenersByType.get(eventType).delete(listener);
+    offCheck(listener: CheckListener) {
+        this.eventCheckListeners.delete(listener);
     }
 
     activeEvents: GameEvent[] = [];
@@ -87,7 +91,7 @@ class GameEventManager {
 
     addEvent(event: GameEvent) {
         this.activeEvents.push(event);
-        this.checkForEffects();
+        this.checkForEffects(this.activeEvents);
         this.performAllEvents();
 
         if (!this.performingEvents && this.eventsResolvedCallback.length > 0) {
@@ -100,27 +104,24 @@ class GameEventManager {
 
     addEvents(events: GameEvent[]) {
         this.activeEvents.push(...events);
-        this.checkForEffects();
+        this.checkForEffects(this.activeEvents);
         this.performAllEvents();
+    }
+
+    checkEvent(event: GameEvent) {
+        const events = [event];
+        this.checkForEffects(events);
+        return events.length > 0;
     }
 
     onResolved(callback: () => void) {
         this.eventsResolvedCallback.push(callback);
     }
 
-    checkForEffects() {
-        this.activeEvents.filter(event => {
-            for (const listener of this.eventCheckListenersByType.get(event.type) ?? []) {
-                if (!listener(event))
-                    return false;
-            }
-            for (const listener of this.eventCheckListenersByType.get(GameEventType.All) ?? []) {
-                if (!listener(event))
-                    return false;
-            }
-
-            return true;
-        });
+    checkForEffects(events: GameEvent[]) {
+        for (const listener of this.eventCheckListeners) {
+            listener(events);
+        }
     }
 
     performAllEvents() {

@@ -14,3 +14,11 @@ export function removeItem<T>(array: T[], item: T) {
         array.splice(index, 1);
     }
 }
+
+export function removeIf<T>(array: T[], predicate: (item: T) => boolean) {
+    for (let i = array.length - 1; i >= 0; i--) {
+        if (predicate(array[i])) {
+            array.splice(i, 1);
+        }
+    }
+}
