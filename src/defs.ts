@@ -27,6 +27,7 @@ export type AbilityDef = {
 };
 
 export enum Keyword {
+    Defender = "defender",
     Flying = "flying",
     Reach = "reach",
 }

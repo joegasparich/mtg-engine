@@ -40,7 +40,8 @@ export class CombatManager {
         if (card.tapped)
             return false;
 
-        return true;
+        // 508.1c: Check restrictions on declaring this creature as an attacker.
+        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareAttacker, "", card));
     }
 
     static canBlock(card: Card) {

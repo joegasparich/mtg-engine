@@ -1,4 +1,10 @@
 {
+    "defender": {
+        "keyword": "defender",
+        "parts": {
+            "AbilityPart_Defender": {}
+        }
+    },
     "flying": {
         "keyword": "flying",
         "parts": {

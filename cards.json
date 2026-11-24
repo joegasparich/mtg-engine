@@ -147,8 +147,22 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Wall of Swords",
+        "image_url": "https://cards.scryfall.io/large/front/2/c/2ca96f03-51a2-4c98-8b1a-71db8fd3f3bb.jpg?1783919570",
+        "oracle_text": "Defender (This creature can't attack.)\nFlying",
+        "type": "Creature",
+        "cost": "{3}{W}",
+        "power": 3,
+        "toughness": 5,
+        "abilities": [
+            {
+                "keyword": "defender"
+            },
+            {
+                "keyword": "flying"
+            }
+        ]
     }
-
-
-
 ]

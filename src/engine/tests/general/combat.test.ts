@@ -2,12 +2,13 @@ import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_ChangeCardZone,GameEvent_GoToNextStep,GameEvent_GoToStep } from "@engine/events";
-import gameEventManager from "@engine/events/GameEventManager";
+import { GameEvent_ChangeCardZone,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import gameEventManager,{ GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS } from "@engine/tests/testData";
+import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 let playerA: Player;
@@ -86,6 +87,46 @@ test("blocker should win", () => {
     expect(bearsDestroyed).toBeCalledTimes(0);
     expect(goblins.zone).toBe(playerA.graveyard);
     expect(bears.zone).toBe(playerB.battlefield);
+});
+
+test("defender prevents attacking and allows blocking", () => {
+    const defender = new Card({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ keyword: Keyword.Defender, parts: {} }],
+    }, playerA);
+    const attacker = new Card(cardData[GRIZZLY_BEARS], playerB);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.battlefield));
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(attacker, playerB.battlefield));
+
+    game.startGame({allowAutoSkip: false});
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    expect(playerActionManager.getCardActions(defender, playerA)).toHaveLength(0);
+    new PlayerActions.DeclareAttacker(defender).perform(playerA);
+    expect(CombatManager.attackingCreatures.has(defender)).toBe(false);
+
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(attacker).perform(playerB);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    const [block] = playerActionManager.getCardActions(defender, playerA);
+    expect(block).toBeInstanceOf(PlayerActions.DeclareBlocker);
+    block.perform(playerA, [attacker]);
+    expect(CombatManager.blockingCreatures.get(defender)).toBe(attacker);
+});
+
+test("defender only intercepts attacker checks on the battlefield", () => {
+    const defender = new Card({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ keyword: Keyword.Defender, parts: {} }],
+    }, playerA);
+    const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "", defender);
+
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.battlefield));
+    expect(gameEventManager.checkEvent(declaration)).toBe(false);
+
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.graveyard));
+    expect(gameEventManager.checkEvent(declaration)).toBe(true);
 });
 
 test("flyer can't be blocked by non flyer", () => {
