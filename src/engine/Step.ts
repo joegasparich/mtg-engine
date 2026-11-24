@@ -3,7 +3,6 @@ import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { GameEvent_DrawCard,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import uiEventManager,{ UIEvent_CardDeselected } from "@ui/UIEventManager";
 import { autobind } from "@utility/typeUtility";
 
 interface Step {
@@ -163,13 +162,6 @@ export class EndOfCombatStep implements Step {
         // TODO: Pass priority
     }
     onEnd(player: Player): void {
-        for (const card of CombatManager.attackingCreatures.keys()) {
-            uiEventManager.fire(new UIEvent_CardDeselected(card));
-        }
-        for (const card of CombatManager.blockingCreatures.keys()) {
-            uiEventManager.fire(new UIEvent_CardDeselected(card));
-        }
-
         CombatManager.reset();
     }
 }

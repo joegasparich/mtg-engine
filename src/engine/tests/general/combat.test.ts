@@ -1,6 +1,7 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
+import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_GoToNextStep,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -127,4 +128,62 @@ test("flyer can be blocked by flyer", () => {
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
 
     expect(playerActionManager.getCardActions(elementalB, playerB, false).length).toBe(1);
+});
+
+test("can withdraw an attacker before confirming and only taps confirmed attackers", () => {
+    const withdrawn = new Card(cardData[GRIZZLY_BEARS], playerA);
+    const attacking = new Card(cardData[GRIZZLY_BEARS], playerA);
+    for (const card of [withdrawn, attacking])
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, playerA.battlefield));
+
+    game.startGame({allowAutoSkip: false});
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    const edit = new PlayerActions.DeclareAttacker(withdrawn);
+    const keep = new PlayerActions.DeclareAttacker(attacking);
+    edit.perform(playerA);
+    keep.perform(playerA);
+
+    expect(edit.withdraw(playerB)).toBe(false);
+    expect(edit.withdraw(playerA)).toBe(true);
+    expect([...CombatManager.attackingCreatures.keys()]).toEqual([attacking]);
+    expect(attacking.tapped).toBe(false);
+
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(withdrawn.tapped).toBe(false);
+    expect(attacking.tapped).toBe(true);
+    expect(keep.withdraw(playerA)).toBe(false);
+});
+
+test("can reassign and withdraw a block while keeping the previous assignment after an illegal edit", () => {
+    const first = new Card(cardData[GRIZZLY_BEARS], playerA);
+    const second = new Card(cardData[GRIZZLY_BEARS], playerA);
+    const flying = new Card(cardData[AIR_ELEMENTAL], playerA);
+    const blocker = new Card(cardData[GRIZZLY_BEARS], playerB);
+    const attackers = [first, second, flying];
+    for (const card of [...attackers, blocker])
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, card.controller.battlefield));
+
+    game.startGame({allowAutoSkip: false});
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const card of attackers)
+        new PlayerActions.DeclareAttacker(card).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    const edit = new PlayerActions.DeclareBlocker(blocker);
+    edit.perform(playerB, [first]);
+    edit.perform(playerB, [flying]);
+    expect(CombatManager.blockingCreatures.get(blocker)).toBe(first);
+
+    edit.perform(playerB, [second]);
+    expect([...CombatManager.blockingCreatures]).toEqual([[blocker, second]]);
+    expect(edit.withdraw(playerA)).toBe(false);
+    expect(edit.withdraw(playerB)).toBe(true);
+    expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
+
+    edit.perform(playerB, [second]);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(second, playerA.graveyard));
+    expect(CombatManager.attackingCreatures.has(second)).toBe(false);
+    expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
+    edit.perform(playerB, [second]);
+    expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
 });

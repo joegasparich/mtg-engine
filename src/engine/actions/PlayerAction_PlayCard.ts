@@ -2,6 +2,7 @@ import { PlayerAction } from "@engine/actions/PlayerAction";
 import playerActionManager,{ ActionTarget } from "@engine/actions/PlayerActionManager";
 import { GameEvent_CastSpell,GameEvent_PlayLand } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import { ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { CardType } from "~/defs";
@@ -41,18 +42,22 @@ export class PlayerAction_PlayCard extends PlayerAction {
     }
 
     private castSpell(player: Player, targets: readonly ActionTarget[] = []) {
+        if (game.infiniteMana || this.payMana(player))
+            gameEventManager.addEvent(new GameEvent_CastSpell(player, this.card, targets));
+    }
+
+    private payMana(player: Player): boolean {
         if (!ManaUtility.canPay(this.card.cost, player.manaPool)) {
-            if (!playerActionManager.canAutoPay(this.card, player)) return;
+            if (!playerActionManager.canAutoPay(this.card, player)) return false;
             playerActionManager.autoPay(this.card, player);
         }
 
         if (this.card.cost && !ManaUtility.canPay(this.card.cost, player.manaPool)) {
             console.log("Attempted to play card with unpayable cost");
-            return;
+            return false;
         }
 
         ManaUtility.pay(this.card.cost, player.manaPool);
-
-        gameEventManager.addEvent(new GameEvent_CastSpell(player, this.card, targets));
+        return true;
     }
 }

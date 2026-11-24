@@ -32,7 +32,7 @@ export async function startGame() {
     window.cards = cardData;
 
     window.addEventListener("keyup", (e) => {
-        if (e.key === " " && !(e.target instanceof HTMLButtonElement))
+        if (e.key === " " && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement))
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 

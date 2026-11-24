@@ -1,6 +1,7 @@
 import * as PIXI from "pixi.js";
 
 import { ActionTarget,Targeter,TargetType } from "@engine/actions";
+import playerActionManager from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
 import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
@@ -20,6 +21,7 @@ UIEvent_CardDeselected,
 UIEvent_CardSelected,
 UIEventType
 } from "@ui/UIEventManager";
+import { UICombat } from "@ui/UICombat";
 import { UIPlayer } from "@ui/UIPlayer";
 import { UIZone } from "@ui/UIZone";
 import { autobind } from "@utility/typeUtility";
@@ -165,6 +167,7 @@ export default class UIRoot extends PIXI.Container {
 
     private readonly zones = new Map<Zone, UIZone>();
     readonly cardOverlay = new PIXI.RenderLayer();
+    readonly combat: UICombat;
 
     mousePos = new PIXI.Point();
 
@@ -179,6 +182,20 @@ export default class UIRoot extends PIXI.Container {
         pixi.stage.addChild(this.cardOverlay);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
         pixi.renderer.on('resize', this.layoutPlayers);
+        this.combat = new UICombat(this);
+
+        const infiniteMana = document.createElement('input');
+        infiniteMana.type = 'checkbox';
+        infiniteMana.checked = game.infiniteMana;
+        infiniteMana.addEventListener('change', () => {
+            game.infiniteMana = infiniteMana.checked;
+            playerActionManager.refreshCardActionsForUI();
+        });
+        const testingToggle = document.createElement('label');
+        testingToggle.className = 'testing-toggle';
+        testingToggle.title = 'Both players can cast spells without spending mana';
+        testingToggle.append(infiniteMana, 'Infinite mana (testing)');
+        document.body.append(testingToggle);
 
         gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
             removeCustomContextMenu();
@@ -210,6 +227,13 @@ export default class UIRoot extends PIXI.Container {
 
         gameEventManager.onPerformed(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
         gameEventManager.onPerformed(GameEventType.StepStart, () => {
+            const declaring = UICombat.declaresAt(game.currentStepIndex);
+            for (const control of [turnLabel, currentStepLabel, nextStepButton, nextPhaseButton, endTurnButton]) {
+                if (declaring)
+                    control.hide();
+                else
+                    control.show();
+            }
             currentStepLabel.text = Step.toString(game.currentStepIndex);
 
             const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
@@ -231,7 +255,10 @@ export default class UIRoot extends PIXI.Container {
             const stepActions = new DOMButton("", { top: '75px', left: '45%', right: '45%' }, null);
             stepActions.hide();
 
-            gameEventManager.onPerformed(GameEventType.StepStart, event => {
+            gameEventManager.onPerformed(GameEventType.StepStart, () => {
+                if (UICombat.declaresAt(game.currentStepIndex))
+                    return;
+
                 const message = game.currentStep().message;
                 if (message) {
                     stepMessageLabel.text = message;

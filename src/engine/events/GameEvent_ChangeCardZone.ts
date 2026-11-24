@@ -1,6 +1,7 @@
 import Card from "@engine/Card";
+import { CombatManager } from "@engine/CombatManager";
 import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
-import { Zone } from "@engine/Zone";
+import { Battlefield,Zone } from "@engine/Zone";
 
 export class GameEvent_ChangeCardZone extends GameEvent {
     type = GameEventType.ChangeCardZone;
@@ -20,6 +21,8 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     }
 
     perform(): boolean {
+        if (this.card.zone instanceof Battlefield)
+            CombatManager.removeFromCombat(this.card);
         this.card.preChangeZone();
         this.card.zone?.onLeave(this.card);
         this.card.zone = this.newZone;

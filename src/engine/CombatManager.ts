@@ -16,6 +16,17 @@ export class CombatManager {
         CombatManager.blockingCreatures.clear();
     }
 
+    // 506.4: A permanent that leaves the battlefield is removed from combat.
+    static removeFromCombat(card: Card) {
+        CombatManager.blockingCreatures.delete(card);
+        if (CombatManager.attackingCreatures.delete(card)) {
+            for (const [blocker, attacker] of CombatManager.blockingCreatures) {
+                if (attacker === card)
+                    CombatManager.blockingCreatures.delete(blocker);
+            }
+        }
+    }
+
     static canAttack(card: Card) {
         if (card.controller !== CombatManager.attackingPlayer)
             return false;
@@ -61,13 +72,11 @@ export class CombatManager {
     }
 
     static canBlockAttacker(blocker: Card, attacker: Card) {
-        if (!CombatManager.attackingCreatures.has(attacker))
+        // 509.1a: A creature can only block an attacker attacking its controller.
+        if (CombatManager.attackingCreatures.get(attacker) !== blocker.controller || !CombatManager.canBlock(blocker))
             return false;
 
-        if (!gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareBlocker, "", blocker, attacker)))
-            return false;
-
-        return CombatManager.canBlock(blocker);
+        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareBlocker, "", blocker, attacker));
     }
 
     static hasAnyAttackers(player: Player): boolean {

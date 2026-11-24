@@ -19,11 +19,19 @@ export class PlayerAction_DeclareBlocker extends PlayerAction {
 
     perform(player: Player, targets?: ActionTarget[]) {
         const target = targets?.[0];
-        if (game.currentStepIndex !== StepIndex.DeclareBlockers || player !== game.activePlayer()
-            || player !== this.card.controller || !(target instanceof Card)
+        if (!this.canEdit(player) || !(target instanceof Card)
             || !CombatManager.canBlockAttacker(this.card, target))
             return;
 
         CombatManager.blockingCreatures.set(this.card, target);
+    }
+
+    withdraw(player: Player): boolean {
+        return this.canEdit(player) && CombatManager.blockingCreatures.delete(this.card);
+    }
+
+    private canEdit(player: Player) {
+        return !game.pendingTargeter && game.currentStepIndex === StepIndex.DeclareBlockers
+            && player === game.activePlayer() && player === this.card.controller;
     }
 }

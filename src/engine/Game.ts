@@ -21,6 +21,7 @@ export default class Game {
     turnNumber = 0;
     currentStepIndex = 0;
     landPlayedThisTurn = false;
+    infiniteMana = false;
     pendingTargeter: Targeter | null = null;
 
     static init() {

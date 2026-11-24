@@ -1,5 +1,6 @@
 import * as PIXI from "pixi.js";
 
+import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
 import playerActionManager,{ TargetType } from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
 import { game } from "@engine/Game";
@@ -29,6 +30,11 @@ export default class UICard extends PIXI.Container {
     private resting = { x: 0, y: 0, angle: 0 };
     private hovered = false;
     private motion = 0.65;
+    private combatRole: 'attack' | 'block' | null = null;
+    private combatTarget: UICard | undefined;
+    private combatColour?: number | null;
+    private combatStartedAt = 0;
+    private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     private isSelected = false;
     private press?: { pointerId: number; origin: PIXI.Point; dragging: boolean };
 
@@ -109,8 +115,9 @@ export default class UICard extends PIXI.Container {
         const dragging = this.press?.dragging;
         const restingAngle = this.card.tapped ? 90 : this.resting.angle;
         if (!dragging) {
-            this.x += (this.resting.x - this.x) * ease;
-            this.y += (this.resting.y - this.y) * ease;
+            const advance = this.combatAdvance();
+            this.x += (this.resting.x + advance.x - this.x) * ease;
+            this.y += (this.resting.y + advance.y - this.y) * ease;
         }
         this.angle += ((dragging ? 0 : restingAngle) - this.angle) * ease;
 
@@ -128,11 +135,39 @@ export default class UICard extends PIXI.Container {
         this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
 
         const hasAction = playerActionManager.cardActionsForUI.get(this.card)?.length > 0;
-        this.updateHighlight(this.isSelected ? 0x00FFFF : hasAction ? 0xFFFFFF : null);
+        const highlight = this.isSelected ? 0x00FFFF : hasAction ? 0xFFFFFF : null;
+        this.updateHighlight(this.combatColour === undefined ? highlight : this.combatColour);
         if (this.halo.visible) {
             this.halo.width = this.art.width;
             this.halo.height = this.art.height;
         }
+    }
+
+    public setCombatDisplay(role: 'attack' | 'block' | null, colour?: number | null, target?: UICard) {
+        if (this.combatRole !== role || this.combatTarget !== target)
+            this.combatStartedAt = performance.now();
+        this.combatRole = role;
+        this.combatTarget = target;
+        this.combatColour = colour;
+    }
+
+    private combatAdvance(): PIXI.PointData {
+        if (!this.combatRole)
+            return { x: 0, y: 0 };
+
+        // Push forward, then settle into a distinct combat position until combat ends.
+        const progress = Math.min(1, (performance.now() - this.combatStartedAt) / 380);
+        const pulse = this.reducedMotion.matches ? 0 : Math.sin(Math.PI * progress) * 30;
+        const distance = 36 + pulse;
+        if (!this.combatTarget?.parent)
+            return { x: 0, y: -distance };
+
+        const target = this.parent.toLocal(this.combatTarget.getGlobalPosition());
+        const dx = target.x - this.resting.x;
+        const dy = target.y - this.resting.y;
+        const length = Math.hypot(dx, dy);
+        const scale = Math.min(0.24, distance / Math.max(1, length));
+        return { x: dx * scale, y: dy * scale };
     }
 
     public setSelected(selected: boolean) {
@@ -207,7 +242,8 @@ export default class UICard extends PIXI.Container {
         if (!dragging) {
             if (releasedOnCard) {
                 this.setHovered(event.pointerType !== 'touch');
-                uiEventManager.fire(new UIEvent_CardClicked(this.card));
+                if (!uiRoot.combat.handleCardClick(this.card))
+                    uiEventManager.fire(new UIEvent_CardClicked(this.card));
             }
             return;
         }
@@ -247,7 +283,8 @@ export default class UICard extends PIXI.Container {
             return;
 
         const player = game.activePlayer();
-        const actions = playerActionManager.getCardActions(this.card, player);
+        const actions = playerActionManager.getCardActions(this.card, player)
+            .filter(action => !(action instanceof PlayerAction_DeclareAttacker || action instanceof PlayerAction_DeclareBlocker));
         if (actions.length === 0)
             return;
 

@@ -49,7 +49,7 @@ class PlayerActionManager {
         });
     }
 
-    private refreshCardActionsForUI() {
+    public refreshCardActionsForUI() {
         const player = game.activePlayer();
         this.cardActionsForUI = player && !game.pendingTargeter
             ? this.getAvailableActions(player)
@@ -111,6 +111,9 @@ class PlayerActionManager {
     }
 
     public canAutoPay(card: Card, actor: Player) {
+        if (game.infiniteMana)
+            return true;
+
         const availableMana: ManaAmount = [...actor.manaPool];
         ManaUtility.addMana(availableMana, actor.getPotentialMana());
         return ManaUtility.canPay(card.cost, availableMana);

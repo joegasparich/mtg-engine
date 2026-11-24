@@ -118,3 +118,32 @@ test("autoPay uses existing mana and land", () => {
     playerActionManager.autoPay(grizzlyBears, player);
     expect(forest.tapped).toBe(true);
 });
+
+test("infinite mana enables spells without spending mana or tapping lands, and can be turned off", () => {
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+    const forest = new Card(cardData[FOREST], player);
+    const bears = new Card(cardData[GRIZZLY_BEARS], player);
+    const another = new Card(cardData[GRIZZLY_BEARS], player);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
+    for (const spell of [bears, another])
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, player.hand));
+    expect(game.infiniteMana).toBe(false);
+    expect(playerActionManager.cardActionsForUI.has(bears)).toBe(false);
+
+    game.infiniteMana = true;
+    playerActionManager.refreshCardActionsForUI();
+    expect(playerActionManager.cardActionsForUI.has(bears)).toBe(true);
+    player.manaPool[ManaColour.R] = 1;
+    new PlayerActions.PlayCard(bears).perform(player);
+    expect(bears.zone).toBe(player.battlefield);
+    expect(forest.tapped).toBe(false);
+    expect(player.manaPool[ManaColour.R]).toBe(1);
+
+    game.infiniteMana = false;
+    player.manaPool[ManaColour.R] = 0;
+    playerActionManager.refreshCardActionsForUI();
+    expect(playerActionManager.cardActionsForUI.has(another)).toBe(false);
+    new PlayerActions.PlayCard(another).perform(player);
+    expect(another.zone).toBe(player.hand);
+});
