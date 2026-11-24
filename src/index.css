@@ -61,3 +61,15 @@ button {
 button:hover { background: #2b555a; transform: translateY(-2px); }
 button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 .message { background: #081b24dd; color: #e3c58a; letter-spacing: .04em; }
+
+.spell-target-dialog {
+    max-width: calc(100vw - 48px);
+    padding: 24px;
+    border: 1px solid #54726d;
+    border-radius: 12px;
+    background: #081b24;
+    color: #e6eee9;
+}
+.spell-target-dialog::backdrop { background: #081b2499; }
+.spell-target-dialog h2 { margin: 0 0 16px; font-size: 18px; }
+.spell-target-choices { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -7,7 +7,8 @@ export abstract class AbilityPart_Activate extends AbilityPart {
         return false;
     }
 
-    payCost() {
+    payCost(): boolean {
+        return true;
     }
 
     resolve() {

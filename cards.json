@@ -136,11 +136,11 @@
             {
                 "parts": {
                     "AbilityPart_Target": {
-                        "inSignal": "SPELL_RESOLVE",
                         "saveAs": "TARGET_PLAYER",
                         "validTargets": ["Player"]
                     },
                     "AbilityPart_Effect_DrawCards": {
+                        "inSignal": "SPELL_RESOLVE",
                         "target": "TARGET_PLAYER",
                         "count": 3
                     }

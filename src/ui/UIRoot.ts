@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 
-import { ActionTarget,TargetType } from "@engine/actions";
+import { ActionTarget,Targeter,TargetType } from "@engine/actions";
 import Card from "@engine/Card";
 import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
@@ -9,6 +9,7 @@ import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield, Zone } from "@engine/Zone";
 import { Step } from "@engine/Step";
+import { removeCustomContextMenu } from "@ui/contextMenu";
 import DOMButton from "@ui/dom/DOMButton";
 import DOMLabel from "@ui/dom/DOMLabel";
 import { drawArrow } from "@ui/drawUtility";
@@ -33,6 +34,7 @@ export async function initRenderer() {
         resolution: window.devicePixelRatio || 1,
         resizeTo: window,
     });
+    pixi.canvas.addEventListener('contextmenu', event => event.preventDefault());
     document.body.appendChild(pixi.canvas);
     pixi.stage.eventMode = 'static';
     pixi.stage.hitArea = pixi.screen;
@@ -85,7 +87,7 @@ export class UITargeter {
         };
 
         if ((targetType & TargetType.Card) != 0)
-            uiEventManager.on(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+            uiEventManager.on(UIEventType.CardClicked, this.onCardTargetClicked);
 
         if ((targetType & TargetType.Player) != 0) {
             for (const player of game.players) {
@@ -99,17 +101,21 @@ export class UITargeter {
             }
         }
 
-        pixi.stage.on('pointerup', event => {
-            if (event.button == 2) {
-                this.onCancelled?.();
-                this.remove();
-            }
-        });
+        pixi.stage.on('pointerup', this.onStagePointerUp);
+        gameEventManager.onPerformed(GameEventType.StepEnd, this.remove);
     }
 
     @autobind
-    onCardClicked(card: Card) {
-        const uiCard = uiRoot.cardToUICard.get(card);
+    private onStagePointerUp(event: PIXI.FederatedPointerEvent) {
+        if (event.button === 2) {
+            this.remove();
+            this.onCancelled?.();
+        }
+    }
+
+    @autobind
+    private onCardTargetClicked(event: UIEvent_CardClicked) {
+        const uiCard = uiRoot.cardToUICard.get(event.card);
 
         // TODO: Handle multi-targeting
         if (this.validateTargets([uiCard.card])) {
@@ -120,6 +126,9 @@ export class UITargeter {
 
     @autobind
     onPlayerAreaClicked(event: PIXI.FederatedPointerEvent) {
+        if (event.button !== 0)
+            return;
+
         const uiPlayer = event.target.parent as UIPlayer;
 
         // TODO: Handle multi-targeting
@@ -129,7 +138,10 @@ export class UITargeter {
         }
     }
 
+    @autobind
     remove() {
+        gameEventManager.offPerformed(GameEventType.StepEnd, this.remove);
+        pixi.stage.off('pointerup', this.onStagePointerUp);
         pixi.stage.removeChild(this.arrow);
 
         if ((this.targetType & TargetType.Player) != 0) {
@@ -141,7 +153,7 @@ export class UITargeter {
         }
 
         if ((this.targetType & TargetType.Card) != 0)
-            uiEventManager.off(UIEventType.CardClicked, (event: UIEvent_CardClicked) => this.onCardClicked(event.card));
+            uiEventManager.off(UIEventType.CardClicked, this.onCardTargetClicked);
     }
 }
 
@@ -169,16 +181,23 @@ export default class UIRoot extends PIXI.Container {
         pixi.renderer.on('resize', this.layoutPlayers);
 
         gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
+            removeCustomContextMenu();
+            const request = event.targeter;
+            if (request.targetType === TargetType.Player && request.count === 1) {
+                this.showPlayerTargetDialog(request);
+                return;
+            }
+
             const targeter = new UITargeter(
-                null, // TODO: display played spell
-                event.targeter.targetType,
-                event.targeter.count,
-                event.targeter.validateTargets,
+                this.cardToUICard.get(request.source),
+                request.targetType,
+                request.count,
+                request.validateTargets,
                 targets => {
-                    event.targeter.onTargeted(targets);
                     targeter.remove();
+                    request.onTargeted(targets);
                 },
-                null
+                request.onCancelled
             );
         });
 
@@ -227,6 +246,7 @@ export default class UIRoot extends PIXI.Container {
             });
 
             gameEventManager.onPerformed(GameEventType.StepEnd, event => {
+                removeCustomContextMenu();
                 stepMessageLabel.text = null;
                 stepMessageLabel.hide();
 
@@ -235,6 +255,53 @@ export default class UIRoot extends PIXI.Container {
                 stepActions.hide();
             });
         }
+    }
+
+    private showPlayerTargetDialog(request: Targeter) {
+        const dialog = document.createElement('dialog');
+        dialog.className = 'spell-target-dialog';
+        const heading = document.createElement('h2');
+        heading.id = 'spell-target-heading';
+        heading.textContent = `Choose a player for ${request.source.name}`;
+        dialog.setAttribute('aria-labelledby', heading.id);
+        dialog.append(heading);
+
+        const close = () => {
+            dialog.close();
+            dialog.remove();
+        };
+        const cancel = () => {
+            close();
+            request.onCancelled();
+        };
+
+        const choices = document.createElement('div');
+        choices.className = 'spell-target-choices';
+        for (const player of game.players) {
+            if (!request.validateTargets([player]))
+                continue;
+
+            const button = document.createElement('button');
+            button.textContent = player === request.source.controller ? 'Yourself' : `Player ${player.id}`;
+            button.addEventListener('click', () => {
+                close();
+                request.onTargeted([player]);
+            });
+            choices.append(button);
+        }
+
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.addEventListener('click', cancel);
+        choices.append(cancelButton);
+        dialog.addEventListener('cancel', event => {
+            event.preventDefault();
+            cancel();
+        });
+
+        dialog.append(choices);
+        document.body.append(dialog);
+        dialog.showModal();
     }
 
     onPlayerAdded(player: Player) {

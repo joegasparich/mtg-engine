@@ -1,4 +1,4 @@
-import playerActionManager from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
@@ -20,6 +20,8 @@ export default class Game {
     activePlayerID = -1;
     turnNumber = 0;
     currentStepIndex = 0;
+    landPlayedThisTurn = false;
+    pendingTargeter: Targeter | null = null;
 
     static init() {
         game = new Game();
@@ -47,6 +49,7 @@ export default class Game {
 
     startGame(options?: GameOptions) {
         this.options = options ?? new GameOptions();
+        this.pendingTargeter = null;
 
         gameEventManager.addEvent(new GameEvent_Log(GameEventType.Log, "Game started"));
 
@@ -64,6 +67,7 @@ export default class Game {
         this.activePlayerID = -1;
         this.turnNumber = 0;
         this.currentStepIndex = 0;
+        this.landPlayedThisTurn = false;
 
         gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
 
@@ -72,15 +76,23 @@ export default class Game {
         if (this.options.allowAutoSkip)
             this.checkAutoSkip();
     }
-    nextStep(doAutoSkip: boolean) {
+    nextStep(doAutoSkip: boolean): boolean {
+        if (this.pendingTargeter)
+            return false;
+
         this.endStep(this.currentStepIndex);
         this.currentStepIndex++;
 
-        if (this.currentStepIndex > StepIndex.End)
+        // 103.8a
+        if (this.currentStepIndex === StepIndex.Draw && this.turnNumber === 0 && this.players.length === 2)
+            this.currentStepIndex++;
+
+        if (this.currentStepIndex > StepIndex.Cleanup)
         {
             this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
             this.turnNumber++;
             this.currentStepIndex = 0;
+            this.landPlayedThisTurn = false;
 
             gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
         }
@@ -89,45 +101,59 @@ export default class Game {
 
         if (doAutoSkip)
             this.checkAutoSkip();
+        return true;
     }
-    skipToNextTurn() {
-        do {
-            this.nextStep(false);
-        } while (this.currentStepIndex != 0);
-
-        if (game.options.allowAutoSkip)
-            this.checkAutoSkip();
+    skipToNextTurn(): boolean {
+        return this.goToStep(StepIndex.Untap, this.options.allowAutoSkip);
     }
-    skipToNextPhase() {
+    skipToNextPhase(): boolean {
         const nextPhaseIndex = (Step.phaseIndex(this.currentStepIndex) + 1) % Step.NUM_PHASES;
-        const nextPhaseStep = Step.phaseStart(nextPhaseIndex);
-        do {
-            this.nextStep(false);
-        } while (this.currentStepIndex != nextPhaseStep);
+        return this.goToStep(Step.phaseStart(nextPhaseIndex));
+    }
+    goToStep(index: StepIndex, autoSkip = false): boolean {
+        if (!Step.all[index] || !this.nextStep(false))
+            return false;
+
+        const advance = () => {
+            if (this.currentStepIndex === index) {
+                if (autoSkip)
+                    this.checkAutoSkip();
+                return;
+            }
+
+            if (this.nextStep(false))
+                gameEventManager.onResolved(advance);
+        };
+        gameEventManager.onResolved(advance);
+        return true;
     }
     canAutoSkip() {
-        if (!this.activePlayer())
-            return true;
+        // Stop at each turn's first main phase even when there are no playable cards.
+        if (this.pendingTargeter || this.currentStepIndex === StepIndex.Main)
+            return false;
 
-        if (!playerActionManager.playerHasActions(this.activePlayer(), true, true))
-            return true;
-
-        return false;
+        const player = this.activePlayer();
+        return !player || !playerActionManager.playerHasActions(player, true);
     }
     checkAutoSkip() {
-        // Automatically advance step if there are no actions
-        // TODO: Priority
-        if (this.canAutoSkip())
-            this.nextStep(true);
+        gameEventManager.onResolved(() => {
+            if (this.canAutoSkip())
+                this.nextStep(true);
+        });
     }
 
     private startStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepStart(this.currentTurnPlayer(), index));
         Step.all[index].onStart(this.currentTurnPlayer());
+        gameEventManager.addEvent(new GameEvent_StepStart(this.currentTurnPlayer(), index));
     }
     private endStep(index: StepIndex) {
-        gameEventManager.addEvent(new GameEvent_StepEnd(this.currentTurnPlayer(), index));
         Step.all[index].onEnd(this.currentTurnPlayer());
+
+        // 106.4
+        for (const player of this.players) {
+            player.manaPool.fill(0);
+        }
+        gameEventManager.addEvent(new GameEvent_StepEnd(this.currentTurnPlayer(), index));
     }
 
     currentStep() {

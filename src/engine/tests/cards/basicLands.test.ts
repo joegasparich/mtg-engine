@@ -6,8 +6,6 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { cardData } from "~/index";
 
-const FOREST = cardData.findIndex(c => c.name == "Forest");
-
 let player: Player;
 
 beforeEach(async () => {
@@ -16,12 +14,20 @@ beforeEach(async () => {
     player = game.addPlayer([]);
 });
 
-test("forest should tap for green mana", () => {
-    const forest = new Card(cardData[FOREST], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
+test.each([
+    ["Plains", ManaColour.W],
+    ["Island", ManaColour.U],
+    ["Swamp", ManaColour.B],
+    ["Mountain", ManaColour.R],
+    ["Forest", ManaColour.G],
+])("%s taps for one mana of its colour", (name, colour) => {
+    const land = new Card(cardData.find(card => card.name === name), player);
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(land, player.battlefield));
 
-    gameEventManager.addEvent(new GameEvent_ActivateAbility(player, forest, forest.abilities[0]));
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(player, land, land.abilities[0]));
 
-    // Check mana added
-    expect(player.manaPool[ManaColour.G]).toBe(1);
+    const expectedMana = [0, 0, 0, 0, 0, 0];
+    expectedMana[colour] = 1;
+    expect(land.tapped).toBe(true);
+    expect(player.manaPool).toEqual(expectedMana);
 });

@@ -1,4 +1,5 @@
 import { Ability,makeAbility } from "@engine/abilities";
+import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
@@ -61,9 +62,9 @@ export default class Card {
         // TODO: Optimise with a canAddMana flag?
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
-        if (this.zone instanceof Battlefield) {
+        if (this.zone === actor.battlefield && this.controller === actor) {
             for (const ability of this.abilities) {
-                if (ability.activatable && ability.canActivate())
+                if (ability.def.isManaAbility && ability.isFreeTap && ability.canActivate())
                     ManaUtility.addMana(potentialMana, ability.getPotentialMana());
             }
         }
@@ -72,13 +73,31 @@ export default class Card {
     }
 
     canPlay() {
+        if (game.pendingTargeter)
+            return false;
+
         if (game.activePlayer() != this.controller)
             return false;
 
         if (game.currentStepIndex != StepIndex.Main && game.currentStepIndex != StepIndex.SecondMain)
             return false;
 
+        if (this.type === CardType.Land) {
+            return this.zone === this.controller.hand
+                && this.controller === game.currentTurnPlayer()
+                && game.stack.stack.length === 0
+                && !game.landPlayedThisTurn;
+        }
+
         return true;
+    }
+
+    get spellTarget(): AbilityPart_Target | undefined {
+        for (const ability of this.abilities) {
+            const target = ability.parts.find(part => part instanceof AbilityPart_Target);
+            if (target)
+                return target;
+        }
     }
 
     canActivate(ability: Ability) {
@@ -97,13 +116,14 @@ export default class Card {
             gameEventManager.addEvent(new GameEvent_DestroyPermanent(this));
     }
 
-    destroy() {
+    destroy(): boolean {
         if (!(this.zone instanceof Battlefield)) {
             console.error(`${this.logName} was destroyed but was not on battlefield`);
-            return;
+            return false;
         }
 
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(this, this.owner.graveyard));
+        return true;
     }
 
     preChangeZone() {

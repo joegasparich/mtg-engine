@@ -14,7 +14,8 @@ export class GameEvent_UntapCard extends GameEvent {
         this.label = `Card ${this.card.logName} was untapped`;
     }
 
-    perform() {
+    perform(): boolean {
         this.card.tapped = false;
+        return true;
     }
 }

@@ -9,7 +9,7 @@ import { game } from "@engine/Game";
 import { ManaAmount,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { Battlefield,Hand } from "@engine/Zone";
+import { CardType } from "~/defs";
 
 export enum TargetType {
     None = 0,
@@ -29,12 +29,12 @@ export const TargetTypesMap: Record<TargetTypeKeys, TargetType> = {
 
 export type ActionTarget = Card | Player;
 export type Targeter = {
+    source: Card;
     targetType: TargetType;
     count: number;
-    validateTargets?: (targets: ActionTarget[]) => boolean;
+    validateTargets: (targets: ActionTarget[]) => boolean;
     onTargeted: (targets: ActionTarget[]) => void;
-    cancellable: boolean;
-    onCancelled?: () => void | null;
+    onCancelled: () => void;
 }
 
 class PlayerActionManager {
@@ -44,58 +44,51 @@ class PlayerActionManager {
     constructor() {
         // Perf Warning: This might end up being too intensive, might need to cache
         gameEventManager.onPerformed(GameEventType.All, (event) => {
-            if (!event.isAction)
-                return;
-
-            const player = game.activePlayer();
-
-            if (!player)
-                return;
-
-            this.cardActionsForUI = this.getAvailableActions(player, true, false);
+            if (event.isAction)
+                this.refreshCardActionsForUI();
         });
     }
 
-    getAvailableActions(actor: Player, factorInPotentialMana = false, ignoreManaAbilities = false): Map<Card, PlayerAction[]> {
+    private refreshCardActionsForUI() {
+        const player = game.activePlayer();
+        this.cardActionsForUI = player && !game.pendingTargeter
+            ? this.getAvailableActions(player)
+            : new Map();
+    }
+
+    getAvailableActions(actor: Player, ignoreManaAbilities = false): Map<Card, PlayerAction[]> {
         const actions = new Map<Card, PlayerAction[]>();
 
-        const originalMana: Readonly<ManaAmount> = [...actor.manaPool];
-        if (factorInPotentialMana)
-            ManaUtility.addMana(actor.manaPool, actor.getPotentialMana());
-
-        for (const zone of actor.zones) {
+        for (const zone of [actor.hand, actor.battlefield]) {
             for (const card of zone.cards) {
                 const cardActions = this.getCardActions(card, actor, ignoreManaAbilities);
 
                 if (!cardActions.length)
                     continue;
 
-                actions.set(card, [...cardActions]);
+                actions.set(card, cardActions);
             }
         }
-
-        if (factorInPotentialMana)
-            actor.manaPool = [...originalMana];
 
         return actions;
     }
 
-    public playerHasActions(actor: Player, factorInPotentialMana = false, ignoreManaAbilities = false) {
-        return this.getAvailableActions(actor, factorInPotentialMana, ignoreManaAbilities).size > 0;
+    public playerHasActions(actor: Player, ignoreManaAbilities = false) {
+        return this.getAvailableActions(actor, ignoreManaAbilities).size > 0;
     }
 
     public getCardActions(card: Card, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
         const cardActions: PlayerAction[] = [];
 
-        if (actor != card.controller)
+        if (!actor || game.pendingTargeter || actor !== game.activePlayer() || actor !== card.controller)
             return [];
 
-        if (card.zone instanceof Hand) {
-            if (card.canPlay() && (ManaUtility.canPay(card.cost, actor.manaPool) || this.canAutoPay(card, actor)))
+        if (card.zone === actor.hand) {
+            if (card.canPlay() && (card.type === CardType.Land || ManaUtility.canPay(card.cost, actor.manaPool) || this.canAutoPay(card, actor)))
                 cardActions.push(new PlayerActions.PlayCard(card));
         }
 
-        if (card.zone instanceof Battlefield) {
+        if (card.zone === actor.battlefield) {
             for (const ability of card.abilities) {
                 if (ignoreManaAbilities && ability.def.isManaAbility)
                     continue;
@@ -118,14 +111,9 @@ class PlayerActionManager {
     }
 
     public canAutoPay(card: Card, actor: Player) {
-        const originalMana: Readonly<ManaAmount> = [...actor.manaPool];
-        ManaUtility.addMana(actor.manaPool, actor.getPotentialMana());
-
-        const canPay = ManaUtility.canPay(card.cost, actor.manaPool);
-
-        actor.manaPool = [...originalMana];
-
-        return canPay;
+        const availableMana: ManaAmount = [...actor.manaPool];
+        ManaUtility.addMana(availableMana, actor.getPotentialMana());
+        return ManaUtility.canPay(card.cost, availableMana);
     }
 
     public autoPay(card: Card, actor: Player) {
@@ -167,7 +155,8 @@ class PlayerActionManager {
                     if (potentialMana[i] == 0)
                         continue;
 
-                    gameEventManager.addEvent(new GameEvent_ActivateAbility(actor, card, ability));
+                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, card, ability)))
+                        continue;
 
                     const diff = Math.min(remaining[i], potentialMana[i]);
                     remaining[i] -= diff;
@@ -194,7 +183,8 @@ class PlayerActionManager {
                     const potentialMana = ability.getPotentialMana();
                     const generic = ManaUtility.asGeneric(potentialMana);
 
-                    gameEventManager.addEvent(new GameEvent_ActivateAbility(actor, card, ability));
+                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, card, ability)))
+                        continue;
 
                     const diff = Math.min(remaining[6], generic);
                     remaining[6] -= diff;
@@ -211,21 +201,37 @@ class PlayerActionManager {
             throw new Error(`Failed to auto pay for card ${card.def.name}, remaining cost: ${remaining}`);
     }
 
-    public startTargeting(targetTypes: TargetTypeKeys[], count: number,
+    public startTargeting(source: Card, targetTypes: TargetTypeKeys[], count: number,
                    validateTargets: (targets: ActionTarget[]) => boolean,
-                   onTargeted: (targets: ActionTarget[]) => void,
-                   cancellable= false, onCancelled: () => void | null = null) {
+                   onTargeted: (targets: ActionTarget[]) => void) {
+        if (game.pendingTargeter)
+            return;
+
         const targetType = targetTypes.reduce((a, b) => a | TargetTypesMap[b], TargetType.None);
 
         const targeter: Targeter = {
+            source,
             targetType,
             count,
             validateTargets,
-            onTargeted,
-            cancellable,
-            onCancelled
+            onTargeted: targets => {
+                if (game.pendingTargeter !== targeter || !validateTargets(targets))
+                    return;
+
+                game.pendingTargeter = null;
+                this.refreshCardActionsForUI();
+                onTargeted(targets);
+            },
+            onCancelled: () => {
+                if (game.pendingTargeter !== targeter)
+                    return;
+
+                game.pendingTargeter = null;
+                this.refreshCardActionsForUI();
+            },
         };
 
+        game.pendingTargeter = targeter;
         gameEventManager.addEvent(new GameEvent_StartTargeting(targeter));
     }
 }

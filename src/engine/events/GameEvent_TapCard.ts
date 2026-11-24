@@ -14,7 +14,8 @@ export class GameEvent_TapCard extends GameEvent {
         this.label = `Card ${this.card.logName} was tapped`;
     }
 
-    perform() {
+    perform(): boolean {
         this.card.tapped = true;
+        return true;
     }
 }

@@ -1,3 +1,4 @@
+import type { ActionTarget } from "@engine/actions";
 import Card from "@engine/Card";
 import Player from "@engine/Player";
 import { Zone } from "@engine/Zone";
@@ -10,10 +11,12 @@ export class Spell {
     owner: Player;
 
     card: Card;
+    readonly targets: readonly ActionTarget[];
 
-    constructor(owner: Player, card: Card) {
+    constructor(owner: Player, card: Card, targets: readonly ActionTarget[]) {
         this.owner = owner;
         this.card = card;
+        this.targets = [...targets];
     }
 }
 
@@ -34,9 +37,18 @@ export class Stack extends Zone {
     name = "Stack";
     stack: (Spell | Ability)[] = [];
 
-    spellCast(caster: Player, card: Card) {
+    spellCast(caster: Player, card: Card, targets: readonly ActionTarget[] = []): boolean {
+        if (card.type === CardType.Land)
+            return false;
+
+        // 601.2c
+        const target = card.spellTarget;
+        if (target ? !target.validateTargets(targets) : targets.length > 0)
+            return false;
+
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this));
-        this.stack.push(new Spell(caster, card));
+        this.stack.push(new Spell(caster, card, targets));
+        return true;
     }
 
     abilityActivated(caster: Player, ability: Ability) {
@@ -64,20 +76,22 @@ export class Stack extends Zone {
 
     resolveSpell(spell: Spell) {
         switch (spell.card.type) {
-            case CardType.Land:
             case CardType.Creature:
                 gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.battlefield));
                 break;
             case CardType.Sorcery:
-            case CardType.Instant:
-                // for (const effect of spell.card.spellAbility.effects) {
-                //     AbilityEffects.get(effect.worker).perform(effect, spell.targets, spell.owner);
-                // }
-                for (const ability of spell.card.abilities) {
-                    ability.fireSignal(HardcodedSignals.SpellResolve);
+            case CardType.Instant: {
+                // 608.2b
+                const target = spell.card.spellTarget;
+                if (!target || target.validateTargets(spell.targets)) {
+                    target?.applyTargets(spell.targets);
+                    for (const ability of spell.card.abilities) {
+                        ability.fireSignal(HardcodedSignals.SpellResolve);
+                    }
                 }
                 gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.graveyard));
                 break;
+            }
             default:
                 break;
         }

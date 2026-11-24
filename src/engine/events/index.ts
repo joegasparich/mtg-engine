@@ -3,6 +3,7 @@ export * from "./GameEvent_CastSpell";
 export * from "./GameEvent_ChangeCardZone";
 export * from "./GameEvent_DestroyPermanent";
 export * from "./GameEvent_DrawCard";
+export * from "./GameEvent_PlayLand";
 export * from "./GameEvent_Step";
 export * from "./GameEvent_TapCard";
 export * from "./GameEvent_UntapCard";

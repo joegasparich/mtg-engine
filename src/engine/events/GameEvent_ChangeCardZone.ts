@@ -19,11 +19,12 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         this.label = `Card ${this.card.logName} changed zones from ${this.card.zone?.name} to ${this.newZone.name}`;
     }
 
-    perform() {
+    perform(): boolean {
         this.card.preChangeZone();
         this.card.zone?.onLeave(this.card);
         this.card.zone = this.newZone;
         this.card.postChangeZone();
         this.newZone.onEnter(this.card);
+        return true;
     }
 }

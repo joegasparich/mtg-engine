@@ -12,7 +12,7 @@ export class GameEvent_DestroyPermanent extends GameEvent {
         this.card = card;
     }
 
-    perform() {
-        this.card.destroy();
+    perform(): boolean {
+        return this.card.destroy();
     }
 }

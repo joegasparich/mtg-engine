@@ -33,6 +33,7 @@ test("should trade", () => {
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
     (new PlayerActions.DeclareAttacker(bearsA).perform(playerA, [playerB]));
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(bearsA.tapped).toBe(true);
     (new PlayerActions.DeclareBlocker(bearsB).perform(playerB, [bearsA]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 

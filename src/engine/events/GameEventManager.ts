@@ -20,6 +20,7 @@ export enum GameEventType {
     DeclareAttacker,
     DeclareBlocker,
     StartTargeting,
+    PlayLand,
 }
 
 export abstract class GameEvent {
@@ -28,7 +29,9 @@ export abstract class GameEvent {
     isAction = true;
     callback: () => void;
 
-    perform() {}
+    perform(): boolean {
+        return true;
+    }
     then(callback: () => void) {
         this.callback = callback;
     }
@@ -90,16 +93,7 @@ class GameEventManager {
     performingEvents: boolean;
 
     addEvent(event: GameEvent) {
-        this.activeEvents.push(event);
-        this.checkForEffects(this.activeEvents);
-        this.performAllEvents();
-
-        if (!this.performingEvents && this.eventsResolvedCallback.length > 0) {
-            for (const callback of this.eventsResolvedCallback) {
-                callback();
-            }
-            this.eventsResolvedCallback.length = 0;
-        }
+        this.addEvents([event]);
     }
 
     addEvents(events: GameEvent[]) {
@@ -114,8 +108,13 @@ class GameEventManager {
         return events.length > 0;
     }
 
+    performImmediate(event: GameEvent): boolean {
+        return this.checkEvent(event) && this.performEvent(event);
+    }
+
     onResolved(callback: () => void) {
         this.eventsResolvedCallback.push(callback);
+        this.performAllEvents();
     }
 
     checkForEffects(events: GameEvent[]) {
@@ -131,25 +130,33 @@ class GameEventManager {
 
         this.performingEvents = true;
 
-        // Performs events, until no new events get added.
-        // TODO: Add infinite loop checking (should cause draw?)
-        while (this.activeEvents.length > 0) {
-            const events = [...this.activeEvents];
-            this.activeEvents = [];
-
-            for (let i = 0; i < events.length; i++) {
-                const event = events[i];
-
-                event.perform();
-                this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
-                this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
-
-                console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
-                event.callback?.();
+        try {
+            while (this.activeEvents.length > 0 || this.eventsResolvedCallback.length > 0) {
+                if (this.activeEvents.length > 0) {
+                    const events = this.activeEvents;
+                    this.activeEvents = [];
+                    for (const event of events) {
+                        this.performEvent(event);
+                    }
+                } else {
+                    this.eventsResolvedCallback.shift()();
+                }
             }
+        } finally {
+            this.performingEvents = false;
         }
+    }
 
-        this.performingEvents = false;
+    private performEvent(event: GameEvent): boolean {
+        if (!event.perform())
+            return false;
+
+        this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
+        this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
+
+        console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
+        event.callback?.();
+        return true;
     }
 }
 

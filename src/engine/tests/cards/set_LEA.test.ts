@@ -1,75 +1,94 @@
+import playerActionManager from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
+import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_GoToStep } from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
+import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
-import { GameEvent_CastSpell,GameEvent_ChangeCardZone } from "@engine/events";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
-import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
-import { ANCESTRAL_RECALL,FOREST } from "@engine/tests/testData";
+import { StepIndex } from "@engine/Step";
+import { ANCESTRAL_RECALL,BASIC_DECK } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
-let playerA: Player;
-let playerB: Player;
-
-beforeEach(async () => {
-    Game.init();
-    game.players.length = 0;
-    playerA = game.addPlayer([]);
-    playerB = game.addPlayer([]);
-});
-
-
-// TODO: Any cards that have non standard effects
 describe("Ancestral Recall", () => {
-    test("draws 3 cards", () => {
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerA), playerA.library));
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerA), playerA.library));
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerA), playerA.library));
+    let caster: Player;
+    let opponent: Player;
+    let island: Card;
+    let recall: Card;
 
-        const recall = new Card(cardData[ANCESTRAL_RECALL], playerA);
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, playerA.hand));
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        game.startGame();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
 
-        const targetPlayerA = (event: GameEvent_StartTargeting) => event.targeter.onTargeted([playerA]);
-        gameEventManager.onPerformed(GameEventType.StartTargeting, targetPlayerA);
-
-        const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
-        gameEventManager.addEvent(new GameEvent_CastSpell(playerA, recall));
-
-        gameEventManager.offPerformed(GameEventType.StartTargeting, targetPlayerA);
-
-        // Test stack resolved properly
-        expect(cardEnteredStack).toHaveBeenCalledTimes(1);
-
-        // Check card entered graveyard
-        expect(playerA.graveyard.cards.length).toBe(1);
-        expect(playerA.graveyard.cards[0]).toBe(recall);
-
-        // Check effect resolved
-        expect(playerA.hand.cards.length).toBe(3);
+        island = new Card(cardData.find(card => card.name === "Island"), caster);
+        recall = new Card(cardData[ANCESTRAL_RECALL], caster);
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(island, caster.battlefield));
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, caster.hand));
     });
-    test("target opponent", () => {
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerB), playerB.library));
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerB), playerB.library));
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], playerB), playerB.library));
 
-        const recall = new Card(cardData[ANCESTRAL_RECALL], playerA);
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, playerA.hand));
+    function beginCasting() {
+        const [action] = playerActionManager.getCardActions(recall, caster);
+        action.perform(caster);
+        expect(game.pendingTargeter?.source).toBe(recall);
+        return game.pendingTargeter;
+    }
 
-        const targetPlayerB = (event: GameEvent_StartTargeting) => event.targeter.onTargeted([playerB]);
-        gameEventManager.onPerformed(GameEventType.StartTargeting, targetPlayerB);
+    test.each(["caster", "opponent"])("only the chosen %s draws three cards", recipient => {
+        const target = recipient === "caster" ? caster : opponent;
+        const resolveSpell = vi.spyOn(game.stack, "resolveSpell");
+        const request = beginCasting();
 
-        const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
-        gameEventManager.addEvent(new GameEvent_CastSpell(playerA, recall));
+        expect(island.tapped).toBe(false);
+        expect(recall.zone).toBe(caster.hand);
+        expect(game.stack.stack).toHaveLength(0);
+        expect(resolveSpell).not.toHaveBeenCalled();
 
-        gameEventManager.offPerformed(GameEventType.StartTargeting, targetPlayerB);
+        request.onTargeted([target]);
+        request.onTargeted([target]);
 
-        // Test stack resolved properly
-        expect(cardEnteredStack).toHaveBeenCalledTimes(1);
+        expect(resolveSpell).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ card: recall, targets: [target] }));
+        expect(game.pendingTargeter).toBeNull();
+        expect(island.tapped).toBe(true);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(recall.zone).toBe(caster.graveyard);
+        expect(caster.hand.cards).toHaveLength(target === caster ? 10 : 7);
+        expect(opponent.hand.cards).toHaveLength(target === opponent ? 10 : 7);
+    });
 
-        // Check card entered graveyard
-        expect(playerA.graveyard.cards.length).toBe(1);
-        expect(playerA.graveyard.cards[0]).toBe(recall);
+    test("rejects a missing target, a card, and a player outside the game", () => {
+        gameEventManager.addEvent(new GameEvent_CastSpell(caster, recall));
+        expect(recall.zone).toBe(caster.hand);
 
-        // Check effect resolved
-        expect(playerB.hand.cards.length).toBe(3);
+        const request = beginCasting();
+        request.onTargeted([]);
+        request.onTargeted([island]);
+        request.onTargeted([new Player(2, [])]);
+
+        expect(game.pendingTargeter).toBe(request);
+        expect(island.tapped).toBe(false);
+        expect(recall.zone).toBe(caster.hand);
+        request.onTargeted([opponent]);
+        expect(opponent.hand.cards).toHaveLength(10);
+    });
+
+    test("cancelling preserves the spell and mana and allows another attempt", () => {
+        caster.manaPool[ManaColour.U] = 1;
+        const request = beginCasting();
+
+        request.onCancelled();
+        request.onTargeted([opponent]);
+
+        expect(game.pendingTargeter).toBeNull();
+        expect(recall.zone).toBe(caster.hand);
+        expect(island.tapped).toBe(false);
+        expect(caster.manaPool[ManaColour.U]).toBe(1);
+        expect(opponent.hand.cards).toHaveLength(7);
+
+        beginCasting().onTargeted([opponent]);
+        expect(recall.zone).toBe(caster.graveyard);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(opponent.hand.cards).toHaveLength(10);
     });
 });

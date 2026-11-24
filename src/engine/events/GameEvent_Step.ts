@@ -8,11 +8,11 @@ export class GameEvent_GoToNextStep extends GameEvent {
         super();
 
         this.type = GameEventType.GoToNextStep;
-        this.label = "Go to next turn";
+        this.label = "Go to next step";
     }
 
-    perform() {
-        game.nextStep(game.options.allowAutoSkip);
+    perform(): boolean {
+        return game.nextStep(game.options.allowAutoSkip);
     }
 }
 export class GameEvent_GoToStep extends GameEvent {
@@ -27,10 +27,8 @@ export class GameEvent_GoToStep extends GameEvent {
         this.index = index;
     }
 
-    perform() {
-        do {
-            game.nextStep(false);
-        } while (game.currentStepIndex != this.index);
+    perform(): boolean {
+        return game.goToStep(this.index);
     }
 }
 
@@ -40,11 +38,11 @@ export class GameEvent_GoToNextPhase extends GameEvent {
         super();
 
         this.type = GameEventType.GoToNextPhase;
-        this.label = "Go to next turn";
+        this.label = "Go to next phase";
     }
 
-    perform() {
-        game.skipToNextPhase();
+    perform(): boolean {
+        return game.skipToNextPhase();
     }
 }
 
@@ -56,8 +54,8 @@ export class GameEvent_GoToNextTurn extends GameEvent {
         this.label = "Go to next turn";
     }
 
-    perform() {
-        game.skipToNextTurn();
+    perform(): boolean {
+        return game.skipToNextTurn();
     }
 }
 
@@ -75,8 +73,6 @@ export class GameEvent_StepStart extends GameEvent {
 
         this.label = `Player ${this.player.id} entered step ${Step.toString(this.stepIndex)}`;
     }
-
-    perform() {}
 }
 
 export class GameEvent_StepEnd extends GameEvent {
@@ -93,6 +89,4 @@ export class GameEvent_StepEnd extends GameEvent {
 
         this.label = `Player ${this.player.id} exited step ${Step.toString(this.stepIndex)}`;
     }
-
-    perform() {}
 }

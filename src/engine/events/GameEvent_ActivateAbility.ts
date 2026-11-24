@@ -22,19 +22,24 @@ export class GameEvent_ActivateAbility extends GameEvent {
         this.label = `Player ${player.id} activated ability of ${card.logName} (TODO)`;
     }
 
-    perform() {
-        if (!this.ability.activatable || !this.ability.canActivate()) {
-            console.log("Attempted to trigger unpayable or non-activated ability");
-            return;
-        }
+    perform(): boolean {
+        if (game.pendingTargeter || !this.ability.activatable || !this.ability.canActivate())
+            return false;
 
-        // Pay cost
-        this.ability.payActivationCost();
+        if (!this.ability.payActivationCost())
+            return false;
+
+        // 605.3b
+        if (this.ability.def.isManaAbility) {
+            this.ability.resolveActivation();
+            return true;
+        }
 
         // Add ability to stack
         game.stack.abilityActivated(this.player, this.ability);//, this.targets);
 
         // TODO: pass priority
         game.stack.resolveAll();
+        return true;
     }
 }

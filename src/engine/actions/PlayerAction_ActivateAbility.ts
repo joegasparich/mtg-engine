@@ -19,6 +19,10 @@ export class PlayerAction_ActivateAbility extends PlayerAction {
     }
 
     perform(player: Player) {
+        if (!player || player !== this.card.controller || this.card.zone !== player.battlefield
+            || !this.card.abilities.includes(this.ability) || !this.card.canActivate(this.ability))
+            return;
+
         gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.card, this.ability));
     }
 }

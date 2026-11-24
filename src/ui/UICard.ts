@@ -243,42 +243,45 @@ export default class UICard extends PIXI.Container {
     @autobind
     private onMouseUp(event: PIXI.FederatedPointerEvent) {
         this.finishPress(event, true);
-        if (event.button == 2) {
-            // const player = game.activePlayer(); // TODO: Uncomment this once priority is in
-            const player = this.card.controller;
+        if (event.button !== 2)
+            return;
 
-            const actions = playerActionManager.getCardActions(this.card, player);
+        const player = game.activePlayer();
+        const actions = playerActionManager.getCardActions(this.card, player);
+        if (actions.length === 0)
+            return;
 
-            if (actions.length > 0) {
-                showCustomContextMenu(event.global, actions.map(a => a.label()), index => {
-                    const action = actions[index];
+        const turn = game.turnNumber;
+        const step = game.currentStepIndex;
+        const isCurrentStep = () => game.turnNumber === turn && game.currentStepIndex === step && game.activePlayer() === player;
 
+        showCustomContextMenu(event.global, actions.map(action => action.label()), index => {
+            if (!isCurrentStep())
+                return;
 
-                    if (action.targets && action.targets.length > 0) {
-                        let targetType = TargetType.None;
-
-                        if (action.targets.some(t => t instanceof Card))
-                            targetType |= TargetType.Card;
-                        if (action.targets.some(t => t instanceof Player))
-                            targetType |= TargetType.Player;
-
-                        // TODO: Multitargeting
-                        const targeter = new UITargeter(
-                            this,
-                            targetType,
-                            1,
-                            targets => action.targets.includes(targets[0]),
-                            targets => {
-                                action.perform(game.activePlayer(), [targets[0]]);
-                                targeter.remove();
-                            },
-                            null
-                        );
-                    } else {
-                        action.perform(game.activePlayer());
-                    }
-                }, event);
+            const action = actions[index];
+            if (!action.targets?.length) {
+                action.perform(player);
+                return;
             }
-        }
+
+            let targetType = TargetType.None;
+            if (action.targets.some(target => target instanceof Card))
+                targetType |= TargetType.Card;
+            if (action.targets.some(target => target instanceof Player))
+                targetType |= TargetType.Player;
+
+            const targeter = new UITargeter(
+                this,
+                targetType,
+                1,
+                targets => isCurrentStep() && action.targets.includes(targets[0]),
+                targets => {
+                    targeter.remove();
+                    action.perform(player, targets);
+                },
+                null
+            );
+        }, event);
     }
 }

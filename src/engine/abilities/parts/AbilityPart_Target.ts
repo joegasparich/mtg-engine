@@ -1,35 +1,25 @@
+import { TargetTypeKeys,type ActionTarget } from "@engine/actions/PlayerActionManager";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import { ActionTarget,TargetTypeKeys } from "@engine/actions";
-import playerActionManager from "@engine/actions/PlayerActionManager";
-import { autobind } from "@utility/typeUtility";
-import { Ability } from "../Ability";
+import { game } from "@engine/Game";
+import Player from "@engine/Player";
 import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
 export class AbilityPart_Target extends AbilityPart {
-    inSignal: string;
-    outSignal = "default";
     saveAs: string;
     validTargets: TargetTypeKeys[];
     count = 1;
 
-    setup(ability: Ability) {
-        super.setup(ability);
+    validateTargets(targets: readonly ActionTarget[]): boolean {
+        return targets.length === this.count && targets.every(target => {
+            if (target instanceof Player)
+                return this.validTargets.includes(TargetTypeKeys.Player) && game.players.includes(target);
 
-        if (!this.inSignal)
-            throw new Error("AbilityPart_Target requires inSignal to be set");
-    }
-
-    onSignalFired(signal: string) {
-        if (signal !== this.inSignal)
-            return;
-
-        playerActionManager.startTargeting(this.validTargets, this.count, this.validateTargets, (targets) => {
-            this.ability.slate[this.saveAs] = targets;
-            this.ability.fireSignal(this.outSignal);
+            return this.validTargets.includes(TargetTypeKeys.Card) && Boolean(target?.zone);
         });
     }
 
-    @autobind
-    validateTargets(targets: ActionTarget[]) { return true; }
+    applyTargets(targets: readonly ActionTarget[]) {
+        this.ability.slate[this.saveAs] = targets;
+    }
 }

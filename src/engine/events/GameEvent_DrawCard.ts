@@ -17,12 +17,13 @@ export class GameEvent_DrawCard extends GameEvent {
         this.label = `Player ${this.player.id} drawing card from library`;
     }
 
-    perform() {
+    perform(): boolean {
         const cards = this.player.library.getTopXCards(this.count);
         for (const card of cards) {
             this.label = `Player ${this.player.id} drew ${card.logName} from library`;
 
             gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
         }
+        return cards.length > 0;
     }
 }

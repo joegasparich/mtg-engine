@@ -4,6 +4,7 @@ import Card from "@engine/Card";
 import { CombatManager } from "@engine/CombatManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
+import { StepIndex } from "@engine/Step";
 
 export class PlayerAction_DeclareAttacker extends PlayerAction {
     targets: ActionTarget[];
@@ -18,14 +19,10 @@ export class PlayerAction_DeclareAttacker extends PlayerAction {
         return `Declare ${this.card.name} as an attacker`;
     }
 
-    perform(player: Player, targets?: ActionTarget[]) {
-        // if (!targets?.length) {
-        //     console.error("Performed declare attacker without a target");
-        //     return;
-        // }
-        //
-        // // TODO: Target player or planeswalker
-        // const target = targets[0] as Player;
+    perform(player: Player, _targets?: ActionTarget[]) {
+        if (game.currentStepIndex !== StepIndex.DeclareAttackers || player !== game.activePlayer()
+            || player !== this.card.controller || !CombatManager.canAttack(this.card))
+            return;
 
         CombatManager.attackingCreatures.set(this.card, game.randomOpponent(player));
     }

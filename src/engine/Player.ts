@@ -35,10 +35,6 @@ export default class Player {
     getPotentialMana(): Readonly<ManaAmount> {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
-        for (const card of this.hand.cards) {
-            ManaUtility.addMana(potentialMana, card.getPotentialMana(this));
-        }
-
         for (const card of this.battlefield.cards) {
             ManaUtility.addMana(potentialMana, card.getPotentialMana(this));
         }

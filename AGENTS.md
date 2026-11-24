@@ -1,0 +1,3 @@
+- You can find the official rules under ref/MagicCompRules.txt
+- Where appropriate, reference the magic rule number
+- Add general tests as well as tests for each card under it's set unless that card is just a straightforward creature.

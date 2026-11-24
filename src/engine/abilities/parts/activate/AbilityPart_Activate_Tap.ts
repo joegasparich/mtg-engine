@@ -10,7 +10,7 @@ export class AbilityPart_Activate_Tap extends AbilityPart_Activate {
         return !this.ability.card.tapped;
     }
 
-    payCost(): void {
-        gameEventManager.addEvent(new GameEvent_TapCard(this.ability.card));
+    payCost(): boolean {
+        return gameEventManager.performImmediate(new GameEvent_TapCard(this.ability.card));
     }
 }

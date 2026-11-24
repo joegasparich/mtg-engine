@@ -96,19 +96,15 @@ export class DeclareAttackersStep implements Step {
         this.message = "Declare attackers";
         this.buttons = [["Finish declaring", this.onFinishDeclaring]];
     }
-    onEnd(player: Player): void {}
-
-    @autobind
-    onFinishDeclaring() {
+    onEnd(): void {
         // 508.1f
         for (const card of CombatManager.attackingCreatures.keys()) {
             gameEventManager.addEvent(new GameEvent_TapCard(card));
         }
+    }
 
-        // 508.2
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-
+    @autobind
+    onFinishDeclaring() {
         game.nextStep(game.options.allowAutoSkip);
     }
 }
@@ -202,6 +198,24 @@ export class EndStep implements Step {
     onEnd(player: Player) {}
 }
 
+export class CleanupStep implements Step {
+    message: string | null = null;
+    buttons: [string, () => void][] = [];
+
+    onStart(): void {
+        game.activePlayerID = -1;
+
+        // 514.2
+        for (const player of game.players) {
+            for (const permanent of player.battlefield.cards) {
+                permanent.damageTaken = 0;
+            }
+        }
+    }
+
+    onEnd(): void {}
+}
+
 export enum StepIndex {
     Untap,
     Upkeep,
@@ -213,7 +227,8 @@ export enum StepIndex {
     CombatDamage,
     EndOfCombat,
     SecondMain,
-    End
+    End,
+    Cleanup
 }
 
 export enum PhaseIndex {
@@ -237,6 +252,7 @@ export namespace Step {
         new EndOfCombatStep(),
         new SecondMainStep(),
         new EndStep(),
+        new CleanupStep(),
     ];
 
     export const NUM_PHASES = 5;
@@ -245,7 +261,7 @@ export namespace Step {
         if (stepIndex <= StepIndex.Main) return PhaseIndex.Main;
         if (stepIndex <= StepIndex.EndOfCombat) return PhaseIndex.Combat;
         if (stepIndex <= StepIndex.SecondMain) return PhaseIndex.SecondMain;
-        if (stepIndex <= StepIndex.End) return PhaseIndex.End;
+        if (stepIndex <= StepIndex.Cleanup) return PhaseIndex.End;
     }
     export function phaseStart(phaseIndex: number): StepIndex {
         switch (phaseIndex) {
@@ -270,6 +286,7 @@ export namespace Step {
             case StepIndex.EndOfCombat: return "End of combat";
             case StepIndex.SecondMain: return "Second main";
             case StepIndex.End: return "End";
+            case StepIndex.Cleanup: return "Cleanup";
         }
     }
 

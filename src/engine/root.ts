@@ -1,11 +1,6 @@
 import * as PIXI from 'pixi.js';
 
-import Card from "@engine/Card";
-import {
-GameEvent_CastSpell,
-GameEvent_ChangeCardZone,
-GameEvent_GoToNextStep
-} from "@engine/events";
+import { GameEvent_GoToNextStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import UIRoot,{ initRenderer, uiRoot } from "@ui/UIRoot";
@@ -21,7 +16,6 @@ declare global {
 }
 
 const PLAINS = 0;
-const ISLAND = 1;
 const MOUNTAIN = 3;
 const FOREST = 4;
 const BEARS = 5;
@@ -38,7 +32,7 @@ export async function startGame() {
     window.cards = cardData;
 
     window.addEventListener("keyup", (e) => {
-        if (e.key == " ")
+        if (e.key === " " && !(e.target instanceof HTMLButtonElement))
             gameEventManager.addEvent(new GameEvent_GoToNextStep());
     });
 
@@ -51,11 +45,6 @@ export async function startGame() {
     uiRoot.onPlayerAdded(playerTwo);
 
     game.startGame({allowAutoSkip: true});
-
-    // Combat Test
-    const island = new Card(cardData[ISLAND], playerOne);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(island, playerOne.hand));
-    gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, island));
 
     // const elemental = new Card(cardData[ELEMENTAL], playerOne);
     // gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerOne.hand));
