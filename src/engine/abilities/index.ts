@@ -1,17 +1,17 @@
-import {Ability, AbilityPart_Activate} from ".";
-import {AbilityDef} from "~/defs";
 import Card from "@engine/Card";
-import {ActionTarget} from "@engine/actions";
+import { ActionTarget } from "@engine/actions";
+import { AbilityDef } from "~/defs";
+import { Ability,AbilityPart_Activate } from ".";
 
-export {Ability} from "./Ability";
-export {AbilityPart} from "./parts/AbilityPart";
-export {AbilityPart_Activate} from "./parts/activate/AbilityPart_Activate";
-export {AbilityPart_Effect} from "./parts/effect/AbilityPart_Effect";
-export {AbilityPart_Effect_AddMana} from "./parts/effect/AbilityPart_Effect_AddMana";
-export {AbilityPart_Trigger} from "./parts/trigger/AbilityPart_Trigger";
+export { Ability } from "./Ability";
+export { AbilityPart } from "./parts/AbilityPart";
+export { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
+export { AbilityPart_Effect } from "./parts/effect/AbilityPart_Effect";
+export { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_AddMana";
+export { AbilityPart_Trigger } from "./parts/trigger/AbilityPart_Trigger";
 
-import {AbilityParts} from "./registry";
-import {keywordData} from "~/index";
+import { keywordData } from "~/index";
+import { AbilityParts } from "./registry";
 
 // Ensures all parts are imported, since we are instantiating them by reflection
 import.meta.glob("./parts/**/*.ts", { eager: true });

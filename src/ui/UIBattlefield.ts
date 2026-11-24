@@ -1,9 +1,9 @@
 import * as PIXI from 'pixi.js';
 
+import { Battlefield } from "@engine/Zone";
 import UICard from "@ui/UICard";
-import {UIZone} from "@ui/UIZone";
-import {Battlefield} from "@engine/Zone";
-import {pixi} from "@ui/UIRoot";
+import { pixi } from "@ui/UIRoot";
+import { UIZone } from "@ui/UIZone";
 
 export class UIBattlefield extends UIZone {
     battlefield: Battlefield;

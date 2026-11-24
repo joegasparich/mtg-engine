@@ -1,21 +1,17 @@
 import * as PIXI from 'pixi.js';
 
-import Game, {game} from "@engine/Game";
-import {CardDef} from "~/defs";
-import UIRoot, {uiRoot} from "@ui/UIRoot";
-import gameEventManager from "@engine/events/GameEventManager";
-import {
-    GameEvent_ActivateAbility,
-    GameEvent_CastSpell,
-    GameEvent_ChangeCardZone,
-    GameEvent_GoToNextStep,
-    GameEvent_GoToNextTurn,
-    GameEvent_GoToStep
-} from "@engine/events";
-import {cardData} from "~/index";
 import Card from "@engine/Card";
-import {StepIndex} from "@engine/Step";
-import {randInt} from "@utility/randomUtility";
+import {
+GameEvent_CastSpell,
+GameEvent_ChangeCardZone,
+GameEvent_GoToNextStep
+} from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
+import Game,{ game } from "@engine/Game";
+import UIRoot,{ initRenderer, uiRoot } from "@ui/UIRoot";
+import { randInt } from "@utility/randomUtility";
+import { CardDef } from "~/defs";
+import { cardData } from "~/index";
 
 declare global {
     interface Window {
@@ -34,6 +30,7 @@ const ELEMENTAL = 7;
 const RECALL = 8;
 
 export async function startGame() {
+    await initRenderer();
     Game.init();
     UIRoot.init();
 

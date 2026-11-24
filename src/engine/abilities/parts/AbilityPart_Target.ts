@@ -1,9 +1,9 @@
-import {AbilityPart} from "./AbilityPart";
-import {Ability} from "../Ability";
-import {ActionTarget, TargetTypeKeys} from "@engine/actions";
+import { RegisterAbilityPart } from "@engine/abilities/registry";
+import { ActionTarget,TargetTypeKeys } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import {autobind} from "@utility/typeUtility";
-import {RegisterAbilityPart} from "@engine/abilities/registry";
+import { autobind } from "@utility/typeUtility";
+import { Ability } from "../Ability";
+import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
 export class AbilityPart_Target extends AbilityPart {

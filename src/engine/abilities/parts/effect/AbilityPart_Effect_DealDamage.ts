@@ -1,4 +1,4 @@
-import {GrammarKey, resolveAbilityGrammar} from "../..";
+import { GrammarKey,resolveAbilityGrammar } from "../..";
 import { RegisterAbilityPart } from "../../registry";
 import { AbilityPart_Effect } from "./AbilityPart_Effect";
 

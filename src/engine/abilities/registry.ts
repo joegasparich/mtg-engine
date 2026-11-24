@@ -1,4 +1,4 @@
-import {AbilityPart} from "@engine/abilities/parts/AbilityPart";
+import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 
 export type AbilityPartConstructor = new () => AbilityPart;
 export const AbilityParts: Record<string, AbilityPartConstructor> = {};

@@ -1,8 +1,7 @@
-// -- WARNING: VIBE CODED -- //
-
 // Store the currently active menu and its outside click handler
+let pendingOutsideHandler: ReturnType<typeof setTimeout> | undefined;
 let activeContextMenu: HTMLDivElement = null;
-let activeOutsideClickHandler: (this:Window, ev: MouseEvent) => any = null;
+let activeOutsideClickHandler: (this:Window, ev: MouseEvent) => void = null;
 
 /**
  * Displays a custom context menu.
@@ -73,7 +72,8 @@ export function showCustomContextMenu(position: {x: number, y: number}, options:
     // Add event listener to close menu when clicking outside
     // Use a timeout to prevent the same event that might have triggered opening
     // (though less relevant for keydown) from immediately closing it.
-    setTimeout(() => {
+    pendingOutsideHandler = setTimeout(() => {
+        pendingOutsideHandler = undefined;
         activeOutsideClickHandler = (e) => {
             // Check if the click is outside the menu
             if (activeContextMenu && !activeContextMenu.contains(e.target as Node)) {
@@ -90,6 +90,8 @@ export function showCustomContextMenu(position: {x: number, y: number}, options:
  * and cleans up its event listeners.
  */
 export function removeCustomContextMenu() {
+    clearTimeout(pendingOutsideHandler);
+    pendingOutsideHandler = undefined;
     if (activeContextMenu) {
         activeContextMenu.remove();
         activeContextMenu = null;

@@ -1,12 +1,12 @@
-import {cardData} from "~/index";
-import Player from "@engine/Player";
-import Game, {game} from "@engine/Game";
+import { PlayerActions } from "@engine/actions";
 import Card from "@engine/Card";
-import {FOREST} from "@engine/tests/testData";
+import { GameEvent_ChangeCardZone } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_ChangeCardZone} from "@engine/events";
-import {PlayerActions} from "@engine/actions";
-import {ManaColour} from "@engine/mana";
+import Game,{ game } from "@engine/Game";
+import { ManaColour } from "@engine/mana";
+import Player from "@engine/Player";
+import { FOREST } from "@engine/tests/testData";
+import { cardData } from "~/index";
 
 let player: Player;
 

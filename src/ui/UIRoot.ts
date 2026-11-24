@@ -1,38 +1,35 @@
 import * as PIXI from "pixi.js";
 
-import UICard from "@ui/UICard";
-import {UIPlayer} from "@ui/UIPlayer";
-import {ActionTarget, TargetType} from "@engine/actions";
-import {drawArrow} from "@ui/drawUtility";
-import uiEventManager, {
-    UIEvent_CardClicked,
-    UIEvent_CardDeselected,
-    UIEvent_CardSelected,
-    UIEventType
-} from "@ui/UIEventManager";
-import {game} from "@engine/Game";
-import {autobind} from "@utility/typeUtility";
+import { ActionTarget,TargetType } from "@engine/actions";
 import Card from "@engine/Card";
+import { GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
+import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import DOMLabel from "@ui/dom/DOMLabel";
+import { Step } from "@engine/Step";
 import DOMButton from "@ui/dom/DOMButton";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {GameEvent_GoToNextPhase, GameEvent_GoToNextStep, GameEvent_GoToNextTurn} from "@engine/events";
-import {Step} from "@engine/Step";
-import {GameEvent_StartTargeting} from "@engine/events/GameEvent_StartTargeting";
+import DOMLabel from "@ui/dom/DOMLabel";
+import { drawArrow } from "@ui/drawUtility";
+import UICard from "@ui/UICard";
+import uiEventManager,{
+UIEvent_CardClicked,
+UIEvent_CardDeselected,
+UIEvent_CardSelected,
+UIEventType
+} from "@ui/UIEventManager";
+import { UIPlayer } from "@ui/UIPlayer";
+import { autobind } from "@utility/typeUtility";
 
-export let pixi: PIXI.Application = null;
+export const pixi = new PIXI.Application();
 
-pixi = new PIXI.Application();
-await pixi.init({ background: '#1099bb', resizeTo: window });
-document.body.appendChild(pixi.canvas);
-pixi.stage.eventMode = 'static';
-pixi.stage.hitArea = pixi.screen;
+export async function initRenderer() {
+    await pixi.init({ background: '#1099bb', resizeTo: window });
+    document.body.appendChild(pixi.canvas);
+    pixi.stage.eventMode = 'static';
+    pixi.stage.hitArea = pixi.screen;
+}
 
-const playerPositions = [
-    new PIXI.Point(pixi.screen.width/2, pixi.screen.height),
-    new PIXI.Point(pixi.screen.width/2, 0),
-];
 const playerRotations = [
     0,
     180
@@ -225,12 +222,13 @@ export default class UIRoot extends PIXI.Container {
     }
 
     onPlayerAdded(player: Player) {
-        if (this.players.length >= playerPositions.length) {
+        if (this.players.length >= playerRotations.length) {
             console.log("Already at max players!!");
             return;
         }
 
-        const uiPlayer = new UIPlayer(player, playerPositions[this.players.length], playerRotations[this.players.length]);
+        const position = new PIXI.Point(pixi.screen.width / 2, this.players.length === 0 ? pixi.screen.height : 0);
+        const uiPlayer = new UIPlayer(player, position, playerRotations[this.players.length]);
         pixi.stage.addChild(uiPlayer);
         this.players.push(uiPlayer);
         this.playerToUIPlayer.set(player, uiPlayer);

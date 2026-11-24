@@ -1,5 +1,5 @@
-import {GameEvent, GameEventType} from "@engine/events/GameEventManager";
-import {Targeter} from "@engine/actions";
+import { Targeter } from "@engine/actions";
+import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 
 export class GameEvent_StartTargeting extends GameEvent {
     type = GameEventType.StartTargeting;

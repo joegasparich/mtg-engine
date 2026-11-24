@@ -1,7 +1,7 @@
-import Game, {game} from "@engine/Game";
-import {cardData} from "~/index";
-import {BASIC_DECK, FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
-import {StepIndex} from "@engine/Step";
+import Game,{ game } from "@engine/Game";
+import { StepIndex } from "@engine/Step";
+import { BASIC_DECK,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { cardData } from "~/index";
 
 test("should start game and add player", () => {
     Game.init();

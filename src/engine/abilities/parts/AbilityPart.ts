@@ -1,4 +1,4 @@
-import {Ability} from "@engine/abilities";
+import { Ability } from "@engine/abilities";
 
 export abstract class AbilityPart {
     ability: Ability;

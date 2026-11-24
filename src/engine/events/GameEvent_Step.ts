@@ -1,7 +1,7 @@
-import {GameEvent, GameEventType} from "@engine/events/GameEventManager";
-import {game} from "@engine/Game";
-import {Step, StepIndex} from "@engine/Step";
+import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import Player from "@engine/Player";
+import { Step,StepIndex } from "@engine/Step";
 
 export class GameEvent_GoToNextStep extends GameEvent {
     constructor() {

@@ -1,11 +1,11 @@
 import * as PIXI from "pixi.js";
 
+import { Zone } from "@engine/Zone";
+import { GameEvent_ChangeCardZone } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import UICard from "@ui/UICard";
-import {Zone} from "@engine/Zone";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {autobind} from "@utility/typeUtility";
-import {GameEvent_ChangeCardZone} from "@engine/events";
-import {uiRoot} from "@ui/UIRoot";
+import { uiRoot } from "@ui/UIRoot";
+import { autobind } from "@utility/typeUtility";
 
 export class UIZone extends PIXI.Container {
     zone: Zone;
@@ -15,7 +15,7 @@ export class UIZone extends PIXI.Container {
 
         this.zone = zone;
 
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone)
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
     }
 
     @autobind

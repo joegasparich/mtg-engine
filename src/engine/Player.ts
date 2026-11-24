@@ -1,7 +1,7 @@
-import {Battlefield, Graveyard, Hand, Library} from "@engine/Zone";
-import {ManaAmount, ManaUtility} from "@engine/mana";
 import Card from "@engine/Card";
-import {cardData} from "~/index";
+import { Battlefield,Graveyard,Hand,Library } from "@engine/Zone";
+import { ManaAmount,ManaUtility } from "@engine/mana";
+import { cardData } from "~/index";
 
 export default class Player {
     id: number;

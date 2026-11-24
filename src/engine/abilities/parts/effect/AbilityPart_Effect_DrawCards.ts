@@ -1,9 +1,9 @@
-import {AbilityPart_Effect} from "./AbilityPart_Effect";
-import {GrammarKey, resolveAbilityGrammar} from "../../index";
-import {RegisterAbilityPart} from "../../registry";
+import { GameEvent_DrawCard } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Player from "@engine/Player";
-import {GameEvent_DrawCard} from "@engine/events";
+import { GrammarKey,resolveAbilityGrammar } from "../../index";
+import { RegisterAbilityPart } from "../../registry";
+import { AbilityPart_Effect } from "./AbilityPart_Effect";
 
 @RegisterAbilityPart
 export class AbilityPart_Effect_DrawCards extends AbilityPart_Effect {

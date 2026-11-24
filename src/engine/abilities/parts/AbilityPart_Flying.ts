@@ -1,12 +1,12 @@
-import {RegisterAbilityPart} from "@engine/abilities/registry";
-import {autobind} from "@utility/typeUtility";
-import {Keyword} from "~/defs";
-import {Battlefield} from "@engine/Zone";
+import { RegisterAbilityPart } from "@engine/abilities/registry";
 import Card from "@engine/Card";
-import {removeIf} from "@utility/arrayUtility";
-import {AbilityPart} from "./AbilityPart";
-import {Ability} from "../Ability";
-import gameEventManager, {GameEvent, GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
+import gameEventManager,{ GameEvent,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { Battlefield } from "@engine/Zone";
+import { removeIf } from "@utility/arrayUtility";
+import { autobind } from "@utility/typeUtility";
+import { Keyword } from "~/defs";
+import { Ability } from "../Ability";
+import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
 class AbilityPart_Flying extends AbilityPart {

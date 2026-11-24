@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge,ipcRenderer } from 'electron';
 
 export interface ElectronAPI {
     fetchImage: (imageUrl: string) => Promise<string>; // Returns a Promise resolving to the Data URL

@@ -1,9 +1,9 @@
-import {PlayerAction} from "@engine/actions/PlayerAction";
-import Player from "@engine/Player";
-import {ManaUtility} from "@engine/mana";
-import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_CastSpell} from "@engine/events";
+import { PlayerAction } from "@engine/actions/PlayerAction";
 import playerActionManager from "@engine/actions/PlayerActionManager";
+import { GameEvent_CastSpell } from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
+import { ManaUtility } from "@engine/mana";
+import Player from "@engine/Player";
 
 export class PlayerAction_PlayCard extends PlayerAction {
     label() {
@@ -11,8 +11,10 @@ export class PlayerAction_PlayCard extends PlayerAction {
     }
 
     perform(player: Player) {
-        if (!ManaUtility.canPay(this.card.cost, player.manaPool))
+        if (!ManaUtility.canPay(this.card.cost, player.manaPool)) {
+            if (!playerActionManager.canAutoPay(this.card, player)) return;
             playerActionManager.autoPay(this.card, player);
+        }
 
         if (this.card.cost && !ManaUtility.canPay(this.card.cost, player.manaPool)) {
             console.log("Attempted to play card with unpayable cost");

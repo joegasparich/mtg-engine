@@ -15,7 +15,6 @@ export async function loadImageFromExternalUrl(externalUrl: string): Promise<PIX
         }
 
         const texture = await PIXI.Assets.load<PIXI.Texture>(dataUrl);
-        texture.source.autoGenerateMipmaps = true;
 
         // Validation for PixiJS v8
         if (!texture) {
@@ -36,7 +35,9 @@ export async function loadImageFromExternalUrl(externalUrl: string): Promise<PIX
             throw new Error('Texture or its source is marked as destroyed.');
         }
 
-        // If all checks pass, create and return the sprite
+        texture.source.autoGenerateMipmaps = true;
+
+        // Return the validated texture
         return texture;
 
     } catch (error) {

@@ -1,8 +1,8 @@
-import Player from "@engine/Player";
-import Game, {game} from "@engine/Game";
-import {cardData} from "~/index";
-import {FOREST, GRIZZLY_BEARS} from "@engine/tests/testData";
 import Card from "@engine/Card";
+import Game,{ game } from "@engine/Game";
+import Player from "@engine/Player";
+import { FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { cardData } from "~/index";
 
 let player: Player;
 

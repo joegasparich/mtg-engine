@@ -1,11 +1,11 @@
-import {CardType} from "~/defs";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {autobind} from "@utility/typeUtility";
-import {GameEvent_ChangeCardZone} from "@engine/events";
-import {Battlefield} from "@engine/Zone";
-import { AbilityPart_Trigger } from "./AbilityPart_Trigger";
-import {Ability, GrammarKey} from "../..";
+import { GameEvent_ChangeCardZone } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { Battlefield } from "@engine/Zone";
+import { autobind } from "@utility/typeUtility";
+import { CardType } from "~/defs";
+import { Ability,GrammarKey } from "../..";
 import { RegisterAbilityPart } from "../../registry";
+import { AbilityPart_Trigger } from "./AbilityPart_Trigger";
 
 @RegisterAbilityPart
 class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {

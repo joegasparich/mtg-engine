@@ -1,23 +1,23 @@
 import Card from "@engine/Card";
+import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import {Battlefield} from "@engine/Zone";
-import {CardType} from "~/defs";
-import {game} from "@engine/Game";
-import gameEventManager, {GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
+import { Battlefield } from "@engine/Zone";
+import gameEventManager,{ GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { CardType } from "~/defs";
 
-export namespace CombatManager {
-    export let attackingPlayer: Player;
-    export const attackingCreatures = new Map<Card, Player>();
-    export const blockingCreatures = new Map<Card, Card>();
+export class CombatManager {
+    static attackingPlayer: Player;
+    static readonly attackingCreatures = new Map<Card, Player>();
+    static readonly blockingCreatures = new Map<Card, Card>();
 
-    export function reset() {
-        attackingPlayer = null;
-        attackingCreatures.clear();
-        blockingCreatures.clear();
+    static reset() {
+        CombatManager.attackingPlayer = null;
+        CombatManager.attackingCreatures.clear();
+        CombatManager.blockingCreatures.clear();
     }
 
-    export function canAttack(card: Card) {
-        if (card.controller !== attackingPlayer)
+    static canAttack(card: Card) {
+        if (card.controller !== CombatManager.attackingPlayer)
             return false;
 
         if (!(card.zone instanceof Battlefield))
@@ -32,8 +32,8 @@ export namespace CombatManager {
         return true;
     }
 
-    export function canBlock(card: Card) {
-        if (!beingAttacked(card.controller))
+    static canBlock(card: Card) {
+        if (!CombatManager.beingAttacked(card.controller))
             return false;
 
         if (!(card.zone instanceof Battlefield))
@@ -48,71 +48,71 @@ export namespace CombatManager {
         return true;
     }
 
-    export function canBlockAnyAttackers(card: Card) {
-        if (!canBlock(card))
+    static canBlockAnyAttackers(card: Card) {
+        if (!CombatManager.canBlock(card))
             return false;
 
-        for (const attacker of attackingCreatures.keys()) {
-            if (canBlockAttacker(card, attacker))
+        for (const attacker of CombatManager.attackingCreatures.keys()) {
+            if (CombatManager.canBlockAttacker(card, attacker))
                 return true;
         }
 
         return false;
     }
 
-    export function canBlockAttacker(blocker: Card, attacker: Card) {
-        if (!attackingCreatures.has(attacker))
+    static canBlockAttacker(blocker: Card, attacker: Card) {
+        if (!CombatManager.attackingCreatures.has(attacker))
             return false;
 
         if (!gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareBlocker, "", blocker, attacker)))
             return false;
 
-        return canBlock(blocker);
+        return CombatManager.canBlock(blocker);
     }
 
-    export function hasAnyAttackers(player: Player): boolean {
+    static hasAnyAttackers(player: Player): boolean {
         for (const card of player.battlefield.cards) {
-            if (canAttack(card))
+            if (CombatManager.canAttack(card))
                 return true;
         }
 
         return false;
     }
 
-    export function hasAnyBlockers(player: Player): boolean {
+    static hasAnyBlockers(player: Player): boolean {
         for (const card of player.battlefield.cards) {
-            if (canBlockAnyAttackers(card))
+            if (CombatManager.canBlockAnyAttackers(card))
                 return true;
         }
 
         return false;
     }
 
-    export function beingAttacked(player: Player) {
-        for (const card of attackingCreatures.keys()) {
-            if (attackingCreatures.get(card) == player)
+    static beingAttacked(player: Player) {
+        for (const card of CombatManager.attackingCreatures.keys()) {
+            if (CombatManager.attackingCreatures.get(card) == player)
                 return true;
         }
 
         return false;
     }
 
-    export function calculateAndAssignDamage() {
-        for (const [blocker, attacker] of blockingCreatures) {
+    static calculateAndAssignDamage() {
+        for (const [blocker, attacker] of CombatManager.blockingCreatures) {
             blocker.damageTaken = attacker.power;
             attacker.damageTaken = blocker.power;
         }
     }
 
-    export function potentialAttackTargetsFor(attacker: Card): Player[] {
+    static potentialAttackTargetsFor(attacker: Card): Player[] {
         return game.players.filter(p => p != attacker.controller);
     }
 
-    export function potentialBlockTargetsFor(blocker: Card): Card[] {
+    static potentialBlockTargetsFor(blocker: Card): Card[] {
         const blockTargets: Card[] = [];
 
-        for (const attacker of attackingCreatures.keys()) {
-            if (canBlockAttacker(blocker, attacker))
+        for (const attacker of CombatManager.attackingCreatures.keys()) {
+            if (CombatManager.canBlockAttacker(blocker, attacker))
                 blockTargets.push(attacker);
         }
 

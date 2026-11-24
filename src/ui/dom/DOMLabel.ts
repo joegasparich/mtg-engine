@@ -1,4 +1,4 @@
-import DOMElement, {DOMPosition} from "./DOMElement";
+import DOMElement,{ DOMPosition } from "./DOMElement";
 
 export default class DOMLabel extends DOMElement {
     get text(): string { return this.element.textContent; }

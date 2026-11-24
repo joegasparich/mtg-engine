@@ -1,18 +1,17 @@
-import {SFCard, SFSet} from "./scryfallTypes";
+import type { SFCard,SFSet } from './scryfallTypes';
 
-const BASE_URL = "https://api.scryfall.com";
+const BASE_URL = 'https://api.scryfall.com';
 
-async function getSet(setID: string): Promise<SFSet> {
-    const res = await fetch(`${BASE_URL}/sets/${setID}`)
-    return await res.json() as SFSet;
+async function getResource<T>(resource: string, id: string): Promise<T> {
+    if (!id.trim()) throw new Error('A Scryfall identifier is required.');
+    const response = await fetch(`${BASE_URL}/${resource}/${encodeURIComponent(id)}`, {
+        signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+        throw new Error(`Scryfall ${resource} request failed (${response.status}).`);
+    }
+    return await response.json() as T;
 }
 
-async function getCard(cardID: string): Promise<SFCard> {
-    const res = await fetch(`${BASE_URL}/cards/${cardID}`);
-    return await res.json() as SFCard;
-}
-
-export {
-    getSet,
-    getCard
-}
+export const getSet = (id: string): Promise<SFSet> => getResource('sets', id);
+export const getCard = (id: string): Promise<SFCard> => getResource('cards', id);

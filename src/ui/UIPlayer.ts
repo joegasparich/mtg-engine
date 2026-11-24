@@ -1,8 +1,8 @@
 import * as PIXI from "pixi.js";
 
 import Player from "@engine/Player";
-import {UIHand} from "@ui/UIHand";
-import {UIBattlefield} from "@ui/UIBattlefield";
+import { UIBattlefield } from "@ui/UIBattlefield";
+import { UIHand } from "@ui/UIHand";
 
 export class UIPlayer extends PIXI.Container {
     player: Player;

@@ -1,11 +1,11 @@
-import {AbilityDef} from "~/defs";
-import {AbilityPart} from "@engine/abilities/parts/AbilityPart";
+import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import Card from "@engine/Card";
-import {ManaAmount, ManaUtility} from "@engine/mana";
+import { ManaAmount,ManaUtility } from "@engine/mana";
+import { AbilityDef } from "~/defs";
+import { SlateVar } from ".";
 import { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
 import { AbilityPart_Activate_Tap } from "./parts/activate/AbilityPart_Activate_Tap";
 import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_AddMana";
-import { SlateVar } from ".";
 
 // Architecture:
 // Abilities are made up of several parts, which communicate with signals

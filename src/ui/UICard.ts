@@ -1,18 +1,18 @@
 import * as PIXI from "pixi.js";
 
+import playerActionManager,{ TargetType } from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
-import {GlowFilter} from "pixi-filters";
-import {pixi, uiRoot, UITargeter} from "@ui/UIRoot";
-import {loadImageFromExternalUrl} from "@utility/imageUtility";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {autobind} from "@utility/typeUtility";
-import playerActionManager, {TargetType} from "@engine/actions/PlayerActionManager";
-import {GameEvent_TapCard, GameEvent_UntapCard} from "@engine/events";
-import {Battlefield} from "@engine/Zone";
-import uiEventManager, {UIEvent_CardClicked} from "@ui/UIEventManager";
-import {showCustomContextMenu} from "@ui/contextMenu";
+import { GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import {game} from "@engine/Game";
+import { Battlefield } from "@engine/Zone";
+import { showCustomContextMenu } from "@ui/contextMenu";
+import uiEventManager,{ UIEvent_CardClicked } from "@ui/UIEventManager";
+import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
+import { loadImageFromExternalUrl } from "@utility/imageUtility";
+import { autobind } from "@utility/typeUtility";
+import { GlowFilter } from "pixi-filters";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -52,7 +52,13 @@ export default class UICard extends PIXI.Sprite {
 
         uiRoot.registerCard(this);
 
-        loadImageFromExternalUrl(card.def.image_url).then(tex => this.texture = tex);
+        loadImageFromExternalUrl(card.def.image_url).then(texture => {
+            if (texture && !this.destroyed) {
+                this.texture = texture;
+                this.width = CARD_WIDTH;
+                this.height = CARD_HEIGHT;
+            }
+        });
         this.width = CARD_WIDTH;
         this.height = CARD_HEIGHT;
         this.anchor = new PIXI.Point(0.5, 0.5);

@@ -1,7 +1,7 @@
+import { GameEvent_TapCard } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_TapCard} from "@engine/events";
-import { AbilityPart_Activate } from "./AbilityPart_Activate";
 import { RegisterAbilityPart } from "../../registry";
+import { AbilityPart_Activate } from "./AbilityPart_Activate";
 
 // This is assumed to be FreeTap. Update Ability if this changes
 @RegisterAbilityPart

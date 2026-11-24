@@ -1,12 +1,12 @@
-import {Battlefield, Zone} from "@engine/Zone";
-import Player from "@engine/Player";
-import {CardDef, CardType, Keyword} from "~/defs";
-import {ManaAmount, ManaCost, ManaUtility} from "@engine/mana";
-import {Ability, makeAbility} from "@engine/abilities";
-import {game} from "@engine/Game";
-import {StepIndex} from "@engine/Step";
+import { Ability,makeAbility } from "@engine/abilities";
+import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_ChangeCardZone, GameEvent_DestroyPermanent} from "@engine/events";
+import { game } from "@engine/Game";
+import { ManaAmount,ManaCost,ManaUtility } from "@engine/mana";
+import Player from "@engine/Player";
+import { StepIndex } from "@engine/Step";
+import { Battlefield,Zone } from "@engine/Zone";
+import { CardDef,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 

@@ -1,4 +1,3 @@
-import Card from "@engine/Card";
 import { AbilityPart } from "../AbilityPart";
 
 export abstract class AbilityPart_Activate extends AbilityPart {

@@ -1,8 +1,8 @@
-import {GameEvent, GameEventType} from "@engine/events/GameEventManager";
-import Player from "@engine/Player";
+import { Ability } from "@engine/abilities";
 import Card from "@engine/Card";
-import {Ability} from "@engine/abilities";
-import {game} from "@engine/Game";
+import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
+import Player from "@engine/Player";
 
 export class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;

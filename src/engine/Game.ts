@@ -1,10 +1,10 @@
-import Player from "@engine/Player";
-import {Stack} from "@engine/Stack";
-import gameEventManager, {GameEvent_Log, GameEvent_Simple, GameEventType} from "@engine/events/GameEventManager";
-import {GameEvent_DrawCard, GameEvent_StepEnd, GameEvent_StepStart} from "@engine/events";
-import {Step, StepIndex} from "@engine/Step";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import {CombatManager} from "@engine/CombatManager";
+import { CombatManager } from "@engine/CombatManager";
+import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
+import gameEventManager,{ GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import Player from "@engine/Player";
+import { Stack } from "@engine/Stack";
+import { Step,StepIndex } from "@engine/Step";
 
 class GameOptions {
     allowAutoSkip = false;

@@ -1,11 +1,10 @@
-import Player from "@engine/Player";
 import Card from "@engine/Card";
-import {ActionTarget} from "@engine/actions";
-import {Zone} from "@engine/Zone";
-import {Ability, HardcodedSignals} from "@engine/abilities";
+import Player from "@engine/Player";
+import { Zone } from "@engine/Zone";
+import { Ability,HardcodedSignals } from "@engine/abilities";
+import { GameEvent_ChangeCardZone } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_ChangeCardZone} from "@engine/events";
-import {CardType} from "~/defs";
+import { CardType } from "~/defs";
 
 export class Spell {
     owner: Player;

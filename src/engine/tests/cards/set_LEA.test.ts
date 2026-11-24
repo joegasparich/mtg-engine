@@ -1,11 +1,11 @@
-import Player from "@engine/Player";
-import Game, {game} from "@engine/Game";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {GameEvent_CastSpell, GameEvent_ChangeCardZone} from "@engine/events";
 import Card from "@engine/Card";
-import {cardData} from "~/index";
-import {ANCESTRAL_RECALL, FOREST} from "@engine/tests/testData";
-import {GameEvent_StartTargeting} from "@engine/events/GameEvent_StartTargeting";
+import Game,{ game } from "@engine/Game";
+import Player from "@engine/Player";
+import { GameEvent_CastSpell,GameEvent_ChangeCardZone } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
+import { ANCESTRAL_RECALL,FOREST } from "@engine/tests/testData";
+import { cardData } from "~/index";
 
 let playerA: Player;
 let playerB: Player;

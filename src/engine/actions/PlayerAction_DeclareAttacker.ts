@@ -1,9 +1,9 @@
-import {PlayerAction} from "@engine/actions/PlayerAction";
-import {ActionTarget} from "@engine/actions/PlayerActionManager";
+import { PlayerAction } from "@engine/actions/PlayerAction";
+import { ActionTarget } from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
+import { CombatManager } from "@engine/CombatManager";
+import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import {CombatManager} from "@engine/CombatManager";
-import {game} from "@engine/Game";
 
 export class PlayerAction_DeclareAttacker extends PlayerAction {
     targets: ActionTarget[];

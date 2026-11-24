@@ -1,9 +1,9 @@
-import {Ability} from "@engine/abilities";
-import {PlayerAction} from "@engine/actions/PlayerAction";
+import { Ability } from "@engine/abilities";
+import { PlayerAction } from "@engine/actions/PlayerAction";
 import Card from "@engine/Card";
-import Player from "@engine/Player";
+import { GameEvent_ActivateAbility } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import {GameEvent_ActivateAbility} from "@engine/events";
+import Player from "@engine/Player";
 
 export class PlayerAction_ActivateAbility extends PlayerAction {
     ability: Ability;

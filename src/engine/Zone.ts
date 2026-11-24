@@ -1,5 +1,5 @@
 import Card from "@engine/Card";
-import {shuffleArray} from "@utility/arrayUtility";
+import { shuffleArray } from "@utility/arrayUtility";
 
 export class Zone {
     name: string;

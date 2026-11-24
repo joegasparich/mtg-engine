@@ -1,15 +1,15 @@
-import {PlayerAction} from "@engine/actions/PlayerAction";
+import { PlayerActions } from "@engine/actions/index";
+import { PlayerAction } from "@engine/actions/PlayerAction";
 import Card from "@engine/Card";
+import { CombatManager } from "@engine/CombatManager";
+import { GameEvent_ActivateAbility } from "@engine/events";
+import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
+import { ManaAmount,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
-import gameEventManager, {GameEventType} from "@engine/events/GameEventManager";
-import {game} from "@engine/Game";
-import {ManaAmount, ManaUtility} from "@engine/mana";
-import {Battlefield, Hand} from "@engine/Zone";
-import {PlayerActions} from "@engine/actions/index";
-import {StepIndex} from "@engine/Step";
-import {CombatManager} from "@engine/CombatManager";
-import {GameEvent_StartTargeting} from "@engine/events/GameEvent_StartTargeting";
-import {GameEvent_ActivateAbility} from "@engine/events";
+import { StepIndex } from "@engine/Step";
+import { Battlefield,Hand } from "@engine/Zone";
 
 export enum TargetType {
     None = 0,

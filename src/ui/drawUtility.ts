@@ -4,7 +4,7 @@ export function calculateCardPositionsRelativeToCenter(
     numberOfCards: number,
     cardWidth: number,
     containerWidth: number,
-    spacing: number = 0
+    spacing = 0
 ): number[] {
     // 1. Handle edge cases: no cards or invalid card width.
     if (numberOfCards <= 0) {

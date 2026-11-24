@@ -1,12 +1,12 @@
-import DOMElement, {DOMPosition} from "./DOMElement";
+import DOMElement,{ DOMPosition } from "./DOMElement";
 
 export default class DOMButton extends DOMElement {
-    set onClick(value: () => any) {
-        this._onClick = value;
+    set onClick(value: () => void) {
         this.element.removeEventListener('click', this._onClick);
+        this._onClick = value;
         this.element.addEventListener('click', this._onClick);
     }
-    private _onClick: () => any;
+    private _onClick: () => void;
 
     get text(): string { return this.element.textContent; }
     set text(val: string) { this.element.textContent = val; }
@@ -14,7 +14,7 @@ export default class DOMButton extends DOMElement {
     constructor(
         text: string,
         position: DOMPosition,
-        onClick: () => any
+        onClick: () => void
     ) {
         super(document.createElement('button'), position);
 

@@ -1,4 +1,4 @@
-import {ActionTarget} from "@engine/actions/PlayerActionManager";
+import { ActionTarget } from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
 import Player from "@engine/Player";
 
