@@ -1,42 +1,50 @@
-import Card from "@engine/Card";
+import type { CardObject,GameObject,Permanent } from "@engine/GameObject";
 import { shuffleArray } from "@utility/arrayUtility";
 
-export class Zone {
+export class Zone<T extends GameObject = GameObject> {
     name: string;
-    cards: Card[] = [];
+    readonly objects: T[] = [];
 
-    onEnter(card: Card) {
-        this.cards.push(card);
+    onEnter(object: T) {
+        if (object.zone || object.retired)
+            throw new Error("Only a fresh rules object can enter a zone");
+        this.objects.push(object);
+        object.enterZone(this);
     }
 
-    onLeave(card: Card) {
-        this.cards = this.cards.filter(o => o != card);
+    onLeave(object: T) {
+        const index = this.objects.indexOf(object);
+        if (index < 0)
+            return;
+        this.objects.splice(index, 1);
+        object.retire();
     }
 }
 
-export class Library extends Zone {
+export class Library extends Zone<CardObject> {
     name = "Library";
 
     shuffle() {
-        shuffleArray(this.cards);
+        shuffleArray(this.objects);
     }
 
-    getTopCard(): Card {
-        return this.cards[-1];
+    getTopCard(): CardObject | undefined {
+        return this.objects.at(-1);
     }
-    getTopXCards(x: number): Card[] {
-        return this.cards.slice(-x);
+
+    getTopXCards(x: number): CardObject[] {
+        return x > 0 ? this.objects.slice(-x) : [];
     }
 }
 
-export class Battlefield extends Zone {
+export class Battlefield extends Zone<Permanent> {
     name = "Battlefield";
 }
 
-export class Hand extends Zone {
+export class Hand extends Zone<CardObject> {
     name = "Hand";
 }
 
-export class Graveyard extends Zone {
+export class Graveyard extends Zone<CardObject> {
     name = "Graveyard";
 }

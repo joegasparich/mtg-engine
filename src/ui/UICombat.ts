@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
+import { CardObject,Permanent } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_GoToNextStep } from "@engine/events";
 import type { GameEvent_StepEnd } from "@engine/events/GameEvent_Step";
@@ -23,8 +23,8 @@ const ELIGIBLE_BLOCK_COLOUR = 0x6ba9ae;
 export class UICombat {
     private readonly overlay = new PIXI.Container();
     private readonly links = new PIXI.Container<PIXI.Graphics>();
-    private readonly badges = new Map<Card, PIXI.Container>();
-    private readonly attackNumbers = new Map<Card, number>();
+    private readonly badges = new Map<Permanent, PIXI.Container>();
+    private readonly attackNumbers = new Map<Permanent, number>();
     private readonly highlighted = new Set<UICard>();
     private readonly panel = document.createElement('section');
     private readonly heading = document.createElement('h2');
@@ -32,9 +32,9 @@ export class UICombat {
     private readonly instruction = document.createElement('p');
     private readonly removeBlock = document.createElement('button');
     private readonly confirm = document.createElement('button');
-    private selectedBlocker: Card | null = null;
-    private readonly eligible: Set<Card> = new Set();
-    private readonly legalTargets: Set<Card> = new Set();
+    private selectedBlocker: Permanent | null = null;
+    private readonly eligible: Set<Permanent> = new Set();
+    private readonly legalTargets: Set<Permanent> = new Set();
 
     constructor(private readonly root: UIRoot) {
         this.overlay.eventMode = 'none';
@@ -70,29 +70,29 @@ export class UICombat {
         return step === StepIndex.DeclareAttackers || step === StepIndex.DeclareBlockers;
     }
 
-    handleCardClick(card: Card): boolean {
-        if (game.pendingTargeter || !UICombat.declaresAt(game.currentStepIndex))
+    handleCardClick(object: CardObject): boolean {
+        if (!(object instanceof Permanent) || game.pendingTargeter || !UICombat.declaresAt(game.currentStepIndex))
             return false;
 
         const actor = game.activePlayer();
         if (game.currentStepIndex === StepIndex.DeclareAttackers) {
-            if (!this.eligible.has(card) && !CombatManager.attackingCreatures.has(card))
+            if (!this.eligible.has(object) && !CombatManager.attackingCreatures.has(object))
                 return false;
 
-            const action = new PlayerAction_DeclareAttacker(card);
-            if (CombatManager.attackingCreatures.has(card))
+            const action = new PlayerAction_DeclareAttacker(object);
+            if (CombatManager.attackingCreatures.has(object))
                 action.withdraw(actor);
             else
                 action.perform(actor);
-        } else if (this.eligible.has(card)) {
-            this.selectedBlocker = this.selectedBlocker === card ? null : card;
-        } else if (this.selectedBlocker && CombatManager.attackingCreatures.has(card)) {
-            if (!this.legalTargets.has(card)) {
-                this.instruction.textContent = `${this.selectedBlocker.name} can’t block ${card.name}. Choose a highlighted attacker.`;
+        } else if (this.eligible.has(object)) {
+            this.selectedBlocker = this.selectedBlocker === object ? null : object;
+        } else if (this.selectedBlocker && CombatManager.attackingCreatures.has(object)) {
+            if (!this.legalTargets.has(object)) {
+                this.instruction.textContent = `${this.selectedBlocker.name} can’t block ${object.name}. Choose a highlighted attacker.`;
                 return true;
             }
 
-            new PlayerAction_DeclareBlocker(this.selectedBlocker).perform(actor, [card]);
+            new PlayerAction_DeclareBlocker(this.selectedBlocker).perform(actor, [object]);
             this.selectedBlocker = null;
         } else {
             return false;
@@ -134,10 +134,10 @@ export class UICombat {
         this.eligible.clear();
         this.legalTargets.clear();
         if (declaring && actor) {
-            for (const card of actor.battlefield.cards) {
-                const actions = playerActionManager.getCardActions(card, actor);
+            for (const permanent of actor.battlefield.objects) {
+                const actions = playerActionManager.getCardActions(permanent, actor);
                 if (actions.some(action => action instanceof (attacking ? PlayerAction_DeclareAttacker : PlayerAction_DeclareBlocker)))
-                    this.eligible.add(card);
+                    this.eligible.add(permanent);
             }
         }
         if (!this.eligible.has(this.selectedBlocker))
@@ -178,22 +178,22 @@ export class UICombat {
         const blockers = CombatManager.blockingCreatures;
         const shown = new Set<UICard>();
 
-        for (const card of new Set([...this.eligible, ...attackers.keys(), ...blockers.keys()])) {
-            const view = this.root.cardToUICard.get(card);
+        for (const permanent of new Set([...this.eligible, ...attackers.keys(), ...blockers.keys()])) {
+            const view = this.root.getCardView(permanent);
             if (!view?.parent)
                 continue;
 
-            const target = blockers.get(card);
-            const role = attackers.has(card) ? 'attack' : target ? 'block' : null;
+            const target = blockers.get(permanent);
+            const role = attackers.has(permanent) ? 'attack' : target ? 'block' : null;
             let colour = role === 'attack' ? ATTACK_COLOUR : role === 'block' ? BLOCK_COLOUR : null;
-            if (this.legalTargets.has(card))
+            if (this.legalTargets.has(permanent))
                 colour = TARGET_COLOUR;
-            else if (this.selectedBlocker === card)
+            else if (this.selectedBlocker === permanent)
                 colour = BLOCK_COLOUR;
-            else if (this.eligible.has(card) && !role && !this.selectedBlocker)
+            else if (this.eligible.has(permanent) && !role && !this.selectedBlocker)
                 colour = game.currentStepIndex === StepIndex.DeclareAttackers ? ELIGIBLE_ATTACK_COLOUR : ELIGIBLE_BLOCK_COLOUR;
 
-            view.setCombatDisplay(role, colour, this.root.cardToUICard.get(target));
+            view.setCombatDisplay(role, colour, this.root.getCardView(target));
             shown.add(view);
         }
 
@@ -228,7 +228,7 @@ export class UICombat {
             this.addBadge(this.selectedBlocker, 'Choose target', BLOCK_COLOUR);
     }
 
-    private addBadge(card: Card, label: string, colour: number) {
+    private addBadge(permanent: Permanent, label: string, colour: number) {
         const badge = new PIXI.Container();
         const text = new PIXI.Text({
             text: label,
@@ -241,19 +241,19 @@ export class UICombat {
             .fill(0x081b24).stroke({ color: colour, width: 1 });
         badge.addChild(background, text);
         this.overlay.addChild(badge);
-        this.badges.set(card, badge);
+        this.badges.set(permanent, badge);
     }
 
     @autobind
     private positionOverlay() {
-        for (const [card, badge] of this.badges) {
-            const view = this.root.cardToUICard.get(card);
+        for (const [permanent, badge] of this.badges) {
+            const view = this.root.getCardView(permanent);
             badge.visible = Boolean(view?.parent);
             if (!badge.visible)
                 continue;
 
             const bounds = view.art.getBounds();
-            const bottomPlayer = this.root.players[0].player === card.controller;
+            const bottomPlayer = this.root.players[0].player === permanent.controller;
             badge.position.set(bounds.x + bounds.width / 2, bottomPlayer ? bounds.y - 10 : bounds.y + bounds.height + 10);
         }
 

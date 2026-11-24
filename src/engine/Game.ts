@@ -1,7 +1,7 @@
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
-import gameEventManager,{ GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ type GameEvent,GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Step,StepIndex } from "@engine/Step";
@@ -26,6 +26,7 @@ export default class Game {
 
     static init() {
         game = new Game();
+        gameEventManager.setStateSettlement(() => game.settleState());
     }
 
     addPlayer(deck: number[]): Player {
@@ -123,9 +124,9 @@ export default class Game {
             }
 
             if (this.nextStep(false))
-                gameEventManager.onResolved(advance);
+                gameEventManager.onIdle(advance);
         };
-        gameEventManager.onResolved(advance);
+        gameEventManager.onIdle(advance);
         return true;
     }
     canAutoSkip() {
@@ -137,7 +138,7 @@ export default class Game {
         return !player || !playerActionManager.playerHasActions(player, true);
     }
     checkAutoSkip() {
-        gameEventManager.onResolved(() => {
+        gameEventManager.onIdle(() => {
             if (this.canAutoSkip())
                 this.nextStep(true);
         });
@@ -162,9 +163,24 @@ export default class Game {
     }
 
     checkState() {
+        gameEventManager.performAllEvents();
+    }
+
+    private settleState(): boolean {
+        // 502.4: The untap step has no priority check. Cleanup still checks under 514.3a.
+        if (this.options && this.currentStepIndex === StepIndex.Untap)
+            return false;
+
+        const actions: GameEvent[] = [];
         for (const player of this.players) {
-            player.checkState();
+            for (const permanent of player.battlefield.objects)
+                permanent.checkState(actions);
         }
+
+        // 117.5 and 704.3: Repeat the checks before putting waiting triggers on the stack.
+        if (actions.length && gameEventManager.performSimultaneous(actions))
+            return true;
+        return this.stack.putWaitingTriggersOnStack();
     }
 
     reset() {

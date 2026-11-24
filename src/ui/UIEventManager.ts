@@ -1,4 +1,4 @@
-import Card from "@engine/Card";
+import type { CardObject } from "@engine/GameObject";
 
 export enum UIEventType {
     CardClicked,
@@ -21,38 +21,38 @@ export class UIEvent_Simple extends UIEvent {
 }
 
 export class UIEvent_CardClicked extends UIEvent {
-    card: Card;
+    object: CardObject;
 
-    constructor(card: Card) {
+    constructor(object: CardObject) {
         super();
 
         this.type = UIEventType.CardClicked;
-        this.label = `Card ${card.logName} clicked`;
-        this.card = card;
+        this.label = `Card ${object.logName} clicked`;
+        this.object = object;
     }
 }
 
 export class UIEvent_CardSelected extends UIEvent {
-    card: Card;
+    object: CardObject;
 
-    constructor(card: Card) {
+    constructor(object: CardObject) {
         super();
 
         this.type = UIEventType.CardSelected;
-        this.label = `Card ${card.logName} selected`;
-        this.card = card;
+        this.label = `Card ${object.logName} selected`;
+        this.object = object;
     }
 }
 
 export class UIEvent_CardDeselected extends UIEvent {
-    card: Card;
+    object: CardObject;
 
-    constructor(card: Card) {
+    constructor(object: CardObject) {
         super();
 
         this.type = UIEventType.CardDeselected;
-        this.label = `Card ${card.logName} deselected`;
-        this.card = card;
+        this.label = `Card ${object.logName} deselected`;
+        this.object = object;
     }
 }
 

@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 
 import { ActionTarget,Targeter,TargetType } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
+import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -51,6 +51,7 @@ type UITarget = UICard | UIPlayer;
 
 export class UITargeter {
     source: UICard;
+    private readonly sourceObject?: CardObject;
     targetType: TargetType;
     count: number;
 
@@ -65,6 +66,7 @@ export class UITargeter {
 
     constructor(source: UICard, targetType: TargetType, count: number, validateTargets: (target: ActionTarget[]) => boolean, onTargeted: (targets: ActionTarget[]) => void, onCancelled: () => void | null) {
         this.source = source;
+        this.sourceObject = source?.object;
         this.targetType = targetType;
         this.count = count;
         this.validateTargets = validateTargets;
@@ -105,6 +107,7 @@ export class UITargeter {
 
         pixi.stage.on('pointerup', this.onStagePointerUp);
         gameEventManager.onPerformed(GameEventType.StepEnd, this.remove);
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onSourceMoved);
     }
 
     @autobind
@@ -116,13 +119,21 @@ export class UITargeter {
     }
 
     @autobind
+    private onSourceMoved(event: GameEvent_ChangeCardZone) {
+        if (event.oldObject === this.sourceObject) {
+            this.remove();
+            this.onCancelled?.();
+        }
+    }
+
+    @autobind
     private onCardTargetClicked(event: UIEvent_CardClicked) {
-        const uiCard = uiRoot.cardToUICard.get(event.card);
+        const uiCard = uiRoot.getCardView(event.object);
 
         // TODO: Handle multi-targeting
-        if (this.validateTargets([uiCard.card])) {
+        if (uiCard && this.validateTargets([event.object])) {
             this.target = uiCard;
-            this.onTargeted([uiCard.card]);
+            this.onTargeted([event.object]);
         }
     }
 
@@ -143,6 +154,7 @@ export class UITargeter {
     @autobind
     remove() {
         gameEventManager.offPerformed(GameEventType.StepEnd, this.remove);
+        gameEventManager.offPerformed(GameEventType.ChangeCardZone, this.onSourceMoved);
         pixi.stage.off('pointerup', this.onStagePointerUp);
         pixi.stage.removeChild(this.arrow);
 
@@ -163,9 +175,9 @@ export default class UIRoot extends PIXI.Container {
     players: UIPlayer[] = [];
     playerToUIPlayer = new Map<Player, UIPlayer>();
     uiPlayerToPlayer = new Map<UIPlayer, Player>();
-    cardToUICard = new Map<Card, UICard>();
+    cardToUICard = new Map<number, UICard>();
 
-    private readonly zones = new Map<Zone, UIZone>();
+    private readonly zones = new Map<Zone, UIZone<PIXI.Container>>();
     readonly cardOverlay = new PIXI.RenderLayer();
     readonly combat: UICombat;
 
@@ -206,7 +218,7 @@ export default class UIRoot extends PIXI.Container {
             }
 
             const targeter = new UITargeter(
-                this.cardToUICard.get(request.source),
+                this.getCardView(request.source),
                 request.targetType,
                 request.count,
                 request.validateTargets,
@@ -240,8 +252,8 @@ export default class UIRoot extends PIXI.Container {
             nextPhaseButton.text = `Skip to ${Step.toStringPhase(nextPhase)}`;
         });
 
-        uiEventManager.on(UIEventType.CardSelected, (event: UIEvent_CardSelected) => this.cardToUICard.get(event.card).setSelected(true));
-        uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.cardToUICard.get(event.card).setSelected(false));
+        uiEventManager.on(UIEventType.CardSelected, (event: UIEvent_CardSelected) => this.getCardView(event.object)?.setSelected(true));
+        uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.getCardView(event.object)?.setSelected(false));
 
         pixi.stage.addEventListener('pointermove', (e) => this.mousePos.copyFrom(e.global));
 
@@ -294,12 +306,17 @@ export default class UIRoot extends PIXI.Container {
         dialog.append(heading);
 
         const close = () => {
+            gameEventManager.offPerformed(GameEventType.ChangeCardZone, onSourceMoved);
             dialog.close();
             dialog.remove();
         };
         const cancel = () => {
             close();
             request.onCancelled();
+        };
+        const onSourceMoved = (event: GameEvent_ChangeCardZone) => {
+            if (event.oldObject === request.source)
+                cancel();
         };
 
         const choices = document.createElement('div');
@@ -309,7 +326,7 @@ export default class UIRoot extends PIXI.Container {
                 continue;
 
             const button = document.createElement('button');
-            button.textContent = player === request.source.controller ? 'Yourself' : `Player ${player.id}`;
+            button.textContent = player === request.source.owner ? 'Yourself' : `Player ${player.id}`;
             button.addEventListener('click', () => {
                 close();
                 request.onTargeted([player]);
@@ -328,6 +345,7 @@ export default class UIRoot extends PIXI.Container {
 
         dialog.append(choices);
         document.body.append(dialog);
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, onSourceMoved);
         dialog.showModal();
     }
 
@@ -357,37 +375,39 @@ export default class UIRoot extends PIXI.Container {
 
     @autobind
     private onCardChangedZone(event: GameEvent_ChangeCardZone) {
-        const source = this.zones.get(event.oldZone);
-        const destination = this.zones.get(event.newZone);
-        let uiCard = this.cardToUICard.get(event.card);
-        if (!uiCard && destination)
-            uiCard = new UICard(event.card);
-        if (!uiCard)
-            return;
+        const { oldObject, newObject } = event;
+        let view = this.getCardView(oldObject);
+        const source = view?.battlefieldGroup?.battlefield ?? this.zones.get(event.oldZone);
+        const host = newObject instanceof Permanent ? this.getCardView(newObject.attachedTo) : undefined;
+        const destination = host?.battlefieldGroup?.battlefield ?? this.zones.get(event.newZone);
 
-        const origin = uiCard.parent ? uiCard.getGlobalPosition() : undefined;
-        if (source) {
-            if (event.oldZone instanceof Battlefield && !(event.newZone instanceof Battlefield))
-                source.animateExit(uiCard);
-            source.removeCard(uiCard);
-        }
-        destination?.addCard(uiCard, origin);
-
-        // A cast passes through the stack before becoming a permanent.
-        if (event.newZone !== game.stack)
-            uiCard.battlefieldDrop = undefined;
-    }
-
-    registerCard(uiCard: UICard) {
-        if (uiRoot.cardToUICard.has(uiCard.card)) {
-            console.error(`UI Card already exists for ${uiCard.card.def.name}`);
+        if (view) {
+            const origin = view.parent ? view.getGlobalPosition() : undefined;
+            if (source && view.parent) {
+                if (event.oldZone instanceof Battlefield && !(event.newZone instanceof Battlefield))
+                    source.animateExit(view);
+                source.removeCard(view);
+            }
+            view.object = newObject;
+            view.setSelected(false);
+            destination?.addCard(view, origin);
+        } else if (destination) {
+            view = new UICard(newObject);
+            destination.addCard(view);
         }
 
-        this.cardToUICard.set(uiCard.card, uiCard);
+        // Preserve the hand drag coordinates through the intermediate stack object.
+        if (view && event.newZone !== game.stack)
+            view.battlefieldDrop = undefined;
     }
 
-    deregisterCard(uiCard: UICard) {
-        this.cardToUICard.delete(uiCard.card);
+    getCardView(object?: CardObject): UICard | undefined {
+        const view = object && this.cardToUICard.get(object.card.id);
+        return view?.object === object ? view : undefined;
+    }
+
+    registerCard(view: UICard) {
+        this.cardToUICard.set(view.card.id, view);
     }
 }
 

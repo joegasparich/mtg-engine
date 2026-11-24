@@ -37,11 +37,11 @@ export class UIHand extends UIZone {
         const edgeHalfHeight = (CARD_HEIGHT * Math.cos(halfAngle) + CARD_WIDTH * Math.sin(halfAngle)) / 2;
         const centerY = -Math.max(CARD_HEIGHT / 2 + 24, edgeDrop + edgeHalfHeight + 8);
 
-        this.children.forEach((card, index) => {
+        this.children.forEach((view, index) => {
             const angle = halfCount > 0 ? (index - halfCount) / halfCount * halfAngle : 0;
             const x = FAN_RADIUS * Math.sin(angle);
             const y = centerY + FAN_RADIUS * (1 - Math.cos(angle));
-            card.layout(x, y, angle * 180 / Math.PI);
+            view.layout(x, y, angle * 180 / Math.PI);
         });
     }
 }

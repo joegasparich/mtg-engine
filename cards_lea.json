@@ -1,0 +1,95 @@
+[
+    {
+        "name": "Grizzly Bears",
+        "image_url": "https://cards.scryfall.io/large/front/4/0/409f9b88-f03e-40b6-9883-68c14c37c0de.jpg?156254673",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{1}{G}",
+        "power": 2,
+        "toughness": 2
+    },
+    {
+        "name": "Mons's Goblin Raiders",
+        "image_url": "https://cards.scryfall.io/large/front/3/4/34ac4e28-1677-4f88-9b1a-7a32635f0ab2.jpg?1664925688",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{R}",
+        "power": 1,
+        "toughness": 1
+    },
+    {
+        "name": "Air Elemental",
+        "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
+        "oracle_text": "",
+        "type": "Creature",
+        "cost": "{3}{U}{U}",
+        "power": 4,
+        "toughness": 4,
+        "abilities": [
+            {
+                "keyword": "flying"
+            }
+        ]
+    },
+    {
+        "name": "Ancestral Recall",
+        "image_url": "https://cards.scryfall.io/large/front/7/1/71283e4c-efd9-4a96-991c-6bbb169b99e7.jpg?1664924695",
+        "oracle_text": "Target player draws three cards.",
+        "type": "Instant",
+        "cost": "{U}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "saveAs": "TARGET_PLAYER",
+                        "validTargets": ["Player"]
+                    },
+                    "AbilityPart_Effect_DrawCards": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "target": "TARGET_PLAYER",
+                        "count": 3
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Wall of Swords",
+        "image_url": "https://cards.scryfall.io/large/front/2/c/2ca96f03-51a2-4c98-8b1a-71db8fd3f3bb.jpg?1783919570",
+        "oracle_text": "Defender (This creature can't attack.)\nFlying",
+        "type": "Creature",
+        "cost": "{3}{W}",
+        "power": 3,
+        "toughness": 5,
+        "abilities": [
+            {
+                "keyword": "defender"
+            },
+            {
+                "keyword": "flying"
+            }
+        ],
+        "subtypes": ["Wall"]
+    },
+    {
+        "name": "Animate Wall",
+        "image_url": "https://cards.scryfall.io/large/front/8/1/8102657a-bdb1-49e7-94f2-ab885f9ff35a.jpg?1783919594",
+        "oracle_text": "Enchant Wall\nEnchanted Wall can attack as though it didn't have defender.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": {
+                            "cardType": "Creature",
+                            "cardSubtype": "Wall"
+                        }
+                    },
+                    "AbilityPart_AttachedCreatureAttacksWithDefender": {}
+                }
+            }
+        ]
+    }
+]

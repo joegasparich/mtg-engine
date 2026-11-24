@@ -1,13 +1,12 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
-import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_PlayLand } from "@engine/events";
+import { GameEvent_CastSpell,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_PlayLand } from "@engine/events";
 import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -19,8 +18,7 @@ beforeEach(async () => {
 });
 
 function addForestToHand(owner: Player) {
-    const forest = new Card(cardData[FOREST], owner);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, owner.hand));
+    const forest = addTestCard(cardData[FOREST], owner, owner.hand);
     return forest;
 }
 
@@ -46,14 +44,15 @@ test.each([StepIndex.Main, StepIndex.SecondMain])("plays the first land directly
         gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
     }
 
-    expect(onPlay).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ player, card: forest }));
+    expect(onPlay).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ player, handObject: forest }));
     expect(onMove).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-        card: forest,
+        oldObject: forest,
+        newObject: expect.objectContaining({ card: forest.card }),
         oldZone: player.hand,
         newZone: player.battlefield,
     }));
-    expect(player.hand.cards).toHaveLength(0);
-    expect(player.battlefield.cards).toEqual([forest]);
+    expect(player.hand.objects).toHaveLength(0);
+    expect(player.battlefield.objects.map(object => object.card)).toEqual([forest.card]);
 });
 
 test("the casting event and stack reject lands", () => {
@@ -65,15 +64,14 @@ test("the casting event and stack reject lands", () => {
     expect(game.stack.spellCast(player, forest)).toBe(false);
 
     expect(forest.zone).toBe(player.hand);
-    expect(game.stack.stack).toHaveLength(0);
+    expect(game.stack.objects).toHaveLength(0);
     expect(playerActionManager.getCardActions(forest, player)).toHaveLength(1);
 });
 
 test("a land play requires an empty stack even if the action was already offered", () => {
     game.startGame();
     const forest = addForestToHand(player);
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
     const [play] = playerActionManager.getCardActions(forest, player);
 
@@ -81,11 +79,11 @@ test("a land play requires an empty stack even if the action was already offered
     expect(playerActionManager.getCardActions(forest, player)).toHaveLength(0);
     play.perform(player);
     expect(forest.zone).toBe(player.hand);
-    expect(bears.zone).toBe(game.stack);
+    expect(game.stack.objects).toContainEqual(expect.objectContaining({ card: bears.card }));
 
     game.stack.resolveAll();
     play.perform(player);
-    expect(forest.zone).toBe(player.battlefield);
+    expect(player.battlefield.objects.map(object => object.card)).toContain(forest.card);
 });
 
 test("both main phases share one land play, including previously offered actions", () => {
@@ -105,8 +103,8 @@ test("both main phases share one land play, including previously offered actions
     expect(playerActionManager.getCardActions(secondLand, player)).toHaveLength(0);
     gameEventManager.addEvent(new GameEvent_PlayLand(player, secondLand));
 
-    expect(player.battlefield.cards).toEqual([firstLand]);
-    expect(player.hand.cards).toEqual([secondLand]);
+    expect(player.battlefield.objects.map(object => object.card)).toEqual([firstLand.card]);
+    expect(player.hand.objects).toEqual([secondLand]);
 });
 
 test("a rejected land play is skipped while the next event is recorded", () => {
@@ -154,25 +152,24 @@ test("a new turn restores the land play for the active player only", () => {
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
     previousTurnPlay.perform(opponent);
     expect(secondLand.zone).toBe(player.hand);
-    expect(opponent.battlefield.cards).toHaveLength(0);
+    expect(opponent.battlefield.objects).toHaveLength(0);
 
     const [opponentPlay] = playerActionManager.getCardActions(opponentLand, opponent);
     opponentPlay.perform(opponent);
-    expect(opponent.battlefield.cards).toEqual([opponentLand]);
+    expect(opponent.battlefield.objects.map(object => object.card)).toEqual([opponentLand.card]);
 
     gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
     const [nextTurnPlay] = playerActionManager.getCardActions(secondLand, player);
     nextTurnPlay.perform(player);
-    expect(player.battlefield.cards).toEqual([firstLand, secondLand]);
+    expect(player.battlefield.objects.map(object => object.card)).toEqual([firstLand.card, secondLand.card]);
 });
 
 test("a spell action from the previous turn cannot spend either player's mana", () => {
     const opponent = game.addPlayer([]);
     startMainPhase();
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
     player.manaPool[ManaColour.G] = 2;
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
     const [action] = playerActionManager.getCardActions(bears, player);
 
     gameEventManager.addEvent(new GameEvent_GoToNextTurn());
@@ -188,8 +185,7 @@ test("a spell action from the previous turn cannot spend either player's mana", 
 });
 
 test("should cast creature spell from hand (bypassing cost)", () => {
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
     gameEventManager.addEvent(new GameEvent_CastSpell(player, bears));
@@ -198,39 +194,16 @@ test("should cast creature spell from hand (bypassing cost)", () => {
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
 
     // Check card entered battlefield
-    expect(player.battlefield.cards.length).toBe(1);
-    expect(player.battlefield.cards[0]).toBe(bears);
+    expect(player.battlefield.objects.length).toBe(1);
+    expect(player.battlefield.objects[0].card).toBe(bears.card);
 });
-
-// test("should cast instant spell from hand (bypassing cost)", () => {
-//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(new Card(cardData[FOREST], player), player.library));
-//
-//     const recall = new Card(cardData[ANCESTRAL_RECALL], player);
-//     gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, player.hand));
-//
-//     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
-//     gameEventManager.addEvent(new GameEvent_CastSpell(player, recall, [player]));
-//
-//     // Test stack resolved properly
-//     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
-//
-//     // Check card entered graveyard
-//     expect(player.graveyard.cards.length).toBe(1);
-//     expect(player.graveyard.cards[0]).toBe(recall);
-//
-//     // Check effect resolved
-//     expect(player.hand.cards.length).toBe(3);
-// });
 
 test("shouldn't play creature card from hand with insufficient mana", () => {
     startMainPhase();
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
-    expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.hand.objects.length).toBe(1);
+    expect(player.hand.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
 
@@ -240,20 +213,19 @@ test("shouldn't play creature card from hand with insufficient mana", () => {
     expect(cardEnteredStack).toHaveBeenCalledTimes(0);
 
     // Check card remained in hand
-    expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.hand.objects.length).toBe(1);
+    expect(player.hand.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 
     // Check card did not enter battlefield
-    expect(player.battlefield.cards.length).toBe(0);
+    expect(player.battlefield.objects.length).toBe(0);
 });
 
 test("should play creature card from hand with sufficient mana", () => {
     startMainPhase();
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
-    expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.hand.objects.length).toBe(1);
+    expect(player.hand.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 
     // Add two green mana
     player.manaPool[ManaColour.G] = 2;
@@ -269,20 +241,19 @@ test("should play creature card from hand with sufficient mana", () => {
     expect(player.manaPool[ManaColour.G]).toBe(0);
 
     // Check card left hand
-    expect(player.hand.cards.length).toBe(0);
+    expect(player.hand.objects.length).toBe(0);
 
     // Check card entered battlefield
-    expect(player.battlefield.cards.length).toBe(1);
-    expect(player.battlefield.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.battlefield.objects.length).toBe(1);
+    expect(player.battlefield.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 });
 
 test("should play creature card from hand with excess mana", () => {
     startMainPhase();
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
-    expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.hand.objects.length).toBe(1);
+    expect(player.hand.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 
     // Add two green mana
     player.manaPool[ManaColour.G] = 3;
@@ -298,20 +269,19 @@ test("should play creature card from hand with excess mana", () => {
     expect(player.manaPool[ManaColour.G]).toBe(1);
 
     // Check card left hand
-    expect(player.hand.cards.length).toBe(0);
+    expect(player.hand.objects.length).toBe(0);
 
     // Check card entered battlefield
-    expect(player.battlefield.cards.length).toBe(1);
-    expect(player.battlefield.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.battlefield.objects.length).toBe(1);
+    expect(player.battlefield.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 });
 
 test("should play creature card from hand with generic mana", () => {
     startMainPhase();
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
-    expect(player.hand.cards.length).toBe(1);
-    expect(player.hand.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.hand.objects.length).toBe(1);
+    expect(player.hand.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 
     // Add two green mana
     player.manaPool[ManaColour.G] = 1;
@@ -328,6 +298,6 @@ test("should play creature card from hand with generic mana", () => {
     expect(player.manaPool[ManaColour.G]).toBe(0);
     expect(player.manaPool[ManaColour.Colourless]).toBe(0);
 
-    expect(player.battlefield.cards.length).toBe(1);
-    expect(player.battlefield.cards[0].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.battlefield.objects.length).toBe(1);
+    expect(player.battlefield.objects[0].def).toBe(cardData[GRIZZLY_BEARS]);
 });

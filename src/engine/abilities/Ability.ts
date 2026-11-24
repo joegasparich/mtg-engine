@@ -1,5 +1,6 @@
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
-import Card from "@engine/Card";
+import type { CardObject } from "@engine/GameObject";
+import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
 import { AbilityDef } from "~/defs";
 import { SlateVar } from ".";
@@ -22,16 +23,25 @@ export class Ability {
     def: AbilityDef;
     parts: AbilityPart[] = [];
     slate: Record<SlateVar | string, any> = {};
-    card: Card;
+    source: CardObject;
 
-    constructor(card: Card) {
-        this.slate["THIS"] = [ card ];
-        this.card = card;
+    constructor(source: CardObject) {
+        this.slate["THIS"] = [ source ];
+        this.source = source;
     }
+
+    private listening = false;
 
     addPart(part: AbilityPart) {
         this.parts.push(part);
-        part.setup(this);
+        part.ability = this;
+    }
+
+    setup() {
+        this.listening = true;
+        gameEventManager.withCheckSource({ object: this.source, keyword: this.def?.keyword }, () => {
+            this.parts.forEach(part => part.setup(this));
+        });
     }
 
     fireSignal(signal: string) {
@@ -39,7 +49,9 @@ export class Ability {
     }
 
     cleanup() {
-        this.parts.forEach(part => part.cleanup(this));
+        if (this.listening)
+            this.parts.forEach(part => part.cleanup(this));
+        this.listening = false;
     }
 
     //-- Getters --//
@@ -56,6 +68,10 @@ export class Ability {
 
     payActivationCost() {
         return this.parts.find(p => p instanceof AbilityPart_Activate).payCost();
+    }
+
+    get activationSignal() {
+        return this.parts.find(p => p instanceof AbilityPart_Activate).outSignal;
     }
 
     resolveActivation() {

@@ -18,12 +18,12 @@ export class GameEvent_DrawCard extends GameEvent {
     }
 
     perform(): boolean {
-        const cards = this.player.library.getTopXCards(this.count);
-        for (const card of cards) {
-            this.label = `Player ${this.player.id} drew ${card.logName} from library`;
+        const objects = this.player.library.getTopXCards(this.count);
+        for (const object of objects) {
+            this.label = `Player ${this.player.id} drew ${object.logName} from library`;
 
-            gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this.player.hand));
+            gameEventManager.addEvent(new GameEvent_ChangeCardZone(object, this.player.hand));
         }
-        return cards.length > 0;
+        return objects.length > 0;
     }
 }

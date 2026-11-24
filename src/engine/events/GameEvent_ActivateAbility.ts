@@ -1,5 +1,5 @@
 import { Ability } from "@engine/abilities";
-import Card from "@engine/Card";
+import { Permanent } from "@engine/GameObject";
 import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
@@ -8,22 +8,23 @@ export class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;
 
     player: Player;
-    card: Card;
+    permanent: Permanent;
     ability: Ability;
 
-    constructor(player: Player, card: Card, ability: Ability) {
+    constructor(player: Player, permanent: Permanent, ability: Ability) {
         super();
 
         this.player = player;
-        this.card = card;
+        this.permanent = permanent;
         this.ability = ability;
 
         // TODO: Log ability label
-        this.label = `Player ${player.id} activated ability of ${card.logName} (TODO)`;
+        this.label = `Player ${player.id} activated ability of ${permanent.logName} (TODO)`;
     }
 
     perform(): boolean {
-        if (game.pendingTargeter || !this.ability.activatable || !this.ability.canActivate())
+        if (game.pendingTargeter || !this.permanent.zone || this.permanent.controller !== this.player
+            || !this.permanent.abilities.includes(this.ability) || !this.ability.activatable || !this.ability.canActivate())
             return false;
 
         if (!this.ability.payActivationCost())
@@ -36,7 +37,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
         }
 
         // Add ability to stack
-        game.stack.abilityActivated(this.player, this.ability);//, this.targets);
+        game.stack.abilityActivated(this.player, this.ability);
 
         // TODO: pass priority
         game.stack.resolveAll();

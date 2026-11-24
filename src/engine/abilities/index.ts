@@ -1,4 +1,4 @@
-import Card from "@engine/Card";
+import { CardObject } from "@engine/GameObject";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
 import { Ability,AbilityPart_Activate } from ".";
@@ -17,13 +17,29 @@ import { AbilityParts } from "./registry";
 import.meta.glob("./parts/**/*.ts", { eager: true });
 
 export type GrammarKey = string;
-export type SlateVar = "THIS"
+export type SlateVar = "THIS" | "CONTROLLER";
 export const HardcodedSignals = {
-    SpellResolve: "SPELL_RESOLVE"
+    SpellResolve: "SPELL_RESOLVE",
 };
 
-export function makeAbility(def: AbilityDef, card: Card): Ability {
-    const ability = new Ability(card);
+function expandParts(parts: AbilityDef["parts"]): [string, object][] {
+    return Object.entries(parts ?? {}).flatMap(([name, config]): [string, object][] => {
+        if (name !== "SimpleAura")
+            return [[name, config]];
+
+        const { targetValidator } = parts.SimpleAura;
+        const target = "ENCHANTED";
+        const attachment = "ATTACHMENT";
+        return [
+            ["AbilityPart_Target", { saveAs: target, validTargets: ["Card"], onBattlefield: true, targetValidator }],
+            ["AbilityPart_Attach", { inSignal: HardcodedSignals.SpellResolve, target, saveAs: attachment, targetValidator }],
+            ["AbilityPart_Aura", { attachmentFrom: attachment }],
+        ];
+    });
+}
+
+export function makeAbility(def: AbilityDef, source: CardObject): Ability {
+    const ability = new Ability(source);
 
     ability.def = def;
 
@@ -32,17 +48,17 @@ export function makeAbility(def: AbilityDef, card: Card): Ability {
 
     let hasActivatePart = false;
 
-    for (const className in ability.def.parts) {
+    for (const [className, config] of expandParts(ability.def.parts)) {
         const ctor = AbilityParts[className];
         if (!ctor)
             continue;
 
         const part = new ctor();
-        Object.assign(part, ability.def.parts[className]);
+        Object.assign(part, config);
 
         if (part instanceof AbilityPart_Activate) {
             if (hasActivatePart)
-                throw new Error(`Ability on ${card.def.name} has multiple activate parts`);
+                throw new Error(`Ability on ${source.def.name} has multiple activate parts`);
 
             hasActivatePart = true;
         }
@@ -53,19 +69,21 @@ export function makeAbility(def: AbilityDef, card: Card): Ability {
     return ability;
 }
 
-export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): ActionTarget {
+type GrammarValue = ActionTarget | undefined;
+
+export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
     const parts = key.split(".");
 
-    let result: ActionTarget = null;
+    let result: GrammarValue;
 
     // TODO: Handle multiple targets in slate
     for (const part of parts) {
         if (ability.slate[part])
             result = ability.slate[part][0];
         else if (part === "controller")
-            result = (result as Card)?.controller;
+            result = result instanceof CardObject ? result.controller ?? result.owner : undefined;
         else if (part === "owner")
-            result = (result as Card)?.owner;
+            result = result instanceof CardObject ? result.owner : undefined;
     }
 
     return result;

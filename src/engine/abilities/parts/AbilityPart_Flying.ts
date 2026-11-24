@@ -1,8 +1,7 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import Card from "@engine/Card";
-import gameEventManager,{ GameEvent,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { Permanent } from "@engine/GameObject";
+import gameEventManager,{ type EventCheck,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import { Battlefield } from "@engine/Zone";
-import { removeIf } from "@utility/arrayUtility";
 import { autobind } from "@utility/typeUtility";
 import { Keyword } from "~/defs";
 import { Ability } from "../Ability";
@@ -13,35 +12,35 @@ class AbilityPart_Flying extends AbilityPart {
     setup(ability: Ability) {
         super.setup(ability);
 
-        if (!(ability.card.zone instanceof Battlefield))
+        if (!(ability.source.zone instanceof Battlefield))
             return;
 
         gameEventManager.onCheck(this.checkForEffects);
     }
 
     cleanup(ability: Ability) {
-        if (!(ability.card.zone instanceof Battlefield))
+        if (!(ability.source.zone instanceof Battlefield))
             return;
 
         gameEventManager.offCheck(this.checkForEffects);
     }
 
     @autobind
-    checkForEffects(events: GameEvent[]) {
-        removeIf(events, (event) => {
+    checkForEffects(check: EventCheck) {
+        check.removeWhere(event => {
             if (event.type != GameEventType.DeclareBlocker)
                 return false;
 
             const blockerEvent = event as GameEvent_Simple;
 
-            if (blockerEvent.cardB !== this.ability.card)
+            if (blockerEvent.objectB !== this.ability.source)
                 return false;
 
-            return !this.canBlockFlying(blockerEvent.cardA);
+            return blockerEvent.objectA instanceof Permanent && !this.canBlockFlying(blockerEvent.objectA);
         });
     }
 
-    canBlockFlying(blocker: Card) {
+    canBlockFlying(blocker: Permanent) {
         if (blocker.hasKeyword(Keyword.Flying))
             return true;
 

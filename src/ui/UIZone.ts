@@ -4,7 +4,7 @@ import { Zone } from "@engine/Zone";
 import UICard from "@ui/UICard";
 import { pixi } from "@ui/UIRoot";
 
-export class UIZone extends PIXI.Container<UICard> {
+export class UIZone<T extends PIXI.Container = UICard> extends PIXI.Container<T | UICard> {
     constructor(public readonly zone: Zone) {
         super();
     }

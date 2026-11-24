@@ -1,4 +1,4 @@
-import Card from "@engine/Card";
+import { Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
@@ -7,8 +7,8 @@ import { CardType } from "~/defs";
 
 export class CombatManager {
     static attackingPlayer: Player;
-    static readonly attackingCreatures = new Map<Card, Player>();
-    static readonly blockingCreatures = new Map<Card, Card>();
+    static readonly attackingCreatures = new Map<Permanent, Player>();
+    static readonly blockingCreatures = new Map<Permanent, Permanent>();
 
     static reset() {
         CombatManager.attackingPlayer = null;
@@ -17,62 +17,62 @@ export class CombatManager {
     }
 
     // 506.4: A permanent that leaves the battlefield is removed from combat.
-    static removeFromCombat(card: Card) {
-        CombatManager.blockingCreatures.delete(card);
-        if (CombatManager.attackingCreatures.delete(card)) {
+    static removeFromCombat(permanent: Permanent) {
+        CombatManager.blockingCreatures.delete(permanent);
+        if (CombatManager.attackingCreatures.delete(permanent)) {
             for (const [blocker, attacker] of CombatManager.blockingCreatures) {
-                if (attacker === card)
+                if (attacker === permanent)
                     CombatManager.blockingCreatures.delete(blocker);
             }
         }
     }
 
-    static canAttack(card: Card) {
-        if (card.controller !== CombatManager.attackingPlayer)
+    static canAttack(attacker: Permanent) {
+        if (attacker.controller !== CombatManager.attackingPlayer)
             return false;
 
-        if (!(card.zone instanceof Battlefield))
+        if (!(attacker.zone instanceof Battlefield))
             return false;
 
-        if (card.type != CardType.Creature)
+        if (attacker.type != CardType.Creature)
             return false;
 
-        if (card.tapped)
+        if (attacker.tapped)
             return false;
 
         // 508.1c: Check restrictions on declaring this creature as an attacker.
-        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareAttacker, "", card));
+        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareAttacker, "", attacker));
     }
 
-    static canBlock(card: Card) {
-        if (!CombatManager.beingAttacked(card.controller))
+    static canBlock(blocker: Permanent) {
+        if (!CombatManager.beingAttacked(blocker.controller))
             return false;
 
-        if (!(card.zone instanceof Battlefield))
+        if (!(blocker.zone instanceof Battlefield))
             return false;
 
-        if (card.type != CardType.Creature)
+        if (blocker.type != CardType.Creature)
             return false;
 
-        if (card.tapped)
+        if (blocker.tapped)
             return false;
 
         return true;
     }
 
-    static canBlockAnyAttackers(card: Card) {
-        if (!CombatManager.canBlock(card))
+    static canBlockAnyAttackers(blocker: Permanent) {
+        if (!CombatManager.canBlock(blocker))
             return false;
 
         for (const attacker of CombatManager.attackingCreatures.keys()) {
-            if (CombatManager.canBlockAttacker(card, attacker))
+            if (CombatManager.canBlockAttacker(blocker, attacker))
                 return true;
         }
 
         return false;
     }
 
-    static canBlockAttacker(blocker: Card, attacker: Card) {
+    static canBlockAttacker(blocker: Permanent, attacker: Permanent) {
         // 509.1a: A creature can only block an attacker attacking its controller.
         if (CombatManager.attackingCreatures.get(attacker) !== blocker.controller || !CombatManager.canBlock(blocker))
             return false;
@@ -81,8 +81,8 @@ export class CombatManager {
     }
 
     static hasAnyAttackers(player: Player): boolean {
-        for (const card of player.battlefield.cards) {
-            if (CombatManager.canAttack(card))
+        for (const permanent of player.battlefield.objects) {
+            if (CombatManager.canAttack(permanent))
                 return true;
         }
 
@@ -90,8 +90,8 @@ export class CombatManager {
     }
 
     static hasAnyBlockers(player: Player): boolean {
-        for (const card of player.battlefield.cards) {
-            if (CombatManager.canBlockAnyAttackers(card))
+        for (const permanent of player.battlefield.objects) {
+            if (CombatManager.canBlockAnyAttackers(permanent))
                 return true;
         }
 
@@ -99,8 +99,8 @@ export class CombatManager {
     }
 
     static beingAttacked(player: Player) {
-        for (const card of CombatManager.attackingCreatures.keys()) {
-            if (CombatManager.attackingCreatures.get(card) == player)
+        for (const attacker of CombatManager.attackingCreatures.keys()) {
+            if (CombatManager.attackingCreatures.get(attacker) == player)
                 return true;
         }
 
@@ -114,12 +114,12 @@ export class CombatManager {
         }
     }
 
-    static potentialAttackTargetsFor(attacker: Card): Player[] {
+    static potentialAttackTargetsFor(attacker: Permanent): Player[] {
         return game.players.filter(p => p != attacker.controller);
     }
 
-    static potentialBlockTargetsFor(blocker: Card): Card[] {
-        const blockTargets: Card[] = [];
+    static potentialBlockTargetsFor(blocker: Permanent): Permanent[] {
+        const blockTargets: Permanent[] = [];
 
         for (const attacker of CombatManager.attackingCreatures.keys()) {
             if (CombatManager.canBlockAttacker(blocker, attacker))

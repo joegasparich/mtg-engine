@@ -1,4 +1,5 @@
 import Card from "@engine/Card";
+import { CardObject } from "@engine/GameObject";
 import { Battlefield,Graveyard,Hand,Library } from "@engine/Zone";
 import { ManaAmount,ManaUtility } from "@engine/mana";
 import { cardData } from "~/index";
@@ -25,31 +26,18 @@ export default class Player {
 
     constructor(id: number, deck: number[]) {
         this.id = id;
-        this.library.cards = deck.map(i => {
-            const card = new Card(cardData[i], this);
-            card.zone = this.library;
-            return card;
-        });
+        for (const index of deck)
+            this.library.onEnter(new CardObject(new Card(cardData[index], this)));
     }
 
     getPotentialMana(): Readonly<ManaAmount> {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
-        for (const card of this.battlefield.cards) {
-            ManaUtility.addMana(potentialMana, card.getPotentialMana(this));
+        for (const permanent of this.battlefield.objects) {
+            ManaUtility.addMana(potentialMana, permanent.getPotentialMana(this));
         }
 
         return potentialMana;
     }
 
-    checkState() {
-        // TODO: Check life and lose
-        for (const card of this.hand.cards) {
-            card.checkState();
-        }
-
-        for (const card of this.battlefield.cards) {
-            card.checkState();
-        }
-    }
 }

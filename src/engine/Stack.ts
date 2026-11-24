@@ -1,103 +1,121 @@
 import type { ActionTarget } from "@engine/actions";
-import Card from "@engine/Card";
-import Player from "@engine/Player";
-import { Zone } from "@engine/Zone";
 import { Ability,HardcodedSignals } from "@engine/abilities";
-import { GameEvent_ChangeCardZone } from "@engine/events";
+import { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
 import gameEventManager from "@engine/events/GameEventManager";
+import { CardObject,Spell,StackAbility } from "@engine/GameObject";
+import type Player from "@engine/Player";
+import { Zone } from "@engine/Zone";
 import { CardType } from "~/defs";
 
-export class Spell {
-    owner: Player;
-
-    card: Card;
-    readonly targets: readonly ActionTarget[];
-
-    constructor(owner: Player, card: Card, targets: readonly ActionTarget[]) {
-        this.owner = owner;
-        this.card = card;
-        this.targets = [...targets];
-    }
-}
-
-// export class Ability {
-//     owner: Player;
-//
-//     effects: AbilityEffectDef[];
-//     targets: ActionTarget[];
-//
-//     constructor(owner: Player, effects: AbilityEffectDef[], targets?: ActionTarget[]) {
-//         this.owner = owner;
-//         this.effects = effects;
-//         this.targets = targets;
-//     }
-// }
-
-export class Stack extends Zone {
+export class Stack extends Zone<Spell | StackAbility> {
     name = "Stack";
-    stack: (Spell | Ability)[] = [];
+    private resolutionScheduled = false;
+    private readonly waitingTriggers: StackAbility[] = [];
 
-    spellCast(caster: Player, card: Card, targets: readonly ActionTarget[] = []): boolean {
-        if (card.type === CardType.Land)
+    spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = []): boolean {
+        if (handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
             return false;
 
         // 601.2c
-        const target = card.spellTarget;
+        const target = handObject.spellTarget;
         if (target ? !target.validateTargets(targets) : targets.length > 0)
             return false;
 
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, this));
-        this.stack.push(new Spell(caster, card, targets));
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets }));
         return true;
     }
 
     abilityActivated(caster: Player, ability: Ability) {
-        this.stack.push(ability);
+        this.onEnter(new StackAbility(caster, ability.source, ability, ability.activationSignal));
     }
 
-    abilityTriggered(caster: Player, ability: Ability) {
-        this.stack.push(ability);
+    abilityTriggered(controller: Player, ability: Ability, signal: string, inputs: Ability["slate"]) {
+        this.waitingTriggers.push(new StackAbility(controller, ability.source, ability, signal, inputs));
+    }
+
+    putWaitingTriggersOnStack(): boolean {
+        const triggers = this.waitingTriggers.splice(0);
+        if (!triggers.length)
+            return false;
+
+        for (const trigger of triggers)
+            this.onEnter(trigger);
+        this.resolveAll();
+        return true;
     }
 
     resolveAll() {
-        // gameEventManager.addEvent(new GameEvent_SimpleEvent(GameEventType.Log, "Stack Resolving"));
+        if (this.resolutionScheduled)
+            return;
 
-        while (this.stack.length > 0) {
-            const spellOrAbility = this.stack.pop();
+        this.resolutionScheduled = true;
+        gameEventManager.onIdle(() => {
+            const top = this.objects.at(-1);
+            if (!top) {
+                this.resolutionScheduled = false;
+                return;
+            }
 
-            if (spellOrAbility instanceof Spell)
-                this.resolveSpell(spellOrAbility);
-            else if (spellOrAbility instanceof Ability)
-                this.resolveAbility(spellOrAbility);
-        }
+            try {
+                // 608.1: Resolve the top object after pending events and follow-ups settle.
+                if (top instanceof Spell)
+                    this.resolveSpell(top);
+                else {
+                    top.resolve();
+                    // 608.2n: The ability ceases to exist at the end of resolution.
+                    gameEventManager.onResolved(() => this.onLeave(top));
+                }
+            } catch (error) {
+                this.resolutionScheduled = false;
+                throw error;
+            }
 
-        // gameEventManager.addEvent(new GameEvent_SimpleEvent(GameEventType.Log, "Stack Resolved"));
+            gameEventManager.onIdle(() => {
+                this.resolutionScheduled = false;
+                // A prevented move must not cause the same spell to resolve again.
+                if (this.objects.length > 0 && !this.objects.includes(top))
+                    this.resolveAll();
+            });
+        });
     }
 
     resolveSpell(spell: Spell) {
-        switch (spell.card.type) {
+        if (spell.zone !== this)
+            return;
+
+        switch (spell.type) {
             case CardType.Creature:
-                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.battlefield));
-                break;
-            case CardType.Sorcery:
-            case CardType.Instant: {
-                // 608.2b
-                const target = spell.card.spellTarget;
-                if (!target || target.validateTargets(spell.targets)) {
-                    target?.applyTargets(spell.targets);
-                    for (const ability of spell.card.abilities) {
-                        ability.fireSignal(HardcodedSignals.SpellResolve);
-                    }
+            case CardType.Enchantment:
+            case CardType.Artifact: {
+                if (this.resolveSpellEffects(spell)) {
+                    const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
+                    const event = resolver?.resolvePermanentSpell(spell)
+                        ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
+                    // 608.3b–c: Validate and commit permanent entry in the same resolution.
+                    gameEventManager.performImmediate(event);
+                    return;
                 }
-                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell.card, spell.owner.graveyard));
                 break;
             }
-            default:
+            case CardType.Sorcery:
+            case CardType.Instant:
+                this.resolveSpellEffects(spell);
                 break;
+            default:
+                return;
         }
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.owner.graveyard));
     }
 
-    resolveAbility(ability: Ability) {
-        ability.resolveActivation();
+    private resolveSpellEffects(spell: Spell): boolean {
+        // 400.7 and 608.2b: A target that changed zones is a different object.
+        const target = spell.spellTarget;
+        if (target && !target.validateTargets(spell.targets))
+            return false;
+
+        target?.applyTargets(spell.targets);
+        for (const ability of spell.abilities)
+            ability.fireSignal(HardcodedSignals.SpellResolve);
+        return true;
     }
 }

@@ -1,6 +1,6 @@
 import type { ActionTarget } from "@engine/actions";
-import Card from "@engine/Card";
-import gameEventManager,{ GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import { CardObject } from "@engine/GameObject";
+import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 
@@ -8,26 +8,23 @@ export class GameEvent_CastSpell extends GameEvent {
     type = GameEventType.CastSpell;
 
     caster: Player;
-    card: Card;
+    handObject: CardObject;
 
-    constructor(caster: Player, card: Card, readonly targets: readonly ActionTarget[] = []) {
+    constructor(caster: Player, handObject: CardObject, readonly targets: readonly ActionTarget[] = []) {
         super();
 
         this.caster = caster;
-        this.card = card;
+        this.handObject = handObject;
 
-        this.label = `Player ${this.caster.id} cast ${this.card.logName}`;
+        this.label = `Player ${this.caster.id} cast ${this.handObject.logName}`;
     }
 
     perform(): boolean {
-        if (game.pendingTargeter || !game.stack.spellCast(this.caster, this.card, this.targets))
+        if (game.pendingTargeter || !game.stack.spellCast(this.caster, this.handObject, this.targets))
             return false;
 
         // TODO: Pass priority to the next player
-
-        gameEventManager.onResolved(() => {
-            game.stack.resolveAll();
-        });
+        game.stack.resolveAll();
         return true;
     }
 }

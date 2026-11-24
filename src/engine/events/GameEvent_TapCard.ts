@@ -1,21 +1,24 @@
-import Card from "@engine/Card";
+import { Permanent } from "@engine/GameObject";
 import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 
 export class GameEvent_TapCard extends GameEvent {
     type = GameEventType.TapCard;
 
-    card: Card;
+    permanent: Permanent;
 
-    constructor(card: Card) {
+    constructor(permanent: Permanent) {
         super();
 
-        this.card = card;
+        this.permanent = permanent;
 
-        this.label = `Card ${this.card.logName} was tapped`;
+        this.label = `Card ${this.permanent.logName} was tapped`;
     }
 
     perform(): boolean {
-        this.card.tapped = true;
+        if (!this.permanent.zone)
+            return false;
+
+        this.permanent.tapped = true;
         return true;
     }
 }

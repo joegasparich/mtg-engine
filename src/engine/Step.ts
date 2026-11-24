@@ -22,9 +22,9 @@ export class UntapStep implements Step {
         game.activePlayerID = -1;
 
         // 502.3
-        for (const card of player.battlefield.cards) {
-            if (card.tapped)
-                gameEventManager.addEvent(new GameEvent_UntapCard(card));
+        for (const permanent of player.battlefield.objects) {
+            if (permanent.tapped)
+                gameEventManager.addEvent(new GameEvent_UntapCard(permanent));
         }
     }
 
@@ -97,8 +97,8 @@ export class DeclareAttackersStep implements Step {
     }
     onEnd(): void {
         // 508.1f
-        for (const card of CombatManager.attackingCreatures.keys()) {
-            gameEventManager.addEvent(new GameEvent_TapCard(card));
+        for (const attacker of CombatManager.attackingCreatures.keys()) {
+            gameEventManager.addEvent(new GameEvent_TapCard(attacker));
         }
     }
 
@@ -141,9 +141,6 @@ export class CombatDamageStep implements Step {
     onStart(player: Player): void {
         // 510.1, 510.2
         CombatManager.calculateAndAssignDamage();
-
-        // TODO: This should happen when a player gets priority
-        game.checkState();
 
         // 510.3
         game.activePlayerID = game.currentTurnPlayerID;
@@ -199,7 +196,7 @@ export class CleanupStep implements Step {
 
         // 514.2
         for (const player of game.players) {
-            for (const permanent of player.battlefield.cards) {
+            for (const permanent of player.battlefield.objects) {
                 permanent.damageTaken = 0;
             }
         }

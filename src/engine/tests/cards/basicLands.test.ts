@@ -1,5 +1,5 @@
-import Card from "@engine/Card";
-import { GameEvent_ActivateAbility,GameEvent_ChangeCardZone } from "@engine/events";
+import { addTestCard } from "@engine/tests/testData";
+import { GameEvent_ActivateAbility } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
@@ -21,8 +21,7 @@ test.each([
     ["Mountain", ManaColour.R],
     ["Forest", ManaColour.G],
 ])("%s taps for one mana of its colour", (name, colour) => {
-    const land = new Card(cardData.find(card => card.name === name), player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(land, player.battlefield));
+    const land = addTestCard(cardData.find(card => card.name === name), player, player.battlefield);
 
     gameEventManager.addEvent(new GameEvent_ActivateAbility(player, land, land.abilities[0]));
 

@@ -44,17 +44,17 @@ test("should load deck", () => {
     let player = game.addPlayer(deck);
 
     // Check player library loaded
-    expect(player.library.cards.length).toBe(1);
-    expect(player.library.cards[0].def).toBe(cardData[FOREST]);
+    expect(player.library.objects.length).toBe(1);
+    expect(player.library.objects[0].def).toBe(cardData[FOREST]);
 
     const deckTwo: number[] = [FOREST, GRIZZLY_BEARS, FOREST];
     player = game.addPlayer(deckTwo);
 
     // Check multiple cards loaded
-    expect(player.library.cards.length).toBe(3);
-    expect(player.library.cards[0].def).toBe(cardData[FOREST]);
-    expect(player.library.cards[1].def).toBe(cardData[GRIZZLY_BEARS]);
-    expect(player.library.cards[2].def).toBe(cardData[FOREST]);
+    expect(player.library.objects.length).toBe(3);
+    expect(player.library.objects[0].def).toBe(cardData[FOREST]);
+    expect(player.library.objects[1].def).toBe(cardData[GRIZZLY_BEARS]);
+    expect(player.library.objects[2].def).toBe(cardData[FOREST]);
 });
 
 const SEVEN_FORESTS = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, FOREST];
@@ -65,6 +65,6 @@ test("should draw 7 cards", async () => {
     await game.startGame();
 
     // Check we drew exactly seven cards
-    expect(player.hand.cards.length).toBe(7);
-    expect(player.library.cards.length).toBe(0);
+    expect(player.hand.objects.length).toBe(7);
+    expect(player.library.objects.length).toBe(0);
 });

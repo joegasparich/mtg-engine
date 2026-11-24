@@ -1,37 +1,37 @@
 import { PlayerAction } from "@engine/actions/PlayerAction";
 import { ActionTarget } from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
+import { Permanent } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 
-export class PlayerAction_DeclareBlocker extends PlayerAction {
-    constructor(card: Card) {
-        super(card);
+export class PlayerAction_DeclareBlocker extends PlayerAction<Permanent> {
+    constructor(blocker: Permanent) {
+        super(blocker);
 
-        this.targets = CombatManager.potentialBlockTargetsFor(card);
+        this.targets = CombatManager.potentialBlockTargetsFor(blocker);
     }
 
     label() {
-        return `Declare ${this.card.name} as a blocker`;
+        return `Declare ${this.object.name} as a blocker`;
     }
 
     perform(player: Player, targets?: ActionTarget[]) {
         const target = targets?.[0];
-        if (!this.canEdit(player) || !(target instanceof Card)
-            || !CombatManager.canBlockAttacker(this.card, target))
+        if (!this.canEdit(player) || !(target instanceof Permanent)
+            || !CombatManager.canBlockAttacker(this.object, target))
             return;
 
-        CombatManager.blockingCreatures.set(this.card, target);
+        CombatManager.blockingCreatures.set(this.object, target);
     }
 
     withdraw(player: Player): boolean {
-        return this.canEdit(player) && CombatManager.blockingCreatures.delete(this.card);
+        return this.canEdit(player) && CombatManager.blockingCreatures.delete(this.object);
     }
 
     private canEdit(player: Player) {
         return !game.pendingTargeter && game.currentStepIndex === StepIndex.DeclareBlockers
-            && player === game.activePlayer() && player === this.card.controller;
+            && player === game.activePlayer() && player === this.object.controller;
     }
 }

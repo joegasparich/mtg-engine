@@ -1,6 +1,6 @@
 import { PlayerActions } from "@engine/actions/index";
 import { PlayerAction } from "@engine/actions/PlayerAction";
-import Card from "@engine/Card";
+import { CardObject,GameObject,Permanent } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ActivateAbility } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
@@ -27,9 +27,9 @@ export const TargetTypesMap: Record<TargetTypeKeys, TargetType> = {
     Card: TargetType.Card
 };
 
-export type ActionTarget = Card | Player;
+export type ActionTarget = GameObject | Player;
 export type Targeter = {
-    source: Card;
+    source: CardObject;
     targetType: TargetType;
     count: number;
     validateTargets: (targets: ActionTarget[]) => boolean;
@@ -39,12 +39,14 @@ export type Targeter = {
 
 class PlayerActionManager {
     // TODO: Maybe move to UI file
-    public cardActionsForUI = new Map<Card, PlayerAction[]>();
+    public cardActionsForUI = new Map<CardObject, PlayerAction[]>();
 
     constructor() {
         // Perf Warning: This might end up being too intensive, might need to cache
         gameEventManager.onPerformed(GameEventType.All, (event) => {
-            if (event.isAction)
+            if (game?.pendingTargeter?.source.retired)
+                game.pendingTargeter.onCancelled();
+            else if (event.isAction)
                 this.refreshCardActionsForUI();
         });
     }
@@ -56,17 +58,17 @@ class PlayerActionManager {
             : new Map();
     }
 
-    getAvailableActions(actor: Player, ignoreManaAbilities = false): Map<Card, PlayerAction[]> {
-        const actions = new Map<Card, PlayerAction[]>();
+    getAvailableActions(actor: Player, ignoreManaAbilities = false): Map<CardObject, PlayerAction[]> {
+        const actions = new Map<CardObject, PlayerAction[]>();
 
         for (const zone of [actor.hand, actor.battlefield]) {
-            for (const card of zone.cards) {
-                const cardActions = this.getCardActions(card, actor, ignoreManaAbilities);
+            for (const object of zone.objects) {
+                const cardActions = this.getCardActions(object, actor, ignoreManaAbilities);
 
                 if (!cardActions.length)
                     continue;
 
-                actions.set(card, cardActions);
+                actions.set(object, cardActions);
             }
         }
 
@@ -77,50 +79,50 @@ class PlayerActionManager {
         return this.getAvailableActions(actor, ignoreManaAbilities).size > 0;
     }
 
-    public getCardActions(card: Card, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
+    public getCardActions(object: CardObject, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
         const cardActions: PlayerAction[] = [];
 
-        if (!actor || game.pendingTargeter || actor !== game.activePlayer() || actor !== card.controller)
+        if (!actor || game.pendingTargeter || actor !== game.activePlayer())
             return [];
 
-        if (card.zone === actor.hand) {
-            if (card.canPlay() && (card.type === CardType.Land || ManaUtility.canPay(card.cost, actor.manaPool) || this.canAutoPay(card, actor)))
-                cardActions.push(new PlayerActions.PlayCard(card));
+        if (object.zone === actor.hand && object.owner === actor) {
+            if (object.canPlay() && (object.type === CardType.Land || ManaUtility.canPay(object.cost, actor.manaPool) || this.canAutoPay(object, actor)))
+                cardActions.push(new PlayerActions.PlayCard(object));
         }
 
-        if (card.zone === actor.battlefield) {
-            for (const ability of card.abilities) {
+        if (object instanceof Permanent && object.zone === actor.battlefield && object.controller === actor) {
+            for (const ability of object.abilities) {
                 if (ignoreManaAbilities && ability.def.isManaAbility)
                     continue;
 
-                if (card.canActivate(ability)) {
-                    cardActions.push(new PlayerActions.ActivateAbility(card, ability));
+                if (object.canActivate(ability)) {
+                    cardActions.push(new PlayerActions.ActivateAbility(object, ability));
                 }
             }
 
-            if (game.currentStepIndex == StepIndex.DeclareAttackers && CombatManager.canAttack(card)) {
-                cardActions.push(new PlayerActions.DeclareAttacker(card));
+            if (game.currentStepIndex == StepIndex.DeclareAttackers && CombatManager.canAttack(object)) {
+                cardActions.push(new PlayerActions.DeclareAttacker(object));
             }
 
-            if (game.currentStepIndex == StepIndex.DeclareBlockers && CombatManager.canBlockAnyAttackers(card)) {
-                cardActions.push(new PlayerActions.DeclareBlocker(card));
+            if (game.currentStepIndex == StepIndex.DeclareBlockers && CombatManager.canBlockAnyAttackers(object)) {
+                cardActions.push(new PlayerActions.DeclareBlocker(object));
             }
         }
 
         return cardActions;
     }
 
-    public canAutoPay(card: Card, actor: Player) {
+    public canAutoPay(object: CardObject, actor: Player) {
         if (game.infiniteMana)
             return true;
 
         const availableMana: ManaAmount = [...actor.manaPool];
         ManaUtility.addMana(availableMana, actor.getPotentialMana());
-        return ManaUtility.canPay(card.cost, availableMana);
+        return ManaUtility.canPay(object.cost, availableMana);
     }
 
-    public autoPay(card: Card, actor: Player) {
-        const remaining = [...card.cost];
+    public autoPay(object: CardObject, actor: Player) {
+        const remaining = [...object.cost];
         const poolCopy = [...actor.manaPool]; // We don't want to actually pay until we have tapped all our lands etc.
 
         // First pay specific colours directly from what we have in the pool
@@ -145,8 +147,8 @@ class PlayerActionManager {
             if (remaining[i] == 0)
                 continue;
 
-            for (const card of actor.battlefield.cards) {
-                for (const ability of card.abilities) {
+            for (const permanent of actor.battlefield.objects) {
+                for (const ability of permanent.abilities) {
                     if (!ability.def.isManaAbility)
                         continue;
 
@@ -158,7 +160,7 @@ class PlayerActionManager {
                     if (potentialMana[i] == 0)
                         continue;
 
-                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, card, ability)))
+                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, permanent, ability)))
                         continue;
 
                     const diff = Math.min(remaining[i], potentialMana[i]);
@@ -174,8 +176,8 @@ class PlayerActionManager {
 
         // Finally, look for cards with mana abilities to pay the generic
         if (remaining[6] > 0) {
-            for (const card of actor.battlefield.cards) {
-                for (const ability of card.abilities) {
+            for (const permanent of actor.battlefield.objects) {
+                for (const ability of permanent.abilities) {
                     if (!ability.def.isManaAbility)
                         continue;
 
@@ -186,7 +188,7 @@ class PlayerActionManager {
                     const potentialMana = ability.getPotentialMana();
                     const generic = ManaUtility.asGeneric(potentialMana);
 
-                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, card, ability)))
+                    if (!gameEventManager.performImmediate(new GameEvent_ActivateAbility(actor, permanent, ability)))
                         continue;
 
                     const diff = Math.min(remaining[6], generic);
@@ -201,10 +203,10 @@ class PlayerActionManager {
         }
 
         if (remaining.some(v => v > 0))
-            throw new Error(`Failed to auto pay for card ${card.def.name}, remaining cost: ${remaining}`);
+            throw new Error(`Failed to auto pay for card ${object.def.name}, remaining cost: ${remaining}`);
     }
 
-    public startTargeting(source: Card, targetTypes: TargetTypeKeys[], count: number,
+    public startTargeting(source: CardObject, targetTypes: TargetTypeKeys[], count: number,
                    validateTargets: (targets: ActionTarget[]) => boolean,
                    onTargeted: (targets: ActionTarget[]) => void) {
         if (game.pendingTargeter)

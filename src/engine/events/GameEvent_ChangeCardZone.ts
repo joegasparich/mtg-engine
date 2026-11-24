@@ -1,33 +1,66 @@
-import Card from "@engine/Card";
+import type { ActionTarget } from "@engine/actions";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
-import { Battlefield,Zone } from "@engine/Zone";
+import { CardObject,Permanent,Spell } from "@engine/GameObject";
+import type Player from "@engine/Player";
+import { Stack } from "@engine/Stack";
+import { Battlefield,type Zone } from "@engine/Zone";
 
 export class GameEvent_ChangeCardZone extends GameEvent {
     type = GameEventType.ChangeCardZone;
+    readonly oldZone?: Zone;
+    newObject?: CardObject;
 
-    card: Card;
-    oldZone: Zone;
-    newZone: Zone;
-
-    constructor(card: Card, newZone: Zone) {
+    constructor(readonly oldObject: CardObject, public newZone: Zone,
+        private readonly options?: { controller?: Player; attachedTo?: Permanent; targets?: readonly ActionTarget[] }) {
         super();
-
-        this.card = card;
-        this.oldZone = card.zone;
-        this.newZone = newZone;
-
-        this.label = `Card ${this.card.logName} changed zones from ${this.card.zone?.name} to ${this.newZone.name}`;
+        this.oldZone = oldObject.zone;
+        this.label = `Card ${oldObject.logName} changed zones from ${this.oldZone?.name} to ${newZone.name}`;
     }
 
     perform(): boolean {
-        if (this.card.zone instanceof Battlefield)
-            CombatManager.removeFromCombat(this.card);
-        this.card.preChangeZone();
-        this.card.zone?.onLeave(this.card);
-        this.card.zone = this.newZone;
-        this.card.postChangeZone();
-        this.newZone.onEnter(this.card);
+        const { oldObject, oldZone, newZone, options } = this;
+        if (oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
+            return false;
+
+        // 400.7: Each zone change creates a new rules object for the same physical card.
+        const controller = options?.controller ?? oldObject.controller ?? oldObject.owner;
+        if (newZone instanceof Stack) {
+            if (!options?.targets)
+                return false;
+            this.newObject = new Spell(oldObject.card, controller, options.targets);
+        }
+        else if (newZone instanceof Battlefield)
+            this.newObject = new Permanent(oldObject.card, controller, options?.attachedTo);
+        else
+            this.newObject = new CardObject(oldObject.card);
+
+        if (oldObject instanceof Permanent)
+            CombatManager.removeFromCombat(oldObject);
+        if (oldZone)
+            oldZone.onLeave(oldObject);
+        else
+            oldObject.retire();
+
+        newZone.onEnter(this.newObject);
+        this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${newZone.name}`;
+        return true;
+    }
+}
+
+export class GameEvent_DestroyPermanent extends GameEvent_ChangeCardZone {
+    type = GameEventType.DestroyPermanent;
+    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
+
+    constructor(readonly permanent: Permanent) {
+        super(permanent, permanent.owner.graveyard);
+        this.label = `Permanent ${permanent.logName} destroyed`;
+    }
+
+    perform(): boolean {
+        if (!(this.permanent.zone instanceof Battlefield) || !super.perform())
+            return false;
+        this.label = `Permanent ${this.permanent.logName} destroyed`;
         return true;
     }
 }

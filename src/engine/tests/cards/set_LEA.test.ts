@@ -1,19 +1,23 @@
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
-import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_GoToStep } from "@engine/events";
+import type { CardObject,Permanent } from "@engine/GameObject";
+import type { Zone } from "@engine/Zone";
+import { CombatManager } from "@engine/CombatManager";
+import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { ANCESTRAL_RECALL,BASIC_DECK } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK } from "@engine/tests/testData";
+import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 describe("Ancestral Recall", () => {
     let caster: Player;
     let opponent: Player;
-    let island: Card;
-    let recall: Card;
+    let island: Permanent;
+    let recall: CardObject;
 
     beforeEach(() => {
         Game.init();
@@ -22,10 +26,8 @@ describe("Ancestral Recall", () => {
         game.startGame();
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
 
-        island = new Card(cardData.find(card => card.name === "Island"), caster);
-        recall = new Card(cardData[ANCESTRAL_RECALL], caster);
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(island, caster.battlefield));
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(recall, caster.hand));
+        island = addTestCard(cardData.find(card => card.name === "Island"), caster, caster.battlefield);
+        recall = addTestCard(cardData[ANCESTRAL_RECALL], caster, caster.hand);
     });
 
     function beginCasting() {
@@ -42,19 +44,19 @@ describe("Ancestral Recall", () => {
 
         expect(island.tapped).toBe(false);
         expect(recall.zone).toBe(caster.hand);
-        expect(game.stack.stack).toHaveLength(0);
+        expect(game.stack.objects).toHaveLength(0);
         expect(resolveSpell).not.toHaveBeenCalled();
 
         request.onTargeted([target]);
         request.onTargeted([target]);
 
-        expect(resolveSpell).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ card: recall, targets: [target] }));
+        expect(resolveSpell).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ card: recall.card, targets: [target] }));
         expect(game.pendingTargeter).toBeNull();
         expect(island.tapped).toBe(true);
         expect(caster.manaPool[ManaColour.U]).toBe(0);
-        expect(recall.zone).toBe(caster.graveyard);
-        expect(caster.hand.cards).toHaveLength(target === caster ? 10 : 7);
-        expect(opponent.hand.cards).toHaveLength(target === opponent ? 10 : 7);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(recall.card);
+        expect(caster.hand.objects).toHaveLength(target === caster ? 10 : 7);
+        expect(opponent.hand.objects).toHaveLength(target === opponent ? 10 : 7);
     });
 
     test("rejects a missing target, a card, and a player outside the game", () => {
@@ -70,7 +72,7 @@ describe("Ancestral Recall", () => {
         expect(island.tapped).toBe(false);
         expect(recall.zone).toBe(caster.hand);
         request.onTargeted([opponent]);
-        expect(opponent.hand.cards).toHaveLength(10);
+        expect(opponent.hand.objects).toHaveLength(10);
     });
 
     test("cancelling preserves the spell and mana and allows another attempt", () => {
@@ -84,11 +86,89 @@ describe("Ancestral Recall", () => {
         expect(recall.zone).toBe(caster.hand);
         expect(island.tapped).toBe(false);
         expect(caster.manaPool[ManaColour.U]).toBe(1);
-        expect(opponent.hand.cards).toHaveLength(7);
+        expect(opponent.hand.objects).toHaveLength(7);
 
         beginCasting().onTargeted([opponent]);
-        expect(recall.zone).toBe(caster.graveyard);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(recall.card);
         expect(caster.manaPool[ManaColour.U]).toBe(0);
-        expect(opponent.hand.cards).toHaveLength(10);
+        expect(opponent.hand.objects).toHaveLength(10);
+    });
+});
+
+describe("Animate Wall", () => {
+    let caster: Player;
+    let opponent: Player;
+    let aura: CardObject;
+    let plains: Permanent;
+
+    function cardByName<T extends CardObject>(name: string, owner: Player, zone: Zone<T>) {
+        return addTestCard(cardData.find(card => card.name === name), owner, zone);
+    }
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        game.startGame();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+
+        plains = cardByName("Plains", caster, caster.battlefield);
+        aura = cardByName("Animate Wall", caster, caster.hand);
+    });
+
+    function beginCasting() {
+        const [action] = playerActionManager.getCardActions(aura, caster);
+        action.perform(caster);
+        expect(game.pendingTargeter?.source).toBe(aura);
+        return game.pendingTargeter;
+    }
+
+    test.each(["caster", "opponent"])("lets the %s's enchanted Wall attack with defender", recipient => {
+        const controller = recipient === "caster" ? caster : opponent;
+        const wall = cardByName("Wall of Swords", controller, controller.battlefield);
+        const otherWall = cardByName("Wall of Swords", controller, controller.battlefield);
+        const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "Declaration", wall);
+        expect(gameEventManager.checkEvent(declaration)).toBe(false);
+
+        const request = beginCasting();
+        expect(plains.tapped).toBe(false);
+        request.onTargeted([wall]);
+        expect(plains.tapped).toBe(true);
+        const attached = caster.battlefield.objects.find(object => object.card === aura.card);
+        expect(attached?.attachedTo).toBe(wall);
+        expect(wall.hasKeyword(Keyword.Defender)).toBe(true);
+
+        if (controller === opponent)
+            gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(CombatManager.canAttack(otherWall)).toBe(false);
+        expect(wall.tapped).toBe(false);
+        const [attack] = playerActionManager.getCardActions(wall, controller);
+        attack.perform(controller);
+        expect(CombatManager.attackingCreatures.has(wall)).toBe(true);
+
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(attached, caster.graveyard));
+        expect(CombatManager.canAttack(wall)).toBe(false);
+    });
+
+    test("requires a Wall on the battlefield before offering or completing the cast", () => {
+        const wall = cardByName("Wall of Swords", opponent, opponent.hand);
+        const otherCreature = cardByName("Grizzly Bears", opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(aura, caster)).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_CastSpell(caster, aura));
+        expect(aura.zone).toBe(caster.hand);
+
+        const legalWall = cardByName("Wall of Swords", caster, caster.battlefield);
+        const request = beginCasting();
+        request.onTargeted([otherCreature]);
+        request.onTargeted([plains]);
+        request.onTargeted([wall]);
+        request.onTargeted([opponent]);
+
+        expect(game.pendingTargeter).toBe(request);
+        expect(plains.tapped).toBe(false);
+        expect(aura.zone).toBe(caster.hand);
+        request.onTargeted([legalWall]);
+        expect(caster.battlefield.objects.find(object => object.card === aura.card)?.attachedTo).toBe(legalWall);
     });
 });

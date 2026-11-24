@@ -1,13 +1,12 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
-import { GameEvent_ChangeCardZone,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_GoToStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -19,30 +18,25 @@ beforeEach(async () => {
 });
 
 test("canAutoPay should be true", () => {
-    const mountain = new Card(cardData[MOUNTAIN], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, player.battlefield));
+    addTestCard(cardData[MOUNTAIN], player, player.battlefield);
 
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, player.hand));
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.hand);
 
     const canAutoPay = playerActionManager.canAutoPay(goblins, player);
     expect(canAutoPay).toBe(true);
 });
 
 test("canAutoPay should be false", () => {
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, player.hand));
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.hand);
 
     const canAutoPay = playerActionManager.canAutoPay(goblins, player);
     expect(canAutoPay).toBe(false);
 });
 
 test("autoPay should tap mountain", () => {
-    const mountain = new Card(cardData[MOUNTAIN], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, player.battlefield));
+    const mountain = addTestCard(cardData[MOUNTAIN], player, player.battlefield);
 
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, player.hand));
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.hand);
 
     expect(mountain.tapped).toBe(false);
     playerActionManager.autoPay(goblins, player);
@@ -52,25 +46,21 @@ test("autoPay should tap mountain", () => {
 test("playing a spell can use mana produced immediately by autopay", () => {
     game.startGame();
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
-    const mountain = new Card(cardData[MOUNTAIN], player);
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, player.battlefield));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, player.hand));
+    const mountain = addTestCard(cardData[MOUNTAIN], player, player.battlefield);
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.hand);
 
     new PlayerActions.PlayCard(goblins).perform(player);
 
     expect(mountain.tapped).toBe(true);
     expect(player.manaPool[ManaColour.R]).toBe(0);
-    expect(goblins.zone).toBe(player.battlefield);
+    expect(player.battlefield.objects.map(object => object.card)).toContain(goblins.card);
 });
 
 test("the playability highlight counts each untapped land once", () => {
     game.startGame();
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    const forest = new Card(cardData[FOREST], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
 
     const pool = player.manaPool;
     expect(playerActionManager.cardActionsForUI.has(bears)).toBe(false);
@@ -78,22 +68,19 @@ test("the playability highlight counts each untapped land once", () => {
     expect(player.manaPool).toBe(pool);
     expect(pool).toEqual([0, 0, 0, 0, 0, 0]);
 
-    const secondForest = new Card(cardData[FOREST], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(secondForest, player.battlefield));
+    const secondForest = addTestCard(cardData[FOREST], player, player.battlefield);
 
     const [action] = playerActionManager.cardActionsForUI.get(bears);
     action.perform(player);
-    expect(bears.zone).toBe(player.battlefield);
+    expect(player.battlefield.objects.map(object => object.card)).toContain(bears.card);
     expect(forest.tapped).toBe(true);
     expect(secondForest.tapped).toBe(true);
 });
 
 test("autoPay uses existing mana in pool first", () => {
-    const mountain = new Card(cardData[MOUNTAIN], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, player.battlefield));
+    const mountain = addTestCard(cardData[MOUNTAIN], player, player.battlefield);
 
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, player.hand));
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.hand);
 
     ManaUtility.addMana(player.manaPool, [0, 0, 0, 1, 0, 0]);
 
@@ -103,11 +90,9 @@ test("autoPay uses existing mana in pool first", () => {
 });
 
 test("autoPay uses existing mana and land", () => {
-    const forest = new Card(cardData[FOREST], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
 
-    const grizzlyBears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(grizzlyBears, player.hand));
+    const grizzlyBears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
     ManaUtility.addMana(player.manaPool, [0, 0, 0, 0, 0, 1]);
 
@@ -122,12 +107,9 @@ test("autoPay uses existing mana and land", () => {
 test("infinite mana enables spells without spending mana or tapping lands, and can be turned off", () => {
     game.startGame();
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
-    const forest = new Card(cardData[FOREST], player);
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    const another = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
-    for (const spell of [bears, another])
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, player.hand));
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+    const another = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
     expect(game.infiniteMana).toBe(false);
     expect(playerActionManager.cardActionsForUI.has(bears)).toBe(false);
 
@@ -136,7 +118,7 @@ test("infinite mana enables spells without spending mana or tapping lands, and c
     expect(playerActionManager.cardActionsForUI.has(bears)).toBe(true);
     player.manaPool[ManaColour.R] = 1;
     new PlayerActions.PlayCard(bears).perform(player);
-    expect(bears.zone).toBe(player.battlefield);
+    expect(player.battlefield.objects.map(object => object.card)).toContain(bears.card);
     expect(forest.tapped).toBe(false);
     expect(player.manaPool[ManaColour.R]).toBe(1);
 

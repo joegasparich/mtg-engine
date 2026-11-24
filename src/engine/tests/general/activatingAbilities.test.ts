@@ -1,12 +1,11 @@
 import { PlayerActions } from "@engine/actions";
-import Card from "@engine/Card";
-import { GameEvent_ActivateAbility,GameEvent_ChangeCardZone,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_ActivateAbility,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -20,10 +19,8 @@ beforeEach(async () => {
 test("a mana ability taps its land and resolves without touching the stack", () => {
     game.startGame();
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
-    const forest = new Card(cardData[FOREST], player);
-    const bears = new Card(cardData[GRIZZLY_BEARS], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, player.hand));
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
     game.stack.spellCast(player, bears);
 
     const abilityEnteredStack = vi.spyOn(game.stack, "abilityActivated");
@@ -31,15 +28,14 @@ test("a mana ability taps its land and resolves without touching the stack", () 
     new PlayerActions.ActivateAbility(forest, forest.abilities[0]).perform(player);
 
     expect(abilityEnteredStack).not.toHaveBeenCalled();
-    expect(game.stack.stack).toHaveLength(1);
-    expect(bears.zone).toBe(game.stack);
+    expect(game.stack.objects).toHaveLength(1);
+    expect(game.stack.objects).toContainEqual(expect.objectContaining({ card: bears.card }));
     expect(forest.tapped).toBe(true);
     expect(player.manaPool[ManaColour.G]).toBe(1);
 });
 
 test("two queued activations cannot pay with the same tap", () => {
-    const forest = new Card(cardData[FOREST], player);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, player.battlefield));
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
     const ability = forest.abilities[0];
     gameEventManager.addEvents([
         new GameEvent_ActivateAbility(player, forest, ability),

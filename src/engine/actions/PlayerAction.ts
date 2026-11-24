@@ -1,13 +1,13 @@
 import { ActionTarget } from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
+import { CardObject } from "@engine/GameObject";
 import Player from "@engine/Player";
 
-export abstract class PlayerAction {
-    card: Card;
+export abstract class PlayerAction<T extends CardObject = CardObject> {
+    object: T;
     targets: ActionTarget[] | null;
 
-    constructor(card: Card) {
-        this.card = card;
+    constructor(object: T) {
+        this.object = object;
     }
 
     label(): string {

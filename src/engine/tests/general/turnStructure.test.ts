@@ -1,12 +1,11 @@
 import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
 import { GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN } from "@engine/tests/testData";
+import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -82,26 +81,26 @@ test.each([false, true])("only the starting player's first draw step is skipped 
         gameEventManager.addEvent(new GameEvent_GoToNextStep());
     }
     expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(player.hand.cards).toHaveLength(7);
-    expect(opponent.hand.cards).toHaveLength(7);
+    expect(player.hand.objects).toHaveLength(7);
+    expect(opponent.hand.objects).toHaveLength(7);
 
     gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     if (!allowAutoSkip)
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
     expect(game.currentTurnPlayer()).toBe(opponent);
-    expect(opponent.hand.cards).toHaveLength(8);
+    expect(opponent.hand.objects).toHaveLength(8);
 
     gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     if (!allowAutoSkip)
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
     expect(game.currentTurnPlayer()).toBe(player);
-    expect(player.hand.cards).toHaveLength(8);
+    expect(player.hand.objects).toHaveLength(8);
 });
 
 test("turn and phase controls wait for a pending target choice", () => {
     game.addPlayer(BASIC_DECK);
     game.startGame({allowAutoSkip: true});
-    playerActionManager.startTargeting(player.hand.cards[0], [TargetTypeKeys.Player], 1, () => true, vi.fn());
+    playerActionManager.startTargeting(player.hand.objects[0], [TargetTypeKeys.Player], 1, () => true, vi.fn());
 
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
     gameEventManager.addEvent(new GameEvent_GoToNextPhase());
@@ -139,11 +138,11 @@ test("should autoskip steps with no player actions", () => {
 test("auto-skip finishes the next player's draw before entering their main phase", () => {
     const opponent = game.addPlayer([FOREST]);
     game.startGame({allowAutoSkip: true});
-    const forest = opponent.hand.cards[0];
+    const forest = opponent.hand.objects[0];
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(forest, opponent.library));
     const onStepStart = (event: GameEvent_StepStart) => {
         if (event.player === opponent && event.stepIndex === StepIndex.Main)
-            expect(forest.zone).toBe(opponent.hand);
+            expect(opponent.hand.objects.map(object => object.card)).toContain(forest.card);
     };
 
     gameEventManager.onPerformed(GameEventType.StepStart, onStepStart);
@@ -155,15 +154,15 @@ test("auto-skip finishes the next player's draw before entering their main phase
 
     expect(game.currentTurnPlayer()).toBe(opponent);
     expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(playerActionManager.cardActionsForUI.has(forest)).toBe(true);
+    const handObject = opponent.hand.objects.find(object => object.card === forest.card);
+    expect(playerActionManager.cardActionsForUI.has(handObject)).toBe(true);
 });
 
 test("auto-skip sees lands untap before checking the next player's spells", () => {
     const opponent = game.addPlayer([MONS_GOBLIN_RAIDERS]);
     game.startGame({allowAutoSkip: true});
-    const goblin = opponent.hand.cards[0];
-    const mountain = new Card(cardData[MOUNTAIN], opponent);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, opponent.battlefield));
+    const goblin = opponent.hand.objects[0];
+    const mountain = addTestCard(cardData[MOUNTAIN], opponent, opponent.battlefield);
     mountain.tapped = true;
     const onStepStart = (event: GameEvent_StepStart) => {
         if (event.player === opponent && event.stepIndex === StepIndex.Main)
@@ -183,7 +182,7 @@ test("auto-skip sees lands untap before checking the next player's spells", () =
 });
 
 test("auto-skip pauses at each main phase when no one can act", () => {
-    player.library.cards.length = 0;
+    player.library.objects.length = 0;
     const opponent = game.addPlayer([]);
     game.startGame({allowAutoSkip: true});
     expect(game.currentTurnPlayer()).toBe(player);
@@ -224,17 +223,16 @@ test.each([
     gameEventManager.addEvent(new GameEvent_DrawCard(player));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
     const bears = game.players.map(owner => {
-        const card = new Card(cardData[GRIZZLY_BEARS], owner);
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, owner.battlefield));
-        card.damageTaken = 1;
-        return card;
+        const permanent = addTestCard(cardData[GRIZZLY_BEARS], owner, owner.battlefield);
+        permanent.damageTaken = 1;
+        return permanent;
     });
-    const hand = [...player.hand.cards];
+    const hand = [...player.hand.objects];
     expect(hand.length).toBeGreaterThan(7);
 
     gameEventManager.addEvent(new Advance());
 
-    expect(bears.map(card => card.damageTaken)).toEqual([0, 0]);
-    expect(bears.map(card => card.zone)).toEqual([player.battlefield, opponent.battlefield]);
-    expect(player.hand.cards).toEqual(hand);
+    expect(bears.map(permanent => permanent.damageTaken)).toEqual([0, 0]);
+    expect(bears.map(permanent => permanent.zone)).toEqual([player.battlefield, opponent.battlefield]);
+    expect(player.hand.objects).toEqual(hand);
 });

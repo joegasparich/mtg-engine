@@ -1,13 +1,12 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager,{ GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS } from "@engine/tests/testData";
+import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS } from "@engine/tests/testData";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -23,13 +22,8 @@ beforeEach(async () => {
 });
 
 test("should trade", () => {
-    const bearsA = new Card(cardData[GRIZZLY_BEARS], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bearsA, playerA.battlefield));
-    const bearsB = new Card(cardData[GRIZZLY_BEARS], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bearsB, playerB.battlefield));
-
-    const bearsADestroyed = vi.spyOn(bearsA, "destroy");
-    const bearsBDestroyed = vi.spyOn(bearsB, "destroy");
+    const bearsA = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const bearsB = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -39,20 +33,13 @@ test("should trade", () => {
     (new PlayerActions.DeclareBlocker(bearsB).perform(playerB, [bearsA]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
-    expect(bearsADestroyed).toBeCalledTimes(1);
-    expect(bearsBDestroyed).toBeCalledTimes(1);
-    expect(bearsA.zone).toBe(playerA.graveyard);
-    expect(bearsB.zone).toBe(playerB.graveyard);
+    expect(playerA.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsA.card }));
+    expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsB.card }));
 });
 
 test("attacker should win", () => {
-    const bears = new Card(cardData[GRIZZLY_BEARS], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, playerA.battlefield));
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, playerB.battlefield));
-
-    const bearsDestroyed = vi.spyOn(bears, "destroy");
-    const goblinsDestroyed = vi.spyOn(goblins, "destroy");
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -61,20 +48,13 @@ test("attacker should win", () => {
     (new PlayerActions.DeclareBlocker(goblins).perform(playerB, [bears]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
-    expect(bearsDestroyed).toBeCalledTimes(0);
-    expect(goblinsDestroyed).toBeCalledTimes(1);
     expect(bears.zone).toBe(playerA.battlefield);
-    expect(goblins.zone).toBe(playerB.graveyard);
+    expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: goblins.card }));
 });
 
 test("blocker should win", () => {
-    const goblins = new Card(cardData[MONS_GOBLIN_RAIDERS], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblins, playerA.battlefield));
-    const bears = new Card(cardData[GRIZZLY_BEARS], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, playerB.battlefield));
-
-    const goblinsDestroyed = vi.spyOn(goblins, "destroy");
-    const bearsDestroyed = vi.spyOn(bears, "destroy");
+    const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], playerA, playerA.battlefield);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -83,20 +63,16 @@ test("blocker should win", () => {
     (new PlayerActions.DeclareBlocker(bears).perform(playerB, [goblins]));
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
 
-    expect(goblinsDestroyed).toBeCalledTimes(1);
-    expect(bearsDestroyed).toBeCalledTimes(0);
-    expect(goblins.zone).toBe(playerA.graveyard);
+    expect(playerA.graveyard.objects).toContainEqual(expect.objectContaining({ card: goblins.card }));
     expect(bears.zone).toBe(playerB.battlefield);
 });
 
 test("defender prevents attacking and allows blocking", () => {
-    const defender = new Card({
+    const defender = addTestCard({
         ...cardData[GRIZZLY_BEARS],
         abilities: [{ keyword: Keyword.Defender, parts: {} }],
-    }, playerA);
-    const attacker = new Card(cardData[GRIZZLY_BEARS], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.battlefield));
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(attacker, playerB.battlefield));
+    }, playerA, playerA.battlefield);
+    const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -116,13 +92,12 @@ test("defender prevents attacking and allows blocking", () => {
 });
 
 test("defender only intercepts attacker checks on the battlefield", () => {
-    const defender = new Card({
+    const defender = addTestCard({
         ...cardData[GRIZZLY_BEARS],
         abilities: [{ keyword: Keyword.Defender, parts: {} }],
-    }, playerA);
+    }, playerA, playerA.battlefield);
     const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "", defender);
 
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.battlefield));
     expect(gameEventManager.checkEvent(declaration)).toBe(false);
 
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(defender, playerA.graveyard));
@@ -130,10 +105,8 @@ test("defender only intercepts attacker checks on the battlefield", () => {
 });
 
 test("flyer can't be blocked by non flyer", () => {
-    const elemental = new Card(cardData[AIR_ELEMENTAL], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerA.battlefield));
-    const bears = new Card(cardData[GRIZZLY_BEARS], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, playerB.battlefield));
+    const elemental = addTestCard(cardData[AIR_ELEMENTAL], playerA, playerA.battlefield);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -144,10 +117,8 @@ test("flyer can't be blocked by non flyer", () => {
 });
 
 test("non flyer can be blocked by flyer", () => {
-    const bears = new Card(cardData[GRIZZLY_BEARS], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bears, playerA.battlefield));
-    const elemental = new Card(cardData[AIR_ELEMENTAL], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerB.battlefield));
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const elemental = addTestCard(cardData[AIR_ELEMENTAL], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -158,10 +129,8 @@ test("non flyer can be blocked by flyer", () => {
 });
 
 test("flyer can be blocked by flyer", () => {
-    const elementalA = new Card(cardData[AIR_ELEMENTAL], playerA);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elementalA, playerA.battlefield));
-    const elementalB = new Card(cardData[AIR_ELEMENTAL], playerB);
-    gameEventManager.addEvent(new GameEvent_ChangeCardZone(elementalB, playerB.battlefield));
+    const elementalA = addTestCard(cardData[AIR_ELEMENTAL], playerA, playerA.battlefield);
+    const elementalB = addTestCard(cardData[AIR_ELEMENTAL], playerB, playerB.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -172,10 +141,8 @@ test("flyer can be blocked by flyer", () => {
 });
 
 test("can withdraw an attacker before confirming and only taps confirmed attackers", () => {
-    const withdrawn = new Card(cardData[GRIZZLY_BEARS], playerA);
-    const attacking = new Card(cardData[GRIZZLY_BEARS], playerA);
-    for (const card of [withdrawn, attacking])
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, playerA.battlefield));
+    const withdrawn = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const attacking = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -196,18 +163,16 @@ test("can withdraw an attacker before confirming and only taps confirmed attacke
 });
 
 test("can reassign and withdraw a block while keeping the previous assignment after an illegal edit", () => {
-    const first = new Card(cardData[GRIZZLY_BEARS], playerA);
-    const second = new Card(cardData[GRIZZLY_BEARS], playerA);
-    const flying = new Card(cardData[AIR_ELEMENTAL], playerA);
-    const blocker = new Card(cardData[GRIZZLY_BEARS], playerB);
+    const first = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const flying = addTestCard(cardData[AIR_ELEMENTAL], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
     const attackers = [first, second, flying];
-    for (const card of [...attackers, blocker])
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(card, card.controller.battlefield));
 
     game.startGame({allowAutoSkip: false});
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
-    for (const card of attackers)
-        new PlayerActions.DeclareAttacker(card).perform(playerA);
+    for (const attacker of attackers)
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
 
     const edit = new PlayerActions.DeclareBlocker(blocker);

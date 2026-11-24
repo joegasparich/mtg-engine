@@ -1,4 +1,6 @@
-import Card from "@engine/Card";
+import type { CardObject } from "@engine/GameObject";
+import { removeIf } from "@utility/arrayUtility";
+import type { Keyword } from "~/defs";
 
 export enum GameEventType {
     All,
@@ -21,12 +23,14 @@ export enum GameEventType {
     DeclareBlocker,
     StartTargeting,
     PlayLand,
+    DetachPermanent,
 }
 
 export abstract class GameEvent {
     type: GameEventType;
     label: string;
     isAction = true;
+    readonly additionalPerformedTypes?: readonly GameEventType[];
     callback: () => void;
 
     perform(): boolean {
@@ -38,16 +42,16 @@ export abstract class GameEvent {
 }
 
 export class GameEvent_Simple extends GameEvent {
-    cardA?: Card;
-    cardB?: Card;
+    objectA?: CardObject;
+    objectB?: CardObject;
 
-    constructor(type: GameEventType, label: string, cardA?: Card, cardB?: Card) {
+    constructor(type: GameEventType, label: string, objectA?: CardObject, objectB?: CardObject) {
         super();
 
         this.type = type;
         this.label = label;
-        this.cardA = cardA;
-        this.cardB = cardB;
+        this.objectA = objectA;
+        this.objectB = objectB;
     }
 }
 
@@ -63,12 +67,29 @@ export class GameEvent_Log extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
-type CheckListener = (events: GameEvent[]) => void;
+export interface EventCheck {
+    readonly events: readonly GameEvent[];
+    add(event: GameEvent): void;
+    replace(event: GameEvent, replacement: GameEvent): void;
+    removeWhere(predicate: (event: GameEvent) => boolean): void;
+}
+
+type CheckListener = (check: EventCheck) => void;
+export type CheckSource = { readonly object: CardObject; readonly keyword?: Keyword };
+type CheckRemovalOverride = (event: GameEvent, source: CheckSource) => boolean;
 
 class GameEventManager {
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
-    private readonly eventCheckListeners = new Set<CheckListener>();
+    private readonly eventCheckListeners = new Map<CheckListener, CheckSource | undefined>();
+    private readonly checkRemovalOverrides = new Set<CheckRemovalOverride>();
+    private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
+    private readonly idleCallbacks: (() => void)[] = [];
+    private settleState?: () => boolean;
+
+    setStateSettlement(settle: () => boolean) {
+        this.settleState = settle;
+    }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
         if (!this.eventPerformedListenersByType.has(eventType))
@@ -82,11 +103,30 @@ class GameEventManager {
     }
 
     onCheck(listener: CheckListener) {
-        this.eventCheckListeners.add(listener);
+        if (!this.eventCheckListeners.has(listener))
+            this.eventCheckListeners.set(listener, this.checkSource);
     }
 
     offCheck(listener: CheckListener) {
         this.eventCheckListeners.delete(listener);
+    }
+
+    withCheckSource(source: CheckSource, register: () => void) {
+        const previousSource = this.checkSource;
+        this.checkSource = source;
+        try {
+            register();
+        } finally {
+            this.checkSource = previousSource;
+        }
+    }
+
+    onCheckRemovalOverride(override: CheckRemovalOverride) {
+        this.checkRemovalOverrides.add(override);
+    }
+
+    offCheckRemovalOverride(override: CheckRemovalOverride) {
+        this.checkRemovalOverrides.delete(override);
     }
 
     activeEvents: GameEvent[] = [];
@@ -103,13 +143,27 @@ class GameEventManager {
     }
 
     checkEvent(event: GameEvent) {
-        const events = [event];
-        this.checkForEffects(events);
-        return events.length > 0;
+        return this.checkForEffects([event], event) !== undefined;
     }
 
     performImmediate(event: GameEvent): boolean {
-        return this.checkEvent(event) && this.performEvent(event);
+        const events = [event];
+        const checkedEvent = this.checkForEffects(events, event);
+        let performed = false;
+        for (const pending of events) {
+            const result = this.performEvent(pending);
+            if (pending === checkedEvent)
+                performed = result;
+        }
+        return performed;
+    }
+
+    performSimultaneous(events: GameEvent[]): boolean {
+        this.checkForEffects(events);
+        // 704.3: Commit the whole batch before any listener observes its results.
+        const performed = events.filter(event => event.perform());
+        performed.forEach(event => this.notifyPerformed(event));
+        return performed.some(event => event.isAction);
     }
 
     onResolved(callback: () => void) {
@@ -117,10 +171,39 @@ class GameEventManager {
         this.performAllEvents();
     }
 
-    checkForEffects(events: GameEvent[]) {
-        for (const listener of this.eventCheckListeners) {
-            listener(events);
+    onIdle(callback: () => void) {
+        this.idleCallbacks.push(callback);
+        this.performAllEvents();
+    }
+
+    checkForEffects(events: GameEvent[], checkedEvent?: GameEvent): GameEvent | undefined {
+        for (const [listener, source] of this.eventCheckListeners) {
+            listener({
+                events,
+                add: event => { events.push(event); },
+                replace: (event, replacement) => {
+                    const index = events.indexOf(event);
+                    if (index < 0 || !this.canRemove(event, source))
+                        return;
+
+                    events[index] = replacement;
+                    if (checkedEvent === event)
+                        checkedEvent = replacement;
+                },
+                removeWhere: predicate => removeIf(events, event => predicate(event) && this.canRemove(event, source)),
+            });
         }
+        return events.includes(checkedEvent) ? checkedEvent : undefined;
+    }
+
+    private canRemove(event: GameEvent, source?: CheckSource): boolean {
+        if (source) {
+            for (const override of this.checkRemovalOverrides) {
+                if (override(event, source))
+                    return false;
+            }
+        }
+        return true;
     }
 
     performAllEvents() {
@@ -131,15 +214,21 @@ class GameEventManager {
         this.performingEvents = true;
 
         try {
-            while (this.activeEvents.length > 0 || this.eventsResolvedCallback.length > 0) {
+            for (;;) {
                 if (this.activeEvents.length > 0) {
                     const events = this.activeEvents;
                     this.activeEvents = [];
                     for (const event of events) {
                         this.performEvent(event);
                     }
-                } else {
+                } else if (this.eventsResolvedCallback.length > 0) {
                     this.eventsResolvedCallback.shift()();
+                } else if (this.settleState?.()) {
+                    continue;
+                } else if (this.idleCallbacks.length > 0) {
+                    this.idleCallbacks.shift()();
+                } else {
+                    break;
                 }
             }
         } finally {
@@ -151,12 +240,18 @@ class GameEventManager {
         if (!event.perform())
             return false;
 
+        this.notifyPerformed(event);
+        return true;
+    }
+
+    private notifyPerformed(event: GameEvent) {
         this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
+        for (const type of event.additionalPerformedTypes ?? [])
+            this.eventPerformedListenersByType.get(type)?.forEach(listener => listener(event));
         this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
 
         console.log(`%cGameEvent: ${event.label}`, "color: cyan;");
         event.callback?.();
-        return true;
     }
 }
 

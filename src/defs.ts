@@ -5,6 +5,7 @@ export interface CardDef {
     image_url: string,
     oracle_text: string,
     type: CardType,
+    subtypes?: string[],
     cost: string, // {3}{G}{G}
     power: number,
     toughness: number,
@@ -17,13 +18,21 @@ export enum CardType {
     Sorcery = "Sorcery",
     Instant = "Instant",
     Artifact = "Artifact",
+    Enchantment = "Enchantment",
 }
+
+export type TargetValidator = {
+    cardType?: CardType;
+    cardSubtype?: string;
+};
 
 export type AbilityDef = {
     activateString?: string;
     keyword?: Keyword;
     isManaAbility?: boolean;
-    parts: Record<ClassName, object>
+    parts: Record<ClassName, object> & {
+        SimpleAura?: { targetValidator?: TargetValidator };
+    };
 };
 
 export enum Keyword {

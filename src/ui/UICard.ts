@@ -2,12 +2,13 @@ import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
 import playerActionManager,{ TargetType } from "@engine/actions/PlayerActionManager";
-import Card from "@engine/Card";
+import { CardObject,Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
 import { Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
+import type { BattlefieldCardGroup } from "@ui/UIBattlefield";
 import uiEventManager,{ UIEvent_CardClicked } from "@ui/UIEventManager";
 import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
 import { loadImageFromExternalUrl } from "@utility/imageUtility";
@@ -19,9 +20,10 @@ export const CARD_HEIGHT = 175;
 const DRAG_THRESHOLD = 6;
 
 export default class UICard extends PIXI.Container {
-    public readonly card: Card;
+    get card() { return this.object.card; }
     public readonly art = new PIXI.Sprite();
     public battlefieldDrop?: PIXI.Point;
+    public battlefieldGroup?: BattlefieldCardGroup;
 
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
@@ -63,10 +65,8 @@ export default class UICard extends PIXI.Container {
         }
     }
 
-    constructor(card: Card) {
+    constructor(public object: CardObject) {
         super();
-
-        this.card = card;
 
         uiRoot.registerCard(this);
 
@@ -78,7 +78,7 @@ export default class UICard extends PIXI.Container {
         // Filter only the glow. The card face renders directly at canvas resolution.
         this.artwork.addChild(this.halo, this.art);
         this.addChild(this.artwork);
-        loadImageFromExternalUrl(card.def.image_url).then(texture => {
+        loadImageFromExternalUrl(this.card.def.image_url).then(texture => {
             if (texture && !this.destroyed) {
                 this.art.texture = texture;
                 this.halo.texture = texture;
@@ -99,6 +99,9 @@ export default class UICard extends PIXI.Container {
     }
 
     private setHovered(hovered: boolean) {
+        if (hovered && this.battlefieldGroup && !this.battlefieldGroup.canPreview(this))
+            return;
+
         this.hovered = hovered;
         if (this.press?.dragging)
             return;
@@ -109,20 +112,28 @@ export default class UICard extends PIXI.Container {
             uiRoot.cardOverlay.detach(this.artwork);
     }
 
+    public clearPreview() {
+        this.hovered = false;
+        if (this.artwork.parentRenderLayer)
+            uiRoot.cardOverlay.detach(this.artwork);
+    }
+
     @autobind
     private render() {
         const ease = 0.18;
-        const dragging = this.press?.dragging;
-        const restingAngle = this.card.tapped ? 90 : this.resting.angle;
+        const group = this.battlefieldGroup;
+        const dragging = group?.dragging ?? this.press?.dragging;
+        const restingAngle = this.object instanceof Permanent && this.object.tapped ? 90 : this.resting.angle;
         if (!dragging) {
+            const position = group?.permanent === this ? group.position : this.position;
             const advance = this.combatAdvance();
-            this.x += (this.resting.x + advance.x - this.x) * ease;
-            this.y += (this.resting.y + advance.y - this.y) * ease;
+            position.x += (this.resting.x + advance.x - position.x) * ease;
+            position.y += (this.resting.y + advance.y - position.y) * ease;
         }
-        this.angle += ((dragging ? 0 : restingAngle) - this.angle) * ease;
+        this.angle += ((dragging && !group ? 0 : restingAngle) - this.angle) * ease;
 
         const preview = this.hovered && !dragging;
-        const lifted = preview && this.card.zone instanceof Hand;
+        const lifted = preview && this.object.zone instanceof Hand;
         // Rotate the lift back into zone coordinates so the card moves straight up.
         const lift = lifted ? -95 : 0;
         this.artwork.x += (lift * Math.sin(this.rotation) - this.artwork.x) * ease;
@@ -134,7 +145,7 @@ export default class UICard extends PIXI.Container {
         this.art.width += (CARD_WIDTH * size - this.art.width) * ease;
         this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
 
-        const hasAction = playerActionManager.cardActionsForUI.get(this.card)?.length > 0;
+        const hasAction = playerActionManager.cardActionsForUI.get(this.object)?.length > 0;
         const highlight = this.isSelected ? 0x00FFFF : hasAction ? 0xFFFFFF : null;
         this.updateHighlight(this.combatColour === undefined ? highlight : this.combatColour);
         if (this.halo.visible) {
@@ -162,7 +173,8 @@ export default class UICard extends PIXI.Container {
         if (!this.combatTarget?.parent)
             return { x: 0, y: -distance };
 
-        const target = this.parent.toLocal(this.combatTarget.getGlobalPosition());
+        const movementZone = this.battlefieldGroup?.battlefield ?? this.parent;
+        const target = movementZone.toLocal(this.combatTarget.getGlobalPosition());
         const dx = target.x - this.resting.x;
         const dy = target.y - this.resting.y;
         const length = Math.hypot(dx, dy);
@@ -185,14 +197,23 @@ export default class UICard extends PIXI.Container {
             if (Math.hypot(dx, dy) < DRAG_THRESHOLD)
                 return;
 
+            if (this.battlefieldGroup && !this.battlefieldGroup.beginDrag(this, this.press.origin)) {
+                this.cancelPress();
+                return;
+            }
             this.press.dragging = true;
-            this.hovered = false;
-            this.alpha = 0.85;
             this.cursor = 'grabbing';
-            uiRoot.cardOverlay.attach(this.artwork);
+            if (!this.battlefieldGroup) {
+                this.hovered = false;
+                this.alpha = 0.85;
+                uiRoot.cardOverlay.attach(this.artwork);
+            }
         }
 
-        this.parent.toLocal(event.global, null, this.position);
+        if (this.battlefieldGroup)
+            this.battlefieldGroup.moveDrag(event.global);
+        else
+            this.parent.toLocal(event.global, null, this.position);
     }
 
     @autobind
@@ -218,6 +239,7 @@ export default class UICard extends PIXI.Container {
             return;
 
         this.press = undefined;
+        this.battlefieldGroup?.cancelDrag(this);
         pixi.stage.off('globalpointermove', this.onDrag);
         pixi.canvas.removeEventListener('pointercancel', this.onPointerCancel);
         window.removeEventListener('blur', this.cancelPress);
@@ -238,24 +260,30 @@ export default class UICard extends PIXI.Container {
             return;
 
         const dragging = this.press.dragging;
+        if (dragging && this.battlefieldGroup) {
+            this.battlefieldGroup.finishDrag(event.global);
+            this.cancelPress();
+            return;
+        }
+
         this.cancelPress();
         if (!dragging) {
             if (releasedOnCard) {
                 this.setHovered(event.pointerType !== 'touch');
-                if (!uiRoot.combat.handleCardClick(this.card))
-                    uiEventManager.fire(new UIEvent_CardClicked(this.card));
+                if (!uiRoot.combat.handleCardClick(this.object))
+                    uiEventManager.fire(new UIEvent_CardClicked(this.object));
             }
             return;
         }
 
         const drop = event.global.clone();
-        const controller = this.card.controller;
+        const controller = this.object.owner;
         const battlefield = uiRoot.playerToUIPlayer.get(controller)?.battlefield;
         if (!battlefield?.containsDrop(drop))
             return;
 
-        if (this.card.zone instanceof Hand) {
-            const action = playerActionManager.getCardActions(this.card, controller)
+        if (this.object.zone instanceof Hand) {
+            const action = playerActionManager.getCardActions(this.object, controller)
                 .find(action => action instanceof PlayerAction_PlayCard);
             if (!action)
                 return;
@@ -263,11 +291,8 @@ export default class UICard extends PIXI.Container {
             this.parent.toLocal(drop, null, this.position);
             this.battlefieldDrop = drop;
             action.perform(controller);
-            if (this.card.zone instanceof Hand)
+            if (this.object.zone instanceof Hand)
                 this.battlefieldDrop = undefined;
-        } else if (this.parent === battlefield) {
-            battlefield.placeCard(this, drop);
-            battlefield.setChildIndex(this, battlefield.children.length - 1);
         }
     }
 
@@ -283,14 +308,15 @@ export default class UICard extends PIXI.Container {
             return;
 
         const player = game.activePlayer();
-        const actions = playerActionManager.getCardActions(this.card, player)
+        const actions = playerActionManager.getCardActions(this.object, player)
             .filter(action => !(action instanceof PlayerAction_DeclareAttacker || action instanceof PlayerAction_DeclareBlocker));
         if (actions.length === 0)
             return;
 
         const turn = game.turnNumber;
         const step = game.currentStepIndex;
-        const isCurrentStep = () => game.turnNumber === turn && game.currentStepIndex === step && game.activePlayer() === player;
+        const source = this.object;
+        const isCurrentStep = () => this.object === source && game.turnNumber === turn && game.currentStepIndex === step && game.activePlayer() === player;
 
         showCustomContextMenu(event.global, actions.map(action => action.label()), index => {
             if (!isCurrentStep())
@@ -303,7 +329,7 @@ export default class UICard extends PIXI.Container {
             }
 
             let targetType = TargetType.None;
-            if (action.targets.some(target => target instanceof Card))
+            if (action.targets.some(target => target instanceof CardObject))
                 targetType |= TargetType.Card;
             if (action.targets.some(target => target instanceof Player))
                 targetType |= TargetType.Player;
