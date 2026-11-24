@@ -50,3 +50,14 @@ button {
 .custom-context-menu-item:hover {
     background-color: #f0f0f0; /* Simple hover effect */
 }
+button {
+    color: #e6eee9;
+    background: #193b43;
+    border: 1px solid #54726d;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px #0005;
+    transition: background 160ms, transform 160ms;
+}
+button:hover { background: #2b555a; transform: translateY(-2px); }
+button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
+.message { background: #081b24dd; color: #e3c58a; letter-spacing: .04em; }

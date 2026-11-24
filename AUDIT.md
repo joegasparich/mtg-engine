@@ -1,5 +1,7 @@
 # Revival audit
 
+The Electron packaging and IPC work below describe the previous desktop version. The app now runs in the browser, serves a static Vite build, and loads card art directly from Scryfall.
+
 ## Completed
 
 - Upgraded Electron to 45, Forge to 8, Vite to 8, Vitest to 4, ESLint to 10, UUID to 14, and Electron fuses to 2.
@@ -29,4 +31,4 @@
 
 ## Further cleanup
 
-Replace broad any types in ability data and event plumbing with explicit types; then enable strict null checking incrementally. Remove obsolete commented prototype code when gameplay behavior is formalized. The archived electron-squirrel-startup dependency remains for Windows installer lifecycle support and currently has no reported npm vulnerabilities.
+Replace broad any types in ability data and event plumbing with explicit types; then enable strict null checking incrementally. Remove obsolete commented prototype code when gameplay behavior is formalized.

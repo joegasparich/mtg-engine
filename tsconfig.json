@@ -15,8 +15,7 @@
             "~/*": ["./src/*"],
             "@engine/*": ["./src/engine/*"],
             "@utility/*": ["./src/utility/*"],
-            "@ui/*": ["./src/ui/*"],
-            "@electron/*": ["./src/electron/*"]
+            "@ui/*": ["./src/ui/*"]
         },
         "outDir": "dist",
         "moduleResolution": "bundler",

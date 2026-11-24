@@ -2,11 +2,10 @@ import * as PIXI from "pixi.js";
 
 import playerActionManager,{ TargetType } from "@engine/actions/PlayerActionManager";
 import Card from "@engine/Card";
-import { GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import { Battlefield } from "@engine/Zone";
+import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
+import { Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
 import uiEventManager,{ UIEvent_CardClicked } from "@ui/UIEventManager";
 import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
@@ -16,32 +15,45 @@ import { GlowFilter } from "pixi-filters";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
-const MIN_DRAG = 100; // ms
+const DRAG_THRESHOLD = 6;
 
-export default class UICard extends PIXI.Sprite {
+export default class UICard extends PIXI.Container {
     public readonly card: Card;
+    public readonly art = new PIXI.Sprite();
+    public battlefieldDrop?: PIXI.Point;
 
-    private hasAction: boolean;
-    private isSelected: boolean;
+    private readonly artwork = new PIXI.Container();
+    private readonly halo = new PIXI.Sprite();
+    private glowFilter?: GlowFilter;
 
-    private _highlightColour?: number = null;
-    private get highlighted() { return this._highlightColour != null; }
-    private set highlightColour(val: number | null) {
-        if (this._highlightColour == val)
+    private resting = { x: 0, y: 0, angle: 0 };
+    private hovered = false;
+    private motion = 0.65;
+    private isSelected = false;
+    private press?: { pointerId: number; origin: PIXI.Point; dragging: boolean };
+
+    public layout(x: number, y: number, angle = 0) {
+        this.resting = { x, y, angle };
+    }
+
+    private updateHighlight(colour: number | null) {
+        this.halo.visible = colour !== null && this.art.texture !== PIXI.Texture.EMPTY;
+        if (!this.halo.visible)
             return;
 
-        this._highlightColour = val;
-        if (this._highlightColour) {
-            this.filters = [
-                new GlowFilter({
-                    color: this._highlightColour,
-                    distance: 20,
-                    outerStrength: 2,
-                    quality: 0.5
-                })
-            ];
-        } else {
-            this.filters = [];
+        if (!this.glowFilter) {
+            this.glowFilter = new GlowFilter({
+                color: colour,
+                distance: 20,
+                outerStrength: 2,
+                quality: 0.5,
+                knockout: true,
+            });
+            this.glowFilter.resolution = 'inherit';
+            this.glowFilter.antialias = 'inherit';
+            this.halo.filters = [this.glowFilter];
+        } else if (this.glowFilter.color !== colour) {
+            this.glowFilter.color = colour;
         }
     }
 
@@ -52,95 +64,185 @@ export default class UICard extends PIXI.Sprite {
 
         uiRoot.registerCard(this);
 
+        this.art.anchor.set(0.5);
+        this.art.width = CARD_WIDTH;
+        this.art.height = CARD_HEIGHT;
+        this.halo.anchor.set(0.5);
+        this.halo.visible = false;
+        // Filter only the glow. The card face renders directly at canvas resolution.
+        this.artwork.addChild(this.halo, this.art);
+        this.addChild(this.artwork);
         loadImageFromExternalUrl(card.def.image_url).then(texture => {
             if (texture && !this.destroyed) {
-                this.texture = texture;
-                this.width = CARD_WIDTH;
-                this.height = CARD_HEIGHT;
+                this.art.texture = texture;
+                this.halo.texture = texture;
             }
         });
-        this.width = CARD_WIDTH;
-        this.height = CARD_HEIGHT;
-        this.anchor = new PIXI.Point(0.5, 0.5);
 
-        // Events, TODO: Clean these up if card is destroyed
+        // The artwork can move independently of the card's interactive footprint.
+        this.hitArea = new PIXI.Rectangle(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT);
         this.eventMode = 'static';
+        this.interactiveChildren = false;
         this.cursor = 'pointer';
+        this.on('pointerover', () => this.setHovered(true));
+        this.on('pointerout', () => this.setHovered(false));
         this.on('pointerdown', this.onMouseDown);
         this.on('pointerup', this.onMouseUp);
-        pixi.stage.on('pointerup', this.globalMouseUp);
-        pixi.stage.on('pointerupoutside', this.globalMouseUp);
-
-        gameEventManager.onPerformed(GameEventType.TapCard, this.onCardTapped);
-        gameEventManager.onPerformed(GameEventType.UntapCard, this.onCardUntapped);
-
+        this.on('pointerupoutside', this.onMouseUpOutside);
         this.onRender = this.render;
     }
 
-    @autobind
-    render(renderer: PIXI.Renderer) {
-        // Called every frame
-        this.hasAction = playerActionManager.cardActionsForUI.get(this.card)?.length > 0;
+    private setHovered(hovered: boolean) {
+        this.hovered = hovered;
+        if (this.press?.dragging)
+            return;
 
-        if (this.isSelected)
-            this.highlightColour = 0x00FFFF;
-        else if (this.hasAction)
-            this.highlightColour = 0xFFFFFF;
-        else
-            this.highlightColour = null;
+        if (hovered)
+            uiRoot.cardOverlay.attach(this.artwork);
+        else if (this.artwork.parentRenderLayer)
+            uiRoot.cardOverlay.detach(this.artwork);
     }
 
     @autobind
-    private onCardTapped(event: GameEvent_TapCard) {
-        if (event.card != this.card)
-            return;
+    private render() {
+        const ease = 0.18;
+        const dragging = this.press?.dragging;
+        const restingAngle = this.card.tapped ? 90 : this.resting.angle;
+        if (!dragging) {
+            this.x += (this.resting.x - this.x) * ease;
+            this.y += (this.resting.y - this.y) * ease;
+        }
+        this.angle += ((dragging ? 0 : restingAngle) - this.angle) * ease;
 
-        this.angle = 90;
-    }
-    @autobind
-    private onCardUntapped(event: GameEvent_UntapCard) {
-        if (event.card != this.card)
-            return;
+        const preview = this.hovered && !dragging;
+        const lifted = preview && this.card.zone instanceof Hand;
+        // Rotate the lift back into zone coordinates so the card moves straight up.
+        const lift = lifted ? -95 : 0;
+        this.artwork.x += (lift * Math.sin(this.rotation) - this.artwork.x) * ease;
+        this.artwork.y += (lift * Math.cos(this.rotation) - this.artwork.y) * ease;
+        this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
 
-        this.angle = 0;
+        this.motion += (1 - this.motion) * ease;
+        const size = (preview ? 1.5 : 1) * this.motion;
+        this.art.width += (CARD_WIDTH * size - this.art.width) * ease;
+        this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
+
+        const hasAction = playerActionManager.cardActionsForUI.get(this.card)?.length > 0;
+        this.updateHighlight(this.isSelected ? 0x00FFFF : hasAction ? 0xFFFFFF : null);
+        if (this.halo.visible) {
+            this.halo.width = this.art.width;
+            this.halo.height = this.art.height;
+        }
     }
 
     public setSelected(selected: boolean) {
         this.isSelected = selected;
     }
 
-    private preDragPos: PIXI.Point;
-    private dragStartTime: number;
-    private hasDragged: boolean;
     @autobind
-    onDrag(event: PIXI.FederatedPointerEvent) {
-        if (Date.now() - this.dragStartTime < MIN_DRAG)
+    private onDrag(event: PIXI.FederatedPointerEvent) {
+        if (!this.press || event.pointerId !== this.press.pointerId)
             return;
 
-        this.alpha = 0.5;
-        this.hasDragged = true;
+        if (!this.press.dragging) {
+            const dx = event.global.x - this.press.origin.x;
+            const dy = event.global.y - this.press.origin.y;
+            if (Math.hypot(dx, dy) < DRAG_THRESHOLD)
+                return;
+
+            this.press.dragging = true;
+            this.hovered = false;
+            this.alpha = 0.85;
+            this.cursor = 'grabbing';
+            uiRoot.cardOverlay.attach(this.artwork);
+        }
+
         this.parent.toLocal(event.global, null, this.position);
     }
 
     @autobind
     private onMouseDown(event: PIXI.FederatedPointerEvent) {
-        if (event.button == 0) {
-            this.preDragPos = this.position.clone();
-            this.dragStartTime = Date.now();
-            pixi.stage.on('pointermove', this.onDrag);
+        if (event.button !== 0 || this.press)
+            return;
+
+        this.press = { pointerId: event.pointerId, origin: event.global.clone(), dragging: false };
+        pixi.stage.on('globalpointermove', this.onDrag);
+        pixi.canvas.addEventListener('pointercancel', this.onPointerCancel);
+        window.addEventListener('blur', this.cancelPress);
+    }
+
+    @autobind
+    private onPointerCancel(event: PointerEvent) {
+        if (event.pointerId === this.press?.pointerId)
+            this.cancelPress();
+    }
+
+    @autobind
+    private cancelPress() {
+        if (!this.press)
+            return;
+
+        this.press = undefined;
+        pixi.stage.off('globalpointermove', this.onDrag);
+        pixi.canvas.removeEventListener('pointercancel', this.onPointerCancel);
+        window.removeEventListener('blur', this.cancelPress);
+        this.alpha = 1;
+        this.cursor = 'pointer';
+        this.setHovered(false);
+    }
+
+    public leaveZone() {
+        this.cancelPress();
+        this.setHovered(false);
+        this.artwork.position.set(0);
+        this.artwork.angle = 0;
+    }
+
+    private finishPress(event: PIXI.FederatedPointerEvent, releasedOnCard: boolean) {
+        if (event.button !== 0 || !this.press || event.pointerId !== this.press.pointerId)
+            return;
+
+        const dragging = this.press.dragging;
+        this.cancelPress();
+        if (!dragging) {
+            if (releasedOnCard) {
+                this.setHovered(event.pointerType !== 'touch');
+                uiEventManager.fire(new UIEvent_CardClicked(this.card));
+            }
+            return;
+        }
+
+        const drop = event.global.clone();
+        const controller = this.card.controller;
+        const battlefield = uiRoot.playerToUIPlayer.get(controller)?.battlefield;
+        if (!battlefield?.containsDrop(drop))
+            return;
+
+        if (this.card.zone instanceof Hand) {
+            const action = playerActionManager.getCardActions(this.card, controller)
+                .find(action => action instanceof PlayerAction_PlayCard);
+            if (!action)
+                return;
+
+            this.parent.toLocal(drop, null, this.position);
+            this.battlefieldDrop = drop;
+            action.perform(controller);
+            if (this.card.zone instanceof Hand)
+                this.battlefieldDrop = undefined;
+        } else if (this.parent === battlefield) {
+            battlefield.placeCard(this, drop);
+            battlefield.setChildIndex(this, battlefield.children.length - 1);
         }
     }
 
     @autobind
-    private onMouseUp(event: PIXI.FederatedPointerEvent) {
-        if (event.button == 0) {
-            if (!(this.card.zone instanceof Battlefield))
-                this.position = this.preDragPos;
+    private onMouseUpOutside(event: PIXI.FederatedPointerEvent) {
+        this.finishPress(event, false);
+    }
 
-            if (!this.hasDragged) {
-                uiEventManager.fire(new UIEvent_CardClicked(this.card));
-            }
-        }
+    @autobind
+    private onMouseUp(event: PIXI.FederatedPointerEvent) {
+        this.finishPress(event, true);
         if (event.button == 2) {
             // const player = game.activePlayer(); // TODO: Uncomment this once priority is in
             const player = this.card.controller;
@@ -177,15 +279,6 @@ export default class UICard extends PIXI.Sprite {
                     }
                 }, event);
             }
-        }
-    }
-
-    @autobind
-    private globalMouseUp(event: PIXI.FederatedPointerEvent) {
-        if (event.button == 0) {
-            pixi.stage.off('pointermove', this.onDrag);
-            this.alpha = 1;
-            this.hasDragged = false;
         }
     }
 }

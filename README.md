@@ -1,20 +1,20 @@
 # MTG Engine
 
-An experimental Magic: The Gathering engine with an Electron/PixiJS interface.
+A Magic: The Gathering engine with a PixiJS browser frontend.
 
 ## Development
 
 Use Node 24 (`nvm use`); the minimum supported version is Node 22.17.
 
-Install dependencies with `npm ci`, then run `npm start`.
+Install dependencies with `npm ci`, then run `npm start` and open the local URL it prints.
 
 - `npm run check`: type checking, lint, and all tests.
 - `npm test`: tests in watch mode.
-- `npm run package`: build a local application bundle.
-- `npm run make`: build platform installers.
+- `npm run build`: create a production build in `dist/`.
+- `npm run preview`: serve the production build locally.
 
-In VS Code, open Run and Debug and select **Start Electron (main process)**. While it runs, use **Attach Electron renderer** for renderer breakpoints. **Debug tests** runs Vitest under the debugger. The renderer attach configuration requires the debug session to be running.
+Deploy the contents of `dist/` to any static web host. Card artwork loads from Scryfall and requires an internet connection.
 
-`npm run start:debug` exposes local debugging ports 9229 and 9223. Normal startup does not enable remote debugging. To load a local Pixi DevTools extension, set `PIXI_DEVTOOLS_PATH` to its directory.
+To set breakpoints in VS Code, start the dev server and select **Debug browser app**. **Debug tests** runs Vitest under the debugger.
 
-See [AUDIT.md](AUDIT.md) for findings, remaining dependency migrations, and cleanup priorities.
+See [AUDIT.md](AUDIT.md) for historical findings and remaining cleanup priorities.

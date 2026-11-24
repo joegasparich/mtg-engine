@@ -2,11 +2,12 @@ import * as PIXI from "pixi.js";
 
 import { ActionTarget,TargetType } from "@engine/actions";
 import Card from "@engine/Card";
-import { GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
+import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
+import { Battlefield, Zone } from "@engine/Zone";
 import { Step } from "@engine/Step";
 import DOMButton from "@ui/dom/DOMButton";
 import DOMLabel from "@ui/dom/DOMLabel";
@@ -19,12 +20,19 @@ UIEvent_CardSelected,
 UIEventType
 } from "@ui/UIEventManager";
 import { UIPlayer } from "@ui/UIPlayer";
+import { UIZone } from "@ui/UIZone";
 import { autobind } from "@utility/typeUtility";
 
 export const pixi = new PIXI.Application();
 
 export async function initRenderer() {
-    await pixi.init({ background: '#1099bb', resizeTo: window });
+    await pixi.init({
+        background: '#102a30',
+        antialias: true,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+        resizeTo: window,
+    });
     document.body.appendChild(pixi.canvas);
     pixi.stage.eventMode = 'static';
     pixi.stage.hitArea = pixi.screen;
@@ -143,6 +151,9 @@ export default class UIRoot extends PIXI.Container {
     uiPlayerToPlayer = new Map<UIPlayer, Player>();
     cardToUICard = new Map<Card, UICard>();
 
+    private readonly zones = new Map<Zone, UIZone>();
+    readonly cardOverlay = new PIXI.RenderLayer();
+
     mousePos = new PIXI.Point();
 
     static init() {
@@ -151,6 +162,11 @@ export default class UIRoot extends PIXI.Container {
 
     constructor() {
         super();
+
+        this.cardOverlay.eventMode = 'none';
+        pixi.stage.addChild(this.cardOverlay);
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
+        pixi.renderer.on('resize', this.layoutPlayers);
 
         gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
             const targeter = new UITargeter(
@@ -227,12 +243,45 @@ export default class UIRoot extends PIXI.Container {
             return;
         }
 
-        const position = new PIXI.Point(pixi.screen.width / 2, this.players.length === 0 ? pixi.screen.height : 0);
-        const uiPlayer = new UIPlayer(player, position, playerRotations[this.players.length]);
-        pixi.stage.addChild(uiPlayer);
+        const uiPlayer = new UIPlayer(player, new PIXI.Point(), playerRotations[this.players.length]);
+        pixi.stage.addChildAt(uiPlayer, pixi.stage.getChildIndex(this.cardOverlay));
+        this.zones.set(player.hand, uiPlayer.hand);
+        this.zones.set(player.battlefield, uiPlayer.battlefield);
         this.players.push(uiPlayer);
         this.playerToUIPlayer.set(player, uiPlayer);
         this.uiPlayerToPlayer.set(uiPlayer, player);
+        this.layoutPlayers();
+    }
+
+    @autobind
+    private layoutPlayers() {
+        this.players.forEach((player, index) => {
+            player.position.set(pixi.screen.width / 2, index === 0 ? pixi.screen.height : 0);
+            player.hand.updatePositions();
+        });
+    }
+
+    @autobind
+    private onCardChangedZone(event: GameEvent_ChangeCardZone) {
+        const source = this.zones.get(event.oldZone);
+        const destination = this.zones.get(event.newZone);
+        let uiCard = this.cardToUICard.get(event.card);
+        if (!uiCard && destination)
+            uiCard = new UICard(event.card);
+        if (!uiCard)
+            return;
+
+        const origin = uiCard.parent ? uiCard.getGlobalPosition() : undefined;
+        if (source) {
+            if (event.oldZone instanceof Battlefield && !(event.newZone instanceof Battlefield))
+                source.animateExit(uiCard);
+            source.removeCard(uiCard);
+        }
+        destination?.addCard(uiCard, origin);
+
+        // A cast passes through the stack before becoming a permanent.
+        if (event.newZone !== game.stack)
+            uiCard.battlefieldDrop = undefined;
     }
 
     registerCard(uiCard: UICard) {

@@ -2,27 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Start Electron (main process)",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "start:debug"
-      ],
-      "console": "integratedTerminal",
-      "autoAttachChildProcesses": true,
-      "skipFiles": [
-        "<node_internals>/**"
-      ]
-    },
-    {
-      "name": "Attach Electron renderer",
+      "name": "Debug browser app",
       "type": "chrome",
-      "request": "attach",
-      "port": 9223,
-      "webRoot": "${workspaceFolder}",
-      "timeout": 30000
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}"
     },
     {
       "name": "Debug tests",
