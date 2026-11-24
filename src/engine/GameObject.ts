@@ -85,10 +85,10 @@ export class CardObject extends GameObject {
                 && !game.landPlayedThisTurn;
         }
 
-        return this.spellTarget?.hasLegalTargets() ?? true;
+        return this.spellTargeter?.hasLegalTargets() ?? true;
     }
 
-    get spellTarget(): AbilityPart_Target | undefined {
+    get spellTargeter(): AbilityPart_Target | undefined {
         for (const ability of this.abilities) {
             const target = ability.parts.find(part => part instanceof AbilityPart_Target);
             if (target)

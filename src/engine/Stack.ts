@@ -17,8 +17,8 @@ export class Stack extends Zone<Spell | StackAbility> {
             return false;
 
         // 601.2c
-        const target = handObject.spellTarget;
-        if (target ? !target.validateTargets(targets) : targets.length > 0)
+        const targeter = handObject.spellTargeter;
+        if (targeter ? !targeter.validateTargets(targets) : targets.length > 0)
             return false;
 
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets }));
@@ -109,7 +109,7 @@ export class Stack extends Zone<Spell | StackAbility> {
 
     private resolveSpellEffects(spell: Spell): boolean {
         // 400.7 and 608.2b: A target that changed zones is a different object.
-        const target = spell.spellTarget;
+        const target = spell.spellTargeter;
         if (target && !target.validateTargets(spell.targets))
             return false;
 

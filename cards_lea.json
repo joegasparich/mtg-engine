@@ -91,5 +91,28 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Armageddon",
+        "image_url": "https://cards.scryfall.io/large/front/5/6/565fc4d4-4c17-44d5-a5bc-31bc99018e5d.jpg?1783919592",
+        "oracle_text": "Destroy all lands.",
+        "type": "Sorcery",
+        "cost": "{3}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectPermanents": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "saveAs": "LANDS",
+                        "targetValidator": { "cardType": "Land" },
+                        "outSignal": "DESTROY_LANDS"
+                    },
+                    "AbilityPart_Effect_DestroyPermanents": {
+                        "inSignal": "DESTROY_LANDS",
+                        "permanentsFrom": "LANDS"
+                    }
+                }
+            }
+        ]
     }
 ]

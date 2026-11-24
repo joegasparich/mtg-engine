@@ -20,7 +20,7 @@ export class PlayerAction_PlayCard extends PlayerAction {
             return;
         }
 
-        const target = this.object.spellTarget;
+        const target = this.object.spellTargeter;
         if (target) {
             if (!playerActionManager.canAutoPay(this.object, player))
                 return;

@@ -9,7 +9,7 @@ import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -170,5 +170,67 @@ describe("Animate Wall", () => {
         expect(aura.zone).toBe(caster.hand);
         request.onTargeted([legalWall]);
         expect(caster.battlefield.objects.find(object => object.card === aura.card)?.attachedTo).toBe(legalWall);
+    });
+});
+
+describe("Armageddon", () => {
+    let caster: Player;
+    let opponent: Player;
+    let armageddon: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        game.startGame();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+        armageddon = addTestCard(cardData.find(card => card.name === "Armageddon"), caster, caster.hand);
+    });
+
+    test("destroys every land on the battlefield simultaneously", () => {
+        const forest = cardData[FOREST];
+        const casterLands = [
+            addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield),
+            ...Array.from({ length: 3 }, () => addTestCard(forest, caster, caster.battlefield)),
+        ];
+        const nonbasic = addTestCard({ ...forest, name: "Nonbasic land", subtypes: [], abilities: [] },
+            opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const landInHand = addTestCard(forest, opponent, opponent.hand);
+        const landInLibrary = addTestCard(forest, opponent, opponent.library);
+
+        const onDestroy = vi.fn(() => {
+            expect(caster.battlefield.objects).toEqual([creature]);
+            expect(opponent.battlefield.objects).toHaveLength(0);
+            expect(new Set(caster.graveyard.objects.map(object => object.card))).toEqual(new Set(casterLands.map(land => land.card)));
+            expect(opponent.graveyard.objects.map(object => object.card)).toEqual([nonbasic.card]);
+            expect(game.stack.objects[0]).toMatchObject({ card: armageddon.card, targets: [] });
+        });
+        gameEventManager.onPerformed(GameEventType.DestroyPermanent, onDestroy);
+        try {
+            const [action] = playerActionManager.getCardActions(armageddon, caster);
+            action.perform(caster);
+
+            expect(onDestroy).toHaveBeenCalledTimes(casterLands.length + 1);
+            expect(game.pendingTargeter).toBeNull();
+            expect(game.stack.objects).toHaveLength(0);
+            expect(caster.graveyard.objects.at(-1)?.card).toBe(armageddon.card);
+            expect(caster.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+            expect(landInHand.zone).toBe(opponent.hand);
+            expect(landInLibrary.zone).toBe(opponent.library);
+        } finally {
+            gameEventManager.offPerformed(GameEventType.DestroyPermanent, onDestroy);
+        }
+    });
+
+    test("can be cast and resolved with no lands on the battlefield", () => {
+        caster.manaPool[ManaColour.W] = 4;
+        const [action] = playerActionManager.getCardActions(armageddon, caster);
+        action.perform(caster);
+
+        expect(game.pendingTargeter).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([armageddon.card]);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
     });
 });
