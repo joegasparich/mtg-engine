@@ -22,12 +22,14 @@ export enum ContinuousEffectKind {
     EventCheck,
     CheckOverride,
     AbilityGrant,
+    ModifyPowerToughness,
 }
 
 export type ContinuousEffect =
     | { kind: ContinuousEffectKind.EventCheck; check: CheckListener }
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
-    | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void };
+    | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void }
+    | { kind: ContinuousEffectKind.ModifyPowerToughness; recipient: Permanent; power: number; toughness: number };
 
 // 609.1 and 610.1: A resolving instruction produces events and can continue after a player choice.
 export class OneShotEffect {
@@ -96,6 +98,8 @@ export class EffectSystem {
                     revoke();
                 };
             }
+            case ContinuousEffectKind.ModifyPowerToughness:
+                return effect.recipient.addPowerToughnessModifier(effect.power, effect.toughness);
         }
     }
 

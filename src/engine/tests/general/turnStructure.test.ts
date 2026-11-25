@@ -173,7 +173,7 @@ test("auto-skip sees lands untap before checking the next player's spells", () =
     expect(playerActionManager.cardActionsForUI.has(goblin)).toBe(true);
 });
 
-test.each([false, true])("empty turns stop for confirmation with dev auto-pass %s", autoPassPriority => {
+test.each([false, true])("empty turns pause in both main phases and at end of turn with dev auto-pass %s", autoPassPriority => {
     player.library.objects.length = 0;
     const opponent = game.addPlayer([]);
     const steps: StepIndex[] = [];
@@ -183,16 +183,25 @@ test.each([false, true])("empty turns stop for confirmation with dev auto-pass %
         game.autoPassPriority = autoPassPriority;
         game.startGame({allowAutoSkip: true});
         expect(game.currentTurnPlayer()).toBe(player);
+        expect(game.currentStepIndex).toBe(StepIndex.Main);
+        expect(game.priorityPlayer).toBe(player);
+        expect(playerActionManager.playerHasActions(player, true)).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_Advance(player));
+        expect(game.currentStepIndex).toBe(StepIndex.SecondMain);
+        expect(game.priorityPlayer).toBe(player);
+        expect(playerActionManager.playerHasActions(player, true)).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_Advance(player));
         expect(game.currentStepIndex).toBe(StepIndex.End);
         expect(game.turnNumber).toBe(0);
-        expect(steps).toContain(StepIndex.Main);
-        expect(steps).toContain(StepIndex.SecondMain);
         expect(steps).not.toContain(StepIndex.DeclareBlockers);
         expect(steps).not.toContain(StepIndex.CombatDamage);
 
-        gameEventManager.addEvent(new GameEvent_Advance());
+        gameEventManager.addEvent(new GameEvent_Advance(player));
         expect(game.currentTurnPlayer()).toBe(opponent);
-        expect(game.currentStepIndex).toBe(StepIndex.End);
+        expect(game.currentStepIndex).toBe(StepIndex.Main);
+        expect(game.priorityPlayer).toBe(opponent);
         expect(game.turnNumber).toBe(1);
         expect(steps).toContain(StepIndex.Cleanup);
     } finally {

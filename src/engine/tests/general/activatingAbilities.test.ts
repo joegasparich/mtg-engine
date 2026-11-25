@@ -1,11 +1,12 @@
 import { PlayerActions } from "@engine/actions";
+import playerActionManager from "@engine/actions/PlayerActionManager";
 import { GameEvent_ActivateAbility,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager,{ type GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,FOREST,GRIZZLY_BEARS,startMainPhase } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -56,4 +57,54 @@ test("two queued activations cannot pay with the same tap", () => {
 
     expect(forest.tapped).toBe(true);
     expect(player.manaPool[ManaColour.G]).toBe(1);
+});
+
+test("two queued activations cannot pay with the same mana", () => {
+    startMainPhase();
+    const creature = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: { AbilityPart_Activate_Mana: { cost: "{1}{G}" } } }],
+    }, player, player.battlefield);
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    player.manaPool[ManaColour.U] = 1;
+
+    expect(playerActionManager.getCardActions(creature, player)).toHaveLength(1);
+    const [ability] = creature.abilities;
+    gameEventManager.addEvents([
+        new GameEvent_ActivateAbility(player, creature, ability),
+        new GameEvent_ActivateAbility(player, creature, ability),
+    ]);
+
+    expect(forest.tapped).toBe(true);
+    expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(game.stack.objects).toHaveLength(1);
+    expect(playerActionManager.getCardActions(creature, player)).toHaveLength(0);
+});
+
+test("temporary power and toughness modifiers add to changed base stats and expire at cleanup", () => {
+    startMainPhase();
+    const creature = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{
+            parts: {
+                AbilityPart_Activate_Mana: { cost: "{G}" },
+                AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn: {
+                    recipient: "THIS",
+                    power: -1,
+                    toughness: 2,
+                },
+            },
+        }],
+    }, player, player.battlefield);
+    player.manaPool[ManaColour.G] = 1;
+    new PlayerActions.ActivateAbility(creature, creature.abilities[0]).perform(player);
+    passPriorityRound();
+    expect(creature).toMatchObject({ power: 1, toughness: 4 });
+
+    creature.power = 4;
+    creature.toughness = 3;
+    expect(creature).toMatchObject({ power: 3, toughness: 5 });
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+    expect(creature).toMatchObject({ power: 4, toughness: 3 });
 });

@@ -81,6 +81,10 @@ test.each([false, true])("auto-skip finds an opponent's playable instant, then d
         expect(island.tapped).toBe(true);
     }
 
+    expect(game.currentStepIndex).toBe(StepIndex.Main);
+    gameEventManager.addEvent(new GameEvent_Advance());
+    expect(game.currentStepIndex).toBe(StepIndex.SecondMain);
+    gameEventManager.addEvent(new GameEvent_Advance());
     expect(game.currentStepIndex).toBe(StepIndex.End);
     expect(game.canEndTurn).toBe(true);
     expect(game.turnNumber).toBe(0);
@@ -90,6 +94,8 @@ test("ending the turn gives the opponent a final chance to respond", () => {
     const player = game.addPlayer([]);
     const opponent = game.addPlayer([]);
     game.startGame({ allowAutoSkip: true });
+    gameEventManager.addEvent(new GameEvent_Advance(player));
+    gameEventManager.addEvent(new GameEvent_Advance(player));
     expect(game.canEndTurn).toBe(true);
     const recall = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
     addTestCard(cardData.find(card => card.name === "Island"), opponent, opponent.battlefield);

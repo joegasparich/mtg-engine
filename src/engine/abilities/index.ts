@@ -1,4 +1,4 @@
-import { CardObject } from "@engine/GameObject";
+import { CardObject,Permanent } from "@engine/GameObject";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
 import { Ability,AbilityPart_Activate } from ".";
@@ -84,6 +84,9 @@ export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): Gramma
             result = result instanceof CardObject ? result.controller ?? result.owner : undefined;
         else if (part === "owner")
             result = result instanceof CardObject ? result.owner : undefined;
+        else if (part === "attachedTo")
+            // 303.4m and 608.2h: Read the current attachment, or its last known value on a retired source.
+            result = result instanceof Permanent ? result.attachedTo : undefined;
     }
 
     return result;

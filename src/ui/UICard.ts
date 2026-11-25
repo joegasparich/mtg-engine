@@ -6,13 +6,15 @@ import { CardObject,Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
-import { Hand } from "@engine/Zone";
+import { Battlefield,Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
 import type { BattlefieldCardGroup } from "@ui/UIBattlefield";
+import { UICardPowerToughness } from "@ui/UICardPowerToughness";
 import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
 import { loadImageFromExternalUrl } from "@utility/imageUtility";
 import { autobind } from "@utility/typeUtility";
 import { GlowFilter } from "pixi-filters";
+import { CardType } from "~/defs";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
@@ -27,6 +29,7 @@ export default class UICard extends PIXI.Container {
 
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
+    private powerToughness?: UICardPowerToughness;
     private focusOutline?: PIXI.Graphics;
     private glowFilter?: GlowFilter;
 
@@ -99,7 +102,7 @@ export default class UICard extends PIXI.Container {
     }
 
     private setHovered(hovered: boolean) {
-        if (hovered && this.battlefieldGroup && !this.battlefieldGroup.canPreview(this))
+        if (hovered && this.battlefieldGroup?.dragging)
             return;
 
         this.hovered = hovered;
@@ -116,6 +119,34 @@ export default class UICard extends PIXI.Container {
         this.hovered = false;
         if (this.artwork.parentRenderLayer)
             uiRoot.cardOverlay.detach(this.artwork);
+    }
+
+    private updatePowerToughness() {
+        const { object, art } = this;
+        if (!(object instanceof Permanent) || !(object.zone instanceof Battlefield)
+            || object.type !== CardType.Creature || object.def.type !== CardType.Creature
+            || art.texture === PIXI.Texture.EMPTY) {
+            if (this.powerToughness)
+                this.powerToughness.visible = false;
+            return;
+        }
+
+        const power = object.power;
+        // 120.6 and 302.7: Marked damage is tracked separately from the creature's actual toughness.
+        const remainingToughness = object.toughness - object.damageTaken;
+        const damaged = object.damageTaken > 0;
+        const show = damaged || power !== object.def.power || remainingToughness !== object.def.toughness;
+        if (this.powerToughness)
+            this.powerToughness.visible = show;
+        if (!show)
+            return;
+
+        this.powerToughness ??= this.artwork.addChildAt(
+            new UICardPowerToughness(art.texture, CARD_WIDTH, CARD_HEIGHT),
+            2,
+        );
+        this.powerToughness.setStats(power, remainingToughness, object.def, damaged);
+        this.powerToughness.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
     @autobind
@@ -135,16 +166,28 @@ export default class UICard extends PIXI.Container {
 
         const preview = this.hovered && !dragging && this.object.zone !== game.stack;
         const lifted = preview && this.object.zone instanceof Hand;
-        // Rotate the lift back into zone coordinates so the card moves straight up.
-        const lift = lifted ? -95 : 0;
-        this.artwork.x += (lift * Math.sin(this.rotation) - this.artwork.x) * ease;
-        this.artwork.y += (lift * Math.cos(this.rotation) - this.artwork.y) * ease;
-        this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
 
         this.motion += (1 - this.motion) * ease;
         const size = (preview ? 1.5 : 1) * this.motion;
         this.art.width += (CARD_WIDTH * size - this.art.width) * ease;
         this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
+
+        const sin = Math.sin(this.rotation);
+        const cos = Math.cos(this.rotation);
+        if (group?.permanent === this && group.children.length > 1) {
+            // Keep the expanded face clear of the Aura title strips, even on a tapped or tilted host.
+            const extraWidth = Math.max(0, this.art.width - CARD_WIDTH);
+            const extraHeight = Math.max(0, this.art.height - CARD_HEIGHT);
+            const offset = (extraWidth * Math.abs(sin) + extraHeight * Math.abs(cos)) / 2;
+            this.artwork.position.set(offset * sin, offset * cos);
+        } else {
+            // Rotate the lift back into zone coordinates so a hand preview moves straight up.
+            const lift = lifted ? -95 : 0;
+            this.artwork.x += (lift * sin - this.artwork.x) * ease;
+            this.artwork.y += (lift * cos - this.artwork.y) * ease;
+        }
+        this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
+        this.updatePowerToughness();
 
         const selection = uiRoot.cardSelection;
         const state = selection?.stateFor(this.object);

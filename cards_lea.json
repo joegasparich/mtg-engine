@@ -1,7 +1,7 @@
 [
     {
         "name": "Grizzly Bears",
-        "image_url": "https://cards.scryfall.io/large/front/4/0/409f9b88-f03e-40b6-9883-68c14c37c0de.jpg?156254673",
+        "image_url": "https://cards.scryfall.io/large/front/b/f/bf11596e-e798-4126-b56c-e23a1ca2a25d.jpg?1783919471",
         "oracle_text": "",
         "type": "Creature",
         "cost": "{1}{G}",
@@ -199,6 +199,34 @@
                                 "AbilityPart_BlockEachAttacker": {}
                             }
                         }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Blessing",
+        "image_url": "https://cards.scryfall.io/large/front/e/5/e5e1bb26-2d76-42c5-8fda-59cadd150d57.jpg?1783919590",
+        "oracle_text": "Enchant creature\n{W}: Enchanted creature gets +1/+1 until end of turn.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "activateString": "{W}: Enchanted creature gets +1/+1 until end of turn",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{W}" },
+                    "AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn": {
+                        "recipient": "THIS.attachedTo",
+                        "power": 1,
+                        "toughness": 1
                     }
                 }
             }

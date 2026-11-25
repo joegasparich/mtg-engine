@@ -298,7 +298,11 @@ export default class Game {
 
         const player = this.priorityPlayer;
         if (player) {
-            return !this.canEndTurn && (this.autoPassPriority || !playerActionManager.playerHasActions(player, true))
+            // 505.2 and 505.6: Pause for the active player's pass before ending either main phase.
+            const mainPhase = this.currentStepIndex === StepIndex.Main || this.currentStepIndex === StepIndex.SecondMain;
+            const awaitingMainPhasePass = mainPhase && player === this.currentTurnPlayer() && !this.stack.objects.length;
+            return !awaitingMainPhasePass && !this.canEndTurn
+                && (this.autoPassPriority || !playerActionManager.playerHasActions(player, true))
                 && this.passPriority(player);
         }
         return this.advance(null);

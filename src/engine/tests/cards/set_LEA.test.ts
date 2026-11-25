@@ -4,6 +4,7 @@ import type { CardObject,Permanent } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -621,5 +622,111 @@ describe("Blaze of Glory", () => {
         expect(CombatManager.blockLimit(returned)).toBe(1);
         expect(returned.abilities).toHaveLength(0);
         expect(attacker.graveyard.objects.map(object => object.card)).toEqual([blaze.card]);
+    });
+});
+
+describe("Blessing", () => {
+    const blessingDef = cardData.find(card => card.name === "Blessing");
+    const plainsDef = cardData.find(card => card.name === "Plains");
+    let caster: Player;
+    let opponent: Player;
+    let creature: Permanent;
+    let blessing: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        blessing = addTestCard(blessingDef, caster, caster.hand);
+    });
+
+    function castBlessing() {
+        const [action] = playerActionManager.getCardActions(blessing, caster);
+        action.perform(caster);
+        game.pendingTargeter.onTargeted([creature]);
+        passPriorityRound();
+        const aura = caster.battlefield.objects.find(object => object.card === blessing.card);
+        expect(aura?.attachedTo).toBe(creature);
+        return aura;
+    }
+
+    function activate(aura: Permanent) {
+        const [action] = playerActionManager.getCardActions(aura, caster);
+        expect(action).toBeInstanceOf(PlayerActions.ActivateAbility);
+        action.perform(caster);
+    }
+
+    test("casts for two white mana and stacks repeatable pumps paid by the Aura's controller", () => {
+        const firstPlains = addTestCard(plainsDef, caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(blessing, caster)).toHaveLength(0);
+        const secondPlains = addTestCard(plainsDef, caster, caster.battlefield);
+        const aura = castBlessing();
+        expect([firstPlains.tapped, secondPlains.tapped]).toEqual([true, true]);
+        expect(creature).toMatchObject({ power: 2, toughness: 2 });
+        expect(playerActionManager.getCardActions(aura, caster)).toHaveLength(0);
+
+        caster.manaPool[ManaColour.W] = 1;
+        const thirdPlains = addTestCard(plainsDef, caster, caster.battlefield);
+        activate(aura);
+        expect(thirdPlains.tapped).toBe(false);
+        activate(aura);
+        expect(thirdPlains.tapped).toBe(true);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(game.stack.objects).toHaveLength(2);
+        expect(game.pendingTargeter).toBeNull();
+        expect(creature).toMatchObject({ power: 2, toughness: 2 });
+
+        gameEventManager.addEvent(new GameEvent_Advance());
+        opponent.manaPool[ManaColour.W] = 1;
+        expect(playerActionManager.getCardActions(aura, opponent)).toHaveLength(0);
+        expect(playerActionManager.getCardActions(creature, opponent)).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_Advance());
+        expect(creature).toMatchObject({ power: 3, toughness: 3 });
+        passPriorityRound();
+        expect(creature).toMatchObject({ power: 4, toughness: 4 });
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(creature, creature, 3));
+        expect(creature).toMatchObject({ damageTaken: 3, zone: opponent.battlefield });
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        expect(creature).toMatchObject({ power: 2, toughness: 2, damageTaken: 0, zone: opponent.battlefield });
+    });
+
+    test("each resolution pumps the creature attached at that time", () => {
+        caster.manaPool[ManaColour.W] = 4;
+        const aura = castBlessing();
+        const other = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+
+        activate(aura);
+        passPriorityRound();
+        activate(aura);
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(aura, other));
+        passPriorityRound();
+
+        expect(aura.attachedTo).toBe(other);
+        expect(creature).toMatchObject({ power: 3, toughness: 3 });
+        expect(other).toMatchObject({ power: 3, toughness: 3 });
+    });
+
+    test("an activation still pumps the last enchanted creature if Blessing leaves first", () => {
+        caster.manaPool[ManaColour.W] = 3;
+        const aura = castBlessing();
+        activate(aura);
+        moveTestCard(aura, caster.graveyard);
+        passPriorityRound();
+
+        expect(creature).toMatchObject({ power: 3, toughness: 3 });
+    });
+
+    test("a pending activation does not pump a creature that left and returned", () => {
+        caster.manaPool[ManaColour.W] = 3;
+        const aura = castBlessing();
+        activate(aura);
+        const returned = moveTestCard(moveTestCard(creature, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+
+        expect(returned).toMatchObject({ power: 2, toughness: 2 });
+        expect(aura.retired).toBe(true);
     });
 });

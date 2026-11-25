@@ -18,14 +18,9 @@ export class BattlefieldCardGroup extends Container<UICard> {
 
     get dragging() { return Boolean(this.drag); }
 
-    canPreview(view: UICard) {
-        return !this.dragging && (view !== this.permanent || this.children.length === 1);
-    }
-
     addCard(view: UICard) {
         view.battlefieldGroup = this;
         this.addChildAt(view, 0);
-        this.permanent.clearPreview();
         this.layoutAuras();
     }
 

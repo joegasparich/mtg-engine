@@ -6,7 +6,7 @@ import { GameEvent_ActivateAbility } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
-import { ManaAmount,ManaUtility } from "@engine/mana";
+import { ManaAmount,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { CardType } from "~/defs";
@@ -114,16 +114,42 @@ class PlayerActionManager {
     }
 
     public canAutoPay(object: CardObject, actor: Player) {
+        return this.canAutoPayManaCost(object.cost, actor);
+    }
+
+    public canAutoPayManaCost(cost: Readonly<ManaCost>, actor: Player) {
         if (game.infiniteMana)
             return true;
 
         const availableMana: ManaAmount = [...actor.manaPool];
         ManaUtility.addMana(availableMana, actor.getPotentialMana());
-        return ManaUtility.canPay(object.cost, availableMana);
+        return ManaUtility.canPay(cost, availableMana);
+    }
+
+    public payManaCost(cost: Readonly<ManaCost>, actor: Player): boolean {
+        if (game.infiniteMana)
+            return true;
+
+        if (!ManaUtility.canPay(cost, actor.manaPool)) {
+            if (!this.canAutoPayManaCost(cost, actor))
+                return false;
+
+            this.tapManaSources(cost, actor);
+            if (!ManaUtility.canPay(cost, actor.manaPool))
+                return false;
+        }
+
+        return ManaUtility.pay(cost, actor.manaPool);
     }
 
     public autoPay(object: CardObject, actor: Player) {
-        const remaining = [...object.cost];
+        const remaining = this.tapManaSources(object.cost, actor);
+        if (remaining.some(v => v > 0))
+            throw new Error(`Failed to auto pay for card ${object.def.name}, remaining cost: ${remaining}`);
+    }
+
+    private tapManaSources(cost: Readonly<ManaCost>, actor: Player) {
+        const remaining = [...cost];
         const poolCopy = [...actor.manaPool]; // We don't want to actually pay until we have tapped all our lands etc.
 
         // First pay specific colours directly from what we have in the pool
@@ -203,8 +229,7 @@ class PlayerActionManager {
             }
         }
 
-        if (remaining.some(v => v > 0))
-            throw new Error(`Failed to auto pay for card ${object.def.name}, remaining cost: ${remaining}`);
+        return remaining;
     }
 
     public startTargeting(source: CardObject, targetTypes: TargetTypeKeys[], count: number,

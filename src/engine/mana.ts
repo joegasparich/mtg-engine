@@ -53,12 +53,12 @@ export namespace ManaUtility {
     }
 
 
-    export function canPay(cost: ManaCost, pool: ManaAmount): boolean {
+    export function canPay(cost: Readonly<ManaCost>, pool: ManaAmount): boolean {
         return this.pay(cost, [...pool]);
     }
 
     // This picks the colours for the player prioritising colourless
-    export function pay(cost: ManaCost, pool: ManaAmount): boolean {
+    export function pay(cost: Readonly<ManaCost>, pool: ManaAmount): boolean {
         if (!cost)
             return true;
 
