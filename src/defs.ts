@@ -27,6 +27,7 @@ export type CardColour = (typeof cardColours)[number];
 export type TargetValidator = {
     cardType?: CardType;
     cardSubtype?: string;
+    tapped?: boolean;
 };
 
 export type AbilityDef = {

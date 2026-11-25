@@ -4,6 +4,7 @@
         "image_url": "https://cards.scryfall.io/large/front/1/2/12cff32a-a365-43ee-a196-8ce32b3bb9fd.jpg?1743205092",
         "oracle_text": "({T}: Add {W}.)",
         "type": "Land",
+        "subtypes": ["Plains"],
         "abilities": [
             {
                 "activateString": "Tap for mana",
@@ -23,6 +24,7 @@
         "image_url": "https://cards.scryfall.io/large/front/1/f/1ff6acc9-581c-468f-894d-41f725da7f33.jpg?1743205101",
         "oracle_text": "({T}: Add {U}.)",
         "type": "Land",
+        "subtypes": ["Island"],
         "abilities": [
             {
                 "activateString": "Tap for mana",
@@ -42,6 +44,7 @@
         "image_url": "https://cards.scryfall.io/large/front/f/0/f0bfdb9e-318f-4acd-9fbd-41b98a8875d6.jpg?1743205109",
         "oracle_text": "({T}: Add {B}.)",
         "type": "Land",
+        "subtypes": ["Swamp"],
         "abilities": [
             {
                 "activateString": "Tap for mana",
@@ -61,6 +64,7 @@
         "image_url": "https://cards.scryfall.io/large/front/b/f/bfa10a88-12e0-4b79-80bb-6f4620277e20.jpg?1743205117",
         "oracle_text": "({T}: Add {R}.)",
         "type": "Land",
+        "subtypes": ["Mountain"],
         "abilities": [
             {
                 "activateString": "Tap for mana",
@@ -80,6 +84,7 @@
         "image_url": "https://cards.scryfall.io/large/front/8/1/8100bceb-ffba-487a-bb45-4fe2a156a8dc.jpg?1743205126",
         "oracle_text": "({T}: Add {G}.)",
         "type": "Land",
+        "subtypes": ["Forest"],
         "abilities": [
             {
                 "activateString": "Tap for mana",

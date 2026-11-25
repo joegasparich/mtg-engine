@@ -2,6 +2,7 @@ import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/eve
 import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { ZoneKind } from "@engine/Zone";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -24,9 +25,10 @@ test("a filtered destruction effect checks its whole batch and uses each permane
         power: 0,
         toughness: 0,
         abilities: [{ parts: {
-            AbilityPart_SelectPermanents: {
+            AbilityPart_SelectObjectsFromZone: {
                 inSignal: "SPELL_RESOLVE",
                 saveAs: "WALLS",
+                zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature, cardSubtype: "Wall" },
                 outSignal: "DESTROY_WALLS",
             },

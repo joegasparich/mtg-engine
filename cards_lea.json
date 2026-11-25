@@ -4,6 +4,7 @@
         "image_url": "https://cards.scryfall.io/large/front/b/f/bf11596e-e798-4126-b56c-e23a1ca2a25d.jpg?1783919471",
         "oracle_text": "",
         "type": "Creature",
+        "subtypes": ["Bear"],
         "cost": "{1}{G}",
         "power": 2,
         "toughness": 2
@@ -13,6 +14,7 @@
         "image_url": "https://cards.scryfall.io/large/front/3/4/34ac4e28-1677-4f88-9b1a-7a32635f0ab2.jpg?1664925688",
         "oracle_text": "",
         "type": "Creature",
+        "subtypes": ["Goblin"],
         "cost": "{R}",
         "power": 1,
         "toughness": 1
@@ -22,6 +24,7 @@
         "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
         "oracle_text": "",
         "type": "Creature",
+        "subtypes": ["Elemental"],
         "cost": "{3}{U}{U}",
         "power": 4,
         "toughness": 4,
@@ -101,9 +104,10 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectPermanents": {
+                    "AbilityPart_SelectObjectsFromZone": {
                         "inSignal": "SPELL_RESOLVE",
                         "saveAs": "LANDS",
+                        "zone": "battlefield",
                         "targetValidator": { "cardType": "Land" },
                         "outSignal": "DESTROY_LANDS"
                     },
@@ -227,6 +231,61 @@
                         "recipient": "THIS.attachedTo",
                         "power": 1,
                         "toughness": 1
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Blue Ward",
+        "image_url": "https://cards.scryfall.io/large/front/9/7/9707fd6f-9c01-4f03-8973-50835a0ffcf2.jpg?1783919589",
+        "oracle_text": "Enchant creature\nEnchanted creature has protection from blue. This effect doesn't remove this Aura.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_GrantAttachedAbility": {
+                        "saveAs": "GRANTED_PROTECTION",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Protection": { "colour": "U" }
+                            }
+                        }
+                    },
+                    "AbilityPart_KeepGrantingAuraAttached": {
+                        "grantFrom": "GRANTED_PROTECTION"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Castle",
+        "image_url": "https://cards.scryfall.io/large/front/8/f/8f86a635-f2fb-4525-bd6d-d84bb73e1d1e.jpg?1783919590",
+        "oracle_text": "Untapped creatures you control get +0/+2.",
+        "type": "Enchantment",
+        "cost": "{3}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                        "saveAs": "UNTAPPED_CREATURES",
+                        "zone": "battlefield",
+                        "targetValidator": { "cardType": "Creature", "tapped": false },
+                        "controlledBy": "THIS.controller"
+                    },
+                    "AbilityPart_ModifyPowerToughness": {
+                        "permanentsFrom": "UNTAPPED_CREATURES",
+                        "toughness": 2
                     }
                 }
             }

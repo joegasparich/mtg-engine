@@ -3,7 +3,7 @@ import { PlayerActions } from "@engine/actions";
 import type { CardObject,Permanent } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
@@ -208,8 +208,11 @@ describe("Animate Wall", () => {
     });
 });
 
-describe("Black Ward", () => {
-    const wardDef = cardData.find(card => card.name === "Black Ward");
+describe.each([
+    { name: "Black Ward", colour: "B", otherColour: "U" },
+    { name: "Blue Ward", colour: "U", otherColour: "B" },
+] as const)("$name", ({ name, colour, otherColour }) => {
+    const wardDef = cardData.find(card => card.name === name);
     let caster: Player;
     let opponent: Player;
     let ward: CardObject;
@@ -252,9 +255,12 @@ describe("Black Ward", () => {
         expect(attachedWard?.attachedTo).toBe(creature);
         expect(creature.abilities).toEqual([expect.objectContaining({ source: creature, grantedBy: attachedWard })]);
 
-        const source = addTestCard({ ...cardData[GRIZZLY_BEARS], cost: "{B}" }, opponent, opponent.battlefield);
+        const source = addTestCard({ ...cardData[GRIZZLY_BEARS], cost: `{${colour}}` }, opponent, opponent.battlefield);
         gameEventManager.addEvent(new GameEvent_DealDamage(source, creature, 1));
         expect(creature.damageTaken).toBe(0);
+
+        const otherSource = addTestCard({ ...cardData[GRIZZLY_BEARS], cost: `{${otherColour}}` }, opponent, opponent.battlefield);
+        expect(gameEventManager.checkEvent(new GameEvent_DealDamage(otherSource, creature, 1))).toBe(true);
 
         moveTestCard(attachedWard, caster.graveyard);
         expect(creature.abilities).toHaveLength(0);
@@ -271,7 +277,7 @@ describe("Black Ward", () => {
         expect(creature.abilities).toHaveLength(0);
         expect(otherCreature.abilities).toEqual([expect.objectContaining({ source: otherCreature, grantedBy: attachedWard })]);
         expect(otherCreature.abilities).not.toContain(initialGrant);
-        attachedWard.colours = new Set(["W", "B"]);
+        attachedWard.colours = new Set(["W", colour]);
         game.checkState();
         expect(attachedWard.zone).toBe(caster.battlefield);
 
@@ -285,9 +291,9 @@ describe("Black Ward", () => {
         expect(otherCreature.abilities).toHaveLength(0);
     });
 
-    test("its own protection keeps a black Black Ward attached until another grant applies", () => {
+    test("its own protection keeps it attached after it gains the protected colour", () => {
         const firstWard = castWard();
-        firstWard.colours = new Set(["W", "B"]);
+        firstWard.colours = new Set(["W", colour]);
         game.checkState();
         expect(firstWard.attachedTo).toBe(creature);
         expect(firstWard.zone).toBe(caster.battlefield);
@@ -298,23 +304,89 @@ describe("Black Ward", () => {
         expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: firstWard.card }));
     });
 
-    test("a separate protection grant from the same Aura can remove a black Black Ward", () => {
+    test("a separate protection grant from the same Aura can remove it", () => {
         ward = addTestCard({
             ...wardDef,
             abilities: [...wardDef.abilities, { parts: {
                 AbilityPart_GrantAttachedAbility: {
-                    grant: { parts: { AbilityPart_Protection: { colour: "B" } } },
+                    grant: { parts: { AbilityPart_Protection: { colour } } },
                 },
             } }],
         }, caster, caster.hand);
         const attachedWard = castWard();
         expect(creature.abilities).toHaveLength(2);
 
-        attachedWard.colours = new Set(["W", "B"]);
+        attachedWard.colours = new Set(["W", colour]);
         game.checkState();
 
         expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: ward.card }));
         expect(creature.abilities).toHaveLength(0);
+    });
+});
+
+describe("Castle", () => {
+    const castleDef = cardData.find(card => card.name === "Castle");
+    let caster: Player;
+    let opponent: Player;
+    let creature: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        creature = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+    });
+
+    test("gives only its controller's untapped creatures +0/+2 after it resolves", () => {
+        const castle = addTestCard(castleDef, caster, caster.hand);
+        const plains = addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield);
+        const forests = Array.from({ length: 3 }, () => addTestCard(cardData[FOREST], caster, caster.battlefield));
+        const opposingCreature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const tappedCreature = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(tappedCreature));
+
+        const [cast] = playerActionManager.getCardActions(castle, caster);
+        cast.perform(caster);
+        expect(creature.toughness).toBe(2);
+        passPriorityRound();
+
+        expect([plains, ...forests].every(land => land.tapped)).toBe(true);
+        expect(creature.power).toBe(2);
+        expect(creature.toughness).toBe(4);
+        expect(opposingCreature.toughness).toBe(2);
+        expect(tappedCreature.toughness).toBe(2);
+        expect(game.pendingTargeter).toBeNull();
+    });
+
+    test("applies as creatures enter and updates when they tap and untap", () => {
+        const castle = addTestCard(castleDef, caster, caster.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(castle));
+
+        const card = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        const entry = new GameEvent_ChangeCardZone(card, caster.battlefield, { controller: caster });
+        gameEventManager.addEvent(entry);
+        const newCreature = caster.battlefield.objects.find(object => object === entry.newObject);
+        expect(newCreature.toughness).toBe(4);
+
+        gameEventManager.addEvent(new GameEvent_TapCard(newCreature));
+        expect(newCreature.toughness).toBe(2);
+        gameEventManager.addEvent(new GameEvent_UntapCard(newCreature));
+        expect(newCreature.toughness).toBe(4);
+    });
+
+    test("each Castle contributes its bonus and losing it can make existing damage lethal", () => {
+        const first = addTestCard(castleDef, caster, caster.battlefield);
+        const second = addTestCard(castleDef, caster, caster.battlefield);
+        expect(creature.toughness).toBe(6);
+
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_DealDamage(attacker, creature, 3));
+        moveTestCard(first, caster.graveyard);
+        expect(creature.toughness).toBe(4);
+
+        moveTestCard(second, caster.graveyard);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(creature.card);
     });
 });
 

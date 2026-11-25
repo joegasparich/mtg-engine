@@ -45,7 +45,6 @@ export class CardObject extends GameObject {
     colours: ReadonlySet<CardColour>;
     private basePower: number;
     private baseToughness: number;
-    private readonly powerToughnessModifiers = new Set<{ power: number; toughness: number }>();
     private baseAbilities: readonly Ability[];
     private readonly grantedAbilities = new Set<Ability>();
 
@@ -64,30 +63,17 @@ export class CardObject extends GameObject {
         this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
     }
 
-    // 613.4c: Add power and toughness modifiers to the underlying characteristics.
     get power(): number {
-        let power = this.basePower;
-        for (const modifier of this.powerToughnessModifiers)
-            power += modifier.power;
-        return power;
+        return gameEventManager.effects.getModifiedPowerToughness(this, "power", this.basePower);
     }
 
     set power(power: number) { this.basePower = power; }
 
     get toughness(): number {
-        let toughness = this.baseToughness;
-        for (const modifier of this.powerToughnessModifiers)
-            toughness += modifier.toughness;
-        return toughness;
+        return gameEventManager.effects.getModifiedPowerToughness(this, "toughness", this.baseToughness);
     }
 
     set toughness(toughness: number) { this.baseToughness = toughness; }
-
-    addPowerToughnessModifier(power: number, toughness: number): () => void {
-        const modifier = { power, toughness };
-        this.powerToughnessModifiers.add(modifier);
-        return () => { this.powerToughnessModifiers.delete(modifier); };
-    }
 
     get abilities(): readonly Ability[] {
         return this.grantedAbilities.size > 0 ? [...this.baseAbilities, ...this.grantedAbilities] : this.baseAbilities;

@@ -7,6 +7,7 @@ import { Permanent,Spell } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { ZoneKind } from "@engine/Zone";
 import { type CardDef,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -61,7 +62,10 @@ test("a black spell that destroys creatures without targeting still affects a pr
         type: CardType.Sorcery,
         cost: "{B}",
         abilities: [{ parts: {
-            AbilityPart_SelectPermanents: { inSignal: "SPELL_RESOLVE", saveAs: "CHOSEN", targetValidator: { cardType: CardType.Creature } },
+            AbilityPart_SelectObjectsFromZone: {
+                inSignal: "SPELL_RESOLVE", saveAs: "CHOSEN", zone: ZoneKind.Battlefield,
+                targetValidator: { cardType: CardType.Creature },
+            },
             AbilityPart_Effect_DestroyPermanents: destroyChosen,
         } }],
     }, player, player.hand);

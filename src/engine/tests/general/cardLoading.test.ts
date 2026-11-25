@@ -24,6 +24,7 @@ test("should load land correctly", () => {
     expect(object.def).toBe(def);
     expect(object.name).toBe(def.name);
     expect(object.type).toBe(def.type);
+    expect(object.subtypes).toEqual(["Forest"]);
     expect(object.cost).toBe(undefined);
     expect(object.abilities[0].def).toEqual(def.abilities[0]);
 
@@ -37,6 +38,7 @@ test("should load simple creature correctly", () => {
     expect(object.def).toBe(def);
     expect(object.name).toBe(def.name);
     expect(object.type).toBe(def.type);
+    expect(object.subtypes).toEqual(["Bear"]);
     expect(object.cost).toEqual([0, 0, 0, 0, 1, 0, 1]);
     expect(object.abilities).toEqual([]);
     expect(object.power).toBe(def.power);

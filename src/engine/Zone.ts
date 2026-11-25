@@ -1,6 +1,14 @@
 import type { CardObject,GameObject,Permanent } from "@engine/GameObject";
 import { shuffleArray } from "@utility/arrayUtility";
 
+export enum ZoneKind {
+    Library = "library",
+    Hand = "hand",
+    Battlefield = "battlefield",
+    Graveyard = "graveyard",
+    Stack = "stack",
+}
+
 export class Zone<T extends GameObject = GameObject> {
     name: string;
     readonly objects: T[] = [];

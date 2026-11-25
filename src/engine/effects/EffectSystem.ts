@@ -25,11 +25,17 @@ export enum ContinuousEffectKind {
     ModifyPowerToughness,
 }
 
+type PowerToughnessModifier = { power: number; toughness: number };
+type PowerToughnessEffect = PowerToughnessModifier & {
+    kind: ContinuousEffectKind.ModifyPowerToughness;
+    appliesTo: (recipient: CardObject) => boolean;
+};
+
 export type ContinuousEffect =
     | { kind: ContinuousEffectKind.EventCheck; check: CheckListener }
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
     | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void }
-    | { kind: ContinuousEffectKind.ModifyPowerToughness; recipient: Permanent; power: number; toughness: number };
+    | PowerToughnessEffect;
 
 // 609.1 and 610.1: A resolving instruction produces events and can continue after a player choice.
 export class OneShotEffect {
@@ -60,6 +66,7 @@ export class EffectSystem {
     private readonly eventChecks = new Map<CheckListener, CheckSource | undefined>();
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
+    private readonly powerToughnessEffects = new Set<PowerToughnessEffect>();
 
     constructor(private readonly events: EventDispatcher) {}
 
@@ -82,6 +89,16 @@ export class EffectSystem {
             end();
     }
 
+    getModifiedPowerToughness(recipient: CardObject, stat: keyof PowerToughnessModifier, base: number): number {
+        // 613.4c: Add each applicable power or toughness modifier to the underlying characteristic.
+        let value = base;
+        for (const effect of this.powerToughnessEffects) {
+            if (effect.appliesTo(recipient))
+                value += effect[stat];
+        }
+        return value;
+    }
+
     private applyContinuous(ability: Ability, effect: ContinuousEffect): () => void {
         switch (effect.kind) {
             case ContinuousEffectKind.EventCheck:
@@ -98,8 +115,11 @@ export class EffectSystem {
                     revoke();
                 };
             }
-            case ContinuousEffectKind.ModifyPowerToughness:
-                return effect.recipient.addPowerToughnessModifier(effect.power, effect.toughness);
+            case ContinuousEffectKind.ModifyPowerToughness: {
+                const modifier = { ...effect };
+                this.powerToughnessEffects.add(modifier);
+                return () => { this.powerToughnessEffects.delete(modifier); };
+            }
         }
     }
 
