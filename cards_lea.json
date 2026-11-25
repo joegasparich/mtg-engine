@@ -290,5 +290,101 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Green Ward",
+        "image_url": "https://cards.scryfall.io/large/front/4/e/4e265847-739d-47aa-8d99-24aff4d78e64.jpg?1783919582",
+        "oracle_text": "Enchant creature\nEnchanted creature has protection from green. This effect doesn't remove this Aura.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_GrantAttachedAbility": {
+                        "saveAs": "GRANTED_PROTECTION",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Protection": { "colour": "G" }
+                            }
+                        }
+                    },
+                    "AbilityPart_KeepGrantingAuraAttached": {
+                        "grantFrom": "GRANTED_PROTECTION"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Red Ward",
+        "image_url": "https://cards.scryfall.io/large/front/3/6/36df52ab-62bd-4a48-8c34-856e20a517c3.jpg?1783919574",
+        "oracle_text": "Enchant creature\nEnchanted creature has protection from red. This effect doesn't remove this Aura.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_GrantAttachedAbility": {
+                        "saveAs": "GRANTED_PROTECTION",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Protection": { "colour": "R" }
+                            }
+                        }
+                    },
+                    "AbilityPart_KeepGrantingAuraAttached": {
+                        "grantFrom": "GRANTED_PROTECTION"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "White Ward",
+        "image_url": "https://cards.scryfall.io/large/front/d/d/dda1b5c6-ba71-4573-b4a8-872df961cc90.jpg?1783919567",
+        "oracle_text": "Enchant creature\nEnchanted creature has protection from white. This effect doesn't remove this Aura.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_GrantAttachedAbility": {
+                        "saveAs": "GRANTED_PROTECTION",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Protection": { "colour": "W" }
+                            }
+                        }
+                    },
+                    "AbilityPart_KeepGrantingAuraAttached": {
+                        "grantFrom": "GRANTED_PROTECTION"
+                    }
+                }
+            }
+        ]
     }
 ]

@@ -211,8 +211,12 @@ describe("Animate Wall", () => {
 describe.each([
     { name: "Black Ward", colour: "B", otherColour: "U" },
     { name: "Blue Ward", colour: "U", otherColour: "B" },
+    { name: "Green Ward", colour: "G", otherColour: "R" },
+    { name: "Red Ward", colour: "R", otherColour: "G" },
+    { name: "White Ward", colour: "W", otherColour: "B" },
 ] as const)("$name", ({ name, colour, otherColour }) => {
     const wardDef = cardData.find(card => card.name === name);
+    const protection = { parts: { AbilityPart_Protection: { colour } } };
     let caster: Player;
     let opponent: Player;
     let ward: CardObject;
@@ -291,32 +295,37 @@ describe.each([
         expect(otherCreature.abilities).toHaveLength(0);
     });
 
-    test("its own protection keeps it attached after it gains the protected colour", () => {
+    test("its own protection keeps it attached until an independent grant applies", () => {
         const firstWard = castWard();
         firstWard.colours = new Set(["W", colour]);
         game.checkState();
         expect(firstWard.attachedTo).toBe(creature);
         expect(firstWard.zone).toBe(caster.battlefield);
 
-        ward = addTestCard(wardDef, caster, caster.hand);
-        const secondWard = castWard();
-        expect(secondWard.attachedTo).toBe(creature);
+        const secondWard = addTestCard(wardDef, caster, caster.hand);
+        expect(secondWard.spellTargeter.validateTargets([creature])).toBe(colour !== "W");
+
+        const { ability: independentGrant } = creature.grantAbility(protection, plains);
+        game.checkState();
         expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: firstWard.card }));
+        expect(creature.abilities).toEqual([independentGrant]);
     });
 
     test("a separate protection grant from the same Aura can remove it", () => {
+        // 702.16n: Start colourless so both grants can apply before the Aura gains the protected colour.
         ward = addTestCard({
             ...wardDef,
+            cost: "{1}",
             abilities: [...wardDef.abilities, { parts: {
                 AbilityPart_GrantAttachedAbility: {
-                    grant: { parts: { AbilityPart_Protection: { colour } } },
+                    grant: protection,
                 },
             } }],
         }, caster, caster.hand);
         const attachedWard = castWard();
         expect(creature.abilities).toHaveLength(2);
 
-        attachedWard.colours = new Set(["W", colour]);
+        attachedWard.colours = new Set([colour]);
         game.checkState();
 
         expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: ward.card }));
