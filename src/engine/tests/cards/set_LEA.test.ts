@@ -1,9 +1,9 @@
-import playerActionManager from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
+import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
@@ -15,6 +15,67 @@ import { StepIndex } from "@engine/Step";
 import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+describe("Death Ward", () => {
+    const deathWard = cardData.find(card => card.name === "Death Ward");
+    const bears = cardData[GRIZZLY_BEARS];
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    test("casts for one white mana and shields an opponent's creature from a spell below it", () => {
+        const ward = addTestCard(deathWard, caster, caster.hand);
+        const creature = addTestCard(bears, opponent, opponent.battlefield);
+        const creatureInHand = addTestCard(bears, opponent, opponent.hand);
+        const plains = addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield);
+        const removal = addTestCard({ ...deathWard, name: "Test destruction spell", abilities: [{ parts: {
+            AbilityPart_Target: {
+                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card], onBattlefield: true,
+                targetValidator: { cardType: CardType.Creature },
+            },
+            AbilityPart_Effect_DestroyPermanents: { inSignal: "SPELL_RESOLVE", permanentsFrom: "TARGET" },
+        } }] }, opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, removal, [creature])).toBe(true);
+        creature.damageTaken = 1;
+
+        const [cast] = playerActionManager.getCardActions(ward, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([plains])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([creatureInHand])).toBe(false);
+        game.pendingTargeter.onTargeted([creature]);
+        expect(plains.tapped).toBe(true);
+        expect(game.stack.objects).toEqual([
+            expect.objectContaining({ card: removal.card }),
+            expect.objectContaining({ card: ward.card }),
+        ]);
+
+        passPriorityRound();
+        expect(creature).toMatchObject({ tapped: false, damageTaken: 1 });
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([ward.card]);
+        passPriorityRound();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(creature.zone).toBe(opponent.battlefield);
+        expect(creature).toMatchObject({ tapped: true, damageTaken: 0 });
+    });
+
+    test("fails to shield a target that leaves and returns before resolution", () => {
+        const ward = addTestCard(deathWard, caster, caster.hand);
+        const creature = addTestCard(bears, opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, ward, [creature])).toBe(true);
+        const returned = moveTestCard(moveTestCard(creature, opponent.hand), opponent.battlefield);
+
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(returned));
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([ward.card]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([creature.card]);
+    });
+});
 
 describe("Conversion", () => {
     const def = cardData.find(card => card.name === "Conversion");

@@ -95,6 +95,7 @@ export class UICombat {
         gameEventManager.onPerformed(GameEventType.StepEnd, this.onStepEnd);
         gameEventManager.onPerformed(GameEventType.PriorityChanged, this.sync);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.sync);
+        gameEventManager.onPerformed(GameEventType.RegeneratePermanent, this.sync);
         gameEventManager.onPerformed(GameEventType.TapCard, this.sync);
         gameEventManager.onPerformed(GameEventType.UntapCard, this.sync);
         gameEventManager.onPerformed(GameEventType.RequestCombatDamageChoice, this.sync);

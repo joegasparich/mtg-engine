@@ -43,6 +43,7 @@ export enum GameEventType {
     AttachPermanent,
     DrawCards,
     CheckBasicLandType,
+    RegeneratePermanent,
 }
 
 export abstract class GameEvent {
