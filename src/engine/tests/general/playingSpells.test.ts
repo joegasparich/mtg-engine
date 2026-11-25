@@ -7,7 +7,7 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { CardType } from "~/defs";
+import { type CardDef,CardType } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -22,6 +22,94 @@ function addForestToHand(owner: Player) {
     const forest = addTestCard(cardData[FOREST], owner, owner.hand);
     return forest;
 }
+
+test("shows each mode, rejects unavailable choices, and can cancel before choosing targets", () => {
+    const other = game.addPlayer([]);
+    startMainPhase();
+    const targetCreature = { parts: { AbilityPart_Target: {
+        saveAs: "CREATURE", validTargets: [TargetTypeKeys.Card],
+        targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+    } } };
+    const targetPlayer = { parts: { AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] } } };
+    const def: CardDef = {
+        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{G}", abilities: [],
+        spellModes: [{ text: "Choose a creature", abilities: [targetCreature] },
+            { text: "Choose a player", abilities: [targetPlayer] }],
+    };
+    const card = addTestCard(def, player, player.hand);
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    const action = new PlayerActions.PlayCard(card);
+    action.perform(player);
+
+    const first = game.pendingSpellModeChoice;
+    expect(first.options).toEqual([{ text: "Choose a creature", enabled: false }, { text: "Choose a player", enabled: true }]);
+    first.submit(other, 1);
+    for (const invalid of [0, -1, 2, NaN, 0.5])
+        first.submit(player, invalid);
+    expect(game.pendingSpellModeChoice).toBe(first);
+    expect(game.pendingTargeter).toBeNull();
+    first.submit(player, null);
+    expect(game.pendingSpellModeChoice).toBeNull();
+    expect(game.priorityPlayer).toBe(player);
+
+    action.perform(player);
+    const second = game.pendingSpellModeChoice;
+    first.submit(player, 1);
+    expect(game.pendingSpellModeChoice).toBe(second);
+    second.submit(player, 1);
+    expect(game.pendingTargeter.validateTargets([other])).toBe(true);
+    game.pendingTargeter.onCancelled();
+
+    expect(card.zone).toBe(player.hand);
+    expect(forest.tapped).toBe(false);
+    expect(game.stack.objects).toEqual([]);
+    expect(playerActionManager.getCardActions(card, player)).toHaveLength(1);
+});
+
+test("announces the mode before X and preserves each spell's mode until it resolves", () => {
+    const other = game.addPlayer([]);
+    startMainPhase();
+    const def: CardDef = {
+        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{G}", abilities: [],
+        spellModes: [
+            { text: "Gain life", abilities: [{ parts: {
+                AbilityPart_Effect_GainLife: { inSignal: "SPELL_RESOLVE", target: "THIS.controller", amount: 1 },
+            } }] },
+            { text: "Target player gains life", abilities: [{ parts: {
+                AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] },
+                AbilityPart_Effect_GainLife: { inSignal: "SPELL_RESOLVE", target: "PLAYER", amount: 2 },
+            } }] },
+        ],
+    };
+    const first = addTestCard(def, player, player.hand);
+    const second = addTestCard(def, player, player.hand);
+    player.manaPool[ManaColour.G] = 3;
+    expect(game.stack.spellCast(player, first)).toBe(false);
+    expect(game.stack.spellCast(player, first, [other], 0, 0)).toBe(false);
+    expect(game.stack.spellCast(player, first, [], 0, 1)).toBe(false);
+    expect(game.stack.spellCast(player, first, [], 0, 2)).toBe(false);
+
+    new PlayerActions.PlayCard(first).perform(player);
+    expect(game.pendingSpellXChoice).toBeNull();
+    game.pendingSpellModeChoice.submit(player, 1);
+    expect(game.pendingTargeter).toBeNull();
+    game.pendingSpellXChoice.submit(player, 1);
+    game.pendingTargeter.onTargeted([other]);
+
+    new PlayerActions.PlayCard(second).perform(player);
+    game.pendingSpellModeChoice.submit(player, 0);
+    game.pendingSpellXChoice.submit(player, 0);
+    expect(game.pendingTargeter).toBeNull();
+    expect(game.stack.objects).toMatchObject([
+        { card: first.card, chosenMode: 1, chosenX: 1, targets: [other] },
+        { card: second.card, chosenMode: 0, chosenX: 0, targets: [] },
+    ]);
+
+    passPriorityRound();
+    expect([player.life, other.life]).toEqual([21, 20]);
+    passPriorityRound();
+    expect([player.life, other.life]).toEqual([21, 22]);
+});
 
 test("announces a safe affordable X, with cancellation before mana is paid", () => {
     const other = game.addPlayer([]);

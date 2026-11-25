@@ -33,6 +33,30 @@ export class UIResolutionChoice {
             this.addSpellXForm(choice);
             return;
         }
+        if (choice.kind === ResolutionChoiceKind.SpellMode) {
+            const prompt = document.createElement("p");
+            prompt.textContent = "Choose one mode.";
+            const list = this.optionsList = document.createElement("ul");
+            list.className = "resolution-card-options";
+            choice.options.forEach(({ text, enabled }, mode) => {
+                const item = document.createElement("li");
+                const option = document.createElement("button");
+                option.textContent = text;
+                option.disabled = !enabled;
+                option.addEventListener("click", () => choice.submit(choice.player, mode));
+                item.append(option);
+                list.append(item);
+            });
+            const cancel = document.createElement("button");
+            cancel.textContent = "Cancel";
+            cancel.addEventListener("click", () => choice.submit(choice.player, null));
+            this.panel.addEventListener("keydown", event => {
+                if (event.key === "Escape")
+                    choice.submit(choice.player, null);
+            });
+            this.panel.append(prompt, list, cancel);
+            return;
+        }
         if (choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
             const prompt = document.createElement("p");
             prompt.textContent = "Choose a prevention effect to apply next.";
@@ -221,7 +245,7 @@ export class UIResolutionChoice {
             this.firstInput.focus();
             this.firstInput.select();
         } else if (this.optionsList)
-            this.optionsList.querySelector("button")?.focus();
+            this.panel.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
         else
             this.root.focusCardSelection();
     }

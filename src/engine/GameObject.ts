@@ -49,11 +49,12 @@ export class CardObject extends GameObject {
     private basePower: number;
     private baseToughness: number;
     private baseAbilities: readonly Ability[];
+    private spellModeAbilities?: Map<number, readonly Ability[]>;
     private readonly activeBaseAbilities = new Set<Ability>();
     private basicLandAbilities?: Map<AbilityDef, Ability>;
     private readonly grantedAbilities = new Set<Ability>();
 
-    constructor(readonly card: Card) {
+    constructor(readonly card: Card, chosenMode?: number) {
         super();
         const def = card.def;
         this.name = def.name;
@@ -67,6 +68,8 @@ export class CardObject extends GameObject {
         // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
         this.colours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
         this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
+        if (chosenMode !== undefined)
+            this.baseAbilities = [...this.baseAbilities, ...this.getSpellModeAbilities(chosenMode)];
     }
 
     get type() { return this.baseType; }
@@ -209,15 +212,41 @@ export class CardObject extends GameObject {
             return !game.landPlayedThisTurn;
 
         return this.abilities.every(ability => ability.parts.every(part => part.canCast?.() ?? true))
-            && (this.spellTargeter?.hasLegalTargets() ?? true);
+            && (this.def.spellModes
+                ? this.def.spellModes.some((_, mode) => this.canChooseSpellMode(mode))
+                : (this.spellTargeter?.hasLegalTargets() ?? true));
+    }
+
+    canChooseSpellMode(mode: number): boolean {
+        // 700.2a: A mode may be chosen only if its casting requirements can be met.
+        return Number.isInteger(mode) && !!this.def.spellModes?.[mode]
+            && this.getSpellModeAbilities(mode).every(ability => ability.parts.every(part => part.canCast?.() ?? true))
+            && (this.getSpellTargeter(mode)?.hasLegalTargets() ?? true);
     }
 
     get spellTargeter(): AbilityPart_Target | undefined {
-        for (const ability of this.abilities) {
+        return this.getSpellTargeter();
+    }
+
+    getSpellTargeter(mode?: number): AbilityPart_Target | undefined {
+        // 700.2c: Only the chosen mode contributes its targets.
+        const abilities = mode === undefined ? this.abilities : [...this.abilities, ...this.getSpellModeAbilities(mode)];
+        for (const ability of abilities) {
             const target = ability.parts.find(part => part instanceof AbilityPart_Target);
             if (target)
                 return target;
         }
+    }
+
+    private getSpellModeAbilities(mode: number): readonly Ability[] {
+        const modeDef = this.def.spellModes?.[mode];
+        if (!modeDef)
+            return [];
+
+        const modes = this.spellModeAbilities ??= new Map();
+        if (!modes.has(mode))
+            modes.set(mode, modeDef.abilities.map(ability => makeAbility(ability, this)));
+        return modes.get(mode);
     }
 
     canAttachTo(target: Permanent): boolean {
@@ -321,8 +350,8 @@ export class Spell extends CardObject {
     override get resolvedDamageSource() { return this.resolvedPermanent; }
 
     constructor(card: Card, override readonly controller: Player, targets: readonly ActionTarget[],
-        readonly chosenX = 0) {
-        super(card);
+        readonly chosenX = 0, readonly chosenMode?: number) {
+        super(card, chosenMode);
         this.targets = [...targets];
         // 107.3a: X in the cost of a spell on the stack equals its announced value.
         if (this.variableManaSymbols)

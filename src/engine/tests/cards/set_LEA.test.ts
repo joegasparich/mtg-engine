@@ -3,7 +3,7 @@ import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
+import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
@@ -230,6 +230,83 @@ describe("Guardian Angel", () => {
         expect(game.getSpecialActions(caster)).toEqual([]);
         game.takeSpecialAction(caster, payment);
         expect(caster.manaPool[ManaColour.W]).toBe(1);
+    });
+});
+
+describe("Healing Salve", () => {
+    const def = cardData.find(card => card.name === "Healing Salve");
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+    let bear: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+        bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 1;
+    });
+
+    function chooseMode(mode: number) {
+        const [action] = playerActionManager.getCardActions(card, caster);
+        action.perform(caster);
+        expect(game.pendingSpellModeChoice.options).toEqual([
+            { text: "Target player gains 3 life.", enabled: true },
+            { text: "Prevent the next 3 damage that would be dealt to any target this turn.", enabled: true },
+        ]);
+        game.pendingSpellModeChoice.submit(caster, mode);
+        expect(caster.manaPool[ManaColour.W]).toBe(1);
+        return game.pendingTargeter;
+    }
+
+    test("gives the targeted player 3 life", () => {
+        const targeting = chooseMode(0);
+        expect(targeting.validateTargets([bear])).toBe(false);
+        targeting.onTargeted([opponent]);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(opponent.life).toBe(20);
+        passPriorityRound();
+        expect([caster.life, opponent.life]).toEqual([20, 23]);
+        gameEventManager.addEvent(new GameEvent_DealDamage(bear, opponent, 1));
+        expect(opponent.life).toBe(22);
+        expect(caster.graveyard.objects[0].card).toBe(card.card);
+    });
+
+    test("prevents 3 damage to a creature across multiple hits", () => {
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], caster, caster.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const targeting = chooseMode(1);
+        expect(targeting.validateTargets([land])).toBe(false);
+        targeting.onTargeted([bear]);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, bear, 2));
+        expect(bear.damageTaken).toBe(0);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, bear, 2));
+        expect(bear.damageTaken).toBe(1);
+        expect([caster.life, opponent.life]).toEqual([20, 20]);
+    });
+
+    test("prevents damage to a player until cleanup", () => {
+        chooseMode(1).onTargeted([caster]);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(bear, caster, 1));
+        expect(caster.life).toBe(20);
+        gameEventManager.addEvent(new GameEvent_Cleanup(caster));
+        gameEventManager.addEvent(new GameEvent_DealDamage(bear, caster, 2));
+        expect(caster.life).toBe(18);
+    });
+
+    test("does not shield a creature that left and returned before resolution", () => {
+        chooseMode(1).onTargeted([bear]);
+        const returned = moveTestCard(moveTestCard(bear, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], caster, caster.battlefield);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, returned, 1));
+        expect(returned.damageTaken).toBe(1);
+        expect(caster.graveyard.objects[0].card).toBe(card.card);
     });
 });
 

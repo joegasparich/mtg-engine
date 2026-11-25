@@ -565,6 +565,38 @@
         ]
     },
     {
+        "name": "Healing Salve",
+        "image_url": "https://cards.scryfall.io/large/front/d/9/d9df8d11-85e6-4428-b114-6e2d4f1d3a8e.jpg?1783919580",
+        "oracle_text": "Choose one —\n• Target player gains 3 life.\n• Prevent the next 3 damage that would be dealt to any target this turn.",
+        "type": "Instant",
+        "cost": "{W}",
+        "abilities": [],
+        "spellModes": [
+            {
+                "text": "Target player gains 3 life.",
+                "abilities": [{
+                    "parts": {
+                        "AbilityPart_Target": { "saveAs": "RECIPIENT", "validTargets": ["Player"] },
+                        "AbilityPart_Effect_GainLife": { "inSignal": "SPELL_RESOLVE", "target": "RECIPIENT", "amount": 3 }
+                    }
+                }]
+            },
+            {
+                "text": "Prevent the next 3 damage that would be dealt to any target this turn.",
+                "abilities": [{
+                    "parts": {
+                        "AbilityPart_Target": {
+                            "saveAs": "RECIPIENT",
+                            "validTargets": ["Player", "Card"],
+                            "targetValidator": { "cardType": "Creature", "onBattlefield": true }
+                        },
+                        "AbilityPart_Effect_PreventDamage": { "inSignal": "SPELL_RESOLVE", "target": "RECIPIENT", "amount": 3 }
+                    }
+                }]
+            }
+        ]
+    },
+    {
         "name": "Farmstead",
         "image_url": "https://cards.scryfall.io/large/front/0/b/0b4a1194-ce5d-4491-9700-1a1abc6ee8e4.jpg?1783919584",
         "oracle_text": "Enchant land\nEnchanted land has \"At the beginning of your upkeep, you may pay {W}{W}. If you do, you gain 1 life.\"",

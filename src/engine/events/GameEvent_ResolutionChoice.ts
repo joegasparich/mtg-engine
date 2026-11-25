@@ -37,6 +37,7 @@ export enum ResolutionChoiceKind {
     Card,
     ManaPayment,
     SpellX,
+    SpellMode,
     DamagePreventionOrder,
     DamagePreventionAllocation,
 }
@@ -67,6 +68,14 @@ export type SpellXChoice = {
     submit(player: Player, x: number | null): void;
 };
 
+export type SpellModeChoice = {
+    readonly kind: ResolutionChoiceKind.SpellMode;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly options: readonly { readonly text: string; readonly enabled: boolean }[];
+    submit(player: Player, mode: number | null): void;
+};
+
 export type DamagePreventionOrderChoice = {
     readonly kind: ResolutionChoiceKind.DamagePreventionOrder;
     readonly player: Player;
@@ -85,7 +94,7 @@ export type DamagePreventionAllocationChoice = {
 };
 
 export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
-export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice | SpellXChoice | DamagePreventionChoice;
+export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
 
 function isDamagePreventionChoice(choice: ResolutionChoice): choice is DamagePreventionChoice {
     return choice.kind === ResolutionChoiceKind.DamagePreventionOrder

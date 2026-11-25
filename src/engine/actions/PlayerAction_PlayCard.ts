@@ -1,7 +1,7 @@
 import { PlayerAction } from "@engine/actions/PlayerAction";
 import playerActionManager,{ ActionTarget } from "@engine/actions/PlayerActionManager";
 import { GameEvent_CastSpell,GameEvent_PlayLand } from "@engine/events";
-import { ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { ResolutionChoiceKind,type SpellModeChoice,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { ManaUtility } from "@engine/mana";
@@ -21,15 +21,44 @@ export class PlayerAction_PlayCard extends PlayerAction {
             return;
         }
 
-        if (this.object.variableManaSymbols) {
-            this.chooseX(player);
-            return;
-        }
-
-        this.chooseTargets(player, 0);
+        if (this.object.def.spellModes)
+            this.chooseMode(player);
+        else
+            this.chooseXOrTargets(player);
     }
 
-    private chooseX(player: Player) {
+    private chooseMode(player: Player) {
+        const canPay = () => playerActionManager.canAutoPayManaCost(this.getCost(0), player);
+        if (!canPay())
+            return;
+
+        // 601.2b–c: Announce the mode before X and any targets.
+        const currentGame = game;
+        const choice: SpellModeChoice = {
+            kind: ResolutionChoiceKind.SpellMode,
+            player,
+            sourceName: this.object.name,
+            options: this.object.def.spellModes.map(({ text }, mode) => ({
+                text, enabled: this.object.canChooseSpellMode(mode),
+            })),
+            submit: (actor, mode) => currentGame.submitResolutionChoice(choice, actor,
+                () => mode === null || (choice.options[mode]?.enabled && this.object.canChooseSpellMode(mode) && canPay()),
+                () => {
+                    if (mode !== null && this.canPlay(player, mode))
+                        this.chooseXOrTargets(player, mode);
+                }),
+        };
+        currentGame.openResolutionChoice(choice);
+    }
+
+    private chooseXOrTargets(player: Player, mode?: number) {
+        if (this.object.variableManaSymbols)
+            this.chooseX(player, mode);
+        else
+            this.chooseTargets(player, 0, mode);
+    }
+
+    private chooseX(player: Player, mode?: number) {
         const max = playerActionManager.maxAffordableX(this.object, player);
         if (max < 0)
             return;
@@ -45,15 +74,15 @@ export class PlayerAction_PlayCard extends PlayerAction {
                 () => x === null || (Number.isSafeInteger(x) && x >= 0 && x <= max
                     && playerActionManager.canAutoPayManaCost(this.getCost(x), player)),
                 () => {
-                    if (x !== null && this.canPlay(player))
-                        this.chooseTargets(player, x);
+                    if (x !== null && this.canPlay(player, mode))
+                        this.chooseTargets(player, x, mode);
                 }),
         };
         currentGame.openResolutionChoice(choice);
     }
 
-    private chooseTargets(player: Player, x: number) {
-        const target = this.object.spellTargeter;
+    private chooseTargets(player: Player, x: number, mode?: number) {
+        const target = this.object.getSpellTargeter(mode);
         if (target) {
             if (!playerActionManager.canAutoPayManaCost(this.getCost(x), player))
                 return;
@@ -61,17 +90,18 @@ export class PlayerAction_PlayCard extends PlayerAction {
             // 601.2c, 601.2h
             playerActionManager.startTargeting(this.object, target.validTargets, target.count,
                 targets => target.validateTargets(targets), targets => {
-                    if (this.canPlay(player))
-                        this.castSpell(player, x, targets);
+                    if (this.canPlay(player, mode))
+                        this.castSpell(player, x, targets, mode);
                 });
             return;
         }
 
-        this.castSpell(player, x);
+        this.castSpell(player, x, [], mode);
     }
 
-    private canPlay(player: Player): boolean {
-        return player === this.object.owner && this.object.zone === player.hand && this.object.canPlay();
+    private canPlay(player: Player, mode?: number): boolean {
+        return player === this.object.owner && this.object.zone === player.hand && this.object.canPlay()
+            && (mode === undefined || this.object.canChooseSpellMode(mode));
     }
 
     private getCost(x: number) {
@@ -80,8 +110,8 @@ export class PlayerAction_PlayCard extends PlayerAction {
             : this.object.cost;
     }
 
-    private castSpell(player: Player, x: number, targets: readonly ActionTarget[] = []) {
+    private castSpell(player: Player, x: number, targets: readonly ActionTarget[], mode?: number) {
         if (playerActionManager.payManaCost(this.getCost(x), player))
-            gameEventManager.addEvent(new GameEvent_CastSpell(player, this.object, targets, x));
+            gameEventManager.addEvent(new GameEvent_CastSpell(player, this.object, targets, x, mode));
     }
 }

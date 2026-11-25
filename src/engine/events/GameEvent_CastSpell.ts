@@ -11,7 +11,7 @@ export class GameEvent_CastSpell extends GameEvent {
     handObject: CardObject;
 
     constructor(caster: Player, handObject: CardObject, readonly targets: readonly ActionTarget[] = [],
-        readonly chosenX = 0) {
+        readonly chosenX = 0, readonly chosenMode?: number) {
         super();
 
         this.caster = caster;
@@ -23,7 +23,7 @@ export class GameEvent_CastSpell extends GameEvent {
 
     perform(): boolean {
         if (this.handObject.owner !== this.caster || !this.handObject.canPlay()
-            || !game.stack.spellCast(this.caster, this.handObject, this.targets, this.chosenX))
+            || !game.stack.spellCast(this.caster, this.handObject, this.targets, this.chosenX, this.chosenMode))
             return false;
 
         game.notePriorityAction();

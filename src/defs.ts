@@ -10,7 +10,13 @@ export interface CardDef {
     power: number,
     toughness: number,
     abilities: AbilityDef[],
+    spellModes?: readonly SpellModeDef[],
 }
+
+export type SpellModeDef = {
+    text: string;
+    abilities: readonly AbilityDef[];
+};
 
 export enum CardType {
     Land = "Land",

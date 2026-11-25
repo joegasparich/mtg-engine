@@ -54,6 +54,9 @@ export default class Game {
     get pendingSpellXChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.SpellX ? this.resolutionChoice : null;
     }
+    get pendingSpellModeChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.SpellMode ? this.resolutionChoice : null;
+    }
     get pendingDamagePreventionChoice() {
         const choice = this.resolutionChoice;
         return choice?.kind === ResolutionChoiceKind.DamagePreventionOrder
