@@ -28,6 +28,9 @@ export enum GameEventType {
     DiscardCard,
     RequestResolutionChoice,
     SubmitResolutionChoice,
+    CheckCombatDamageChooser,
+    RequestCombatDamageChoice,
+    SubmitCombatDamageChoice,
 }
 
 export abstract class GameEvent {
@@ -91,15 +94,15 @@ class GameEventManager {
     private readonly resolutionSteps: (() => void)[] = [];
     private readonly idleCallbacks: (() => void)[] = [];
     private settleState?: () => boolean;
-    private waitingForResolutionInput?: () => boolean;
+    private waitingForChoice?: () => boolean;
 
-    startGame(settle: () => boolean, waitingForResolutionInput: () => boolean) {
+    startGame(settle: () => boolean, waitingForChoice: () => boolean) {
         this.activeEvents.length = 0;
         this.eventsResolvedCallback.length = 0;
         this.resolutionSteps.length = 0;
         this.idleCallbacks.length = 0;
         this.settleState = settle;
-        this.waitingForResolutionInput = waitingForResolutionInput;
+        this.waitingForChoice = waitingForChoice;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -237,8 +240,8 @@ class GameEventManager {
                     for (const event of events) {
                         this.performEvent(event);
                     }
-                } else if (this.waitingForResolutionInput?.()) {
-                    // 117.2e: Process input events while keeping the current resolution open.
+                } else if (this.waitingForChoice?.()) {
+                    // 117.2e: Process input events before resuming the current game action.
                     break;
                 } else if (this.eventsResolvedCallback.length > 0) {
                     this.eventsResolvedCallback.shift()();

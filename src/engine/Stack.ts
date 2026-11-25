@@ -82,7 +82,7 @@ export class Stack extends Zone<Spell | StackAbility> {
     }
 
     resolveSpell(spell: Spell) {
-        if (spell.zone !== this || this.completeResolution || game.pendingResolutionChoice)
+        if (spell.zone !== this || this.completeResolution || game.pendingResolutionChoice || game.pendingCombatDamageChoice)
             return;
 
         if (!gameEventManager.performingEvents) {

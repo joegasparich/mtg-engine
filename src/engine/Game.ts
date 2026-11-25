@@ -1,6 +1,7 @@
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
+import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import { type CardChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
 import type { CardObject } from "@engine/GameObject";
@@ -26,13 +27,16 @@ export default class Game {
     infiniteMana = false;
     pendingTargeter: Targeter | null = null;
     private resolutionChoice: ResolutionChoice | null = null;
+    private combatDamageChoice: CombatDamageChoice | null = null;
 
     get pendingResolutionChoice() { return this.resolutionChoice; }
-    get hasPendingPlayerInput() { return !!(this.pendingTargeter || this.resolutionChoice); }
+    get pendingCombatDamageChoice() { return this.combatDamageChoice; }
+    get hasPendingPlayerInput() { return !!(this.pendingTargeter || this.resolutionChoice || this.combatDamageChoice); }
 
     static init() {
+        CombatManager.reset();
         game = new Game();
-        gameEventManager.startGame(() => game.settleState(), () => game.pendingResolutionChoice !== null);
+        gameEventManager.startGame(() => game.settleState(), () => !!(game.pendingResolutionChoice || game.pendingCombatDamageChoice));
     }
 
     requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void) {
@@ -62,6 +66,33 @@ export default class Game {
         };
         this.resolutionChoice = choice;
         gameEventManager.addEvent(new GameEvent_RequestResolutionChoice(choice));
+    }
+
+    requestCombatDamageChoice(details: CombatDamageAssignment, resume: (amounts: readonly number[]) => void) {
+        if (this.hasPendingPlayerInput)
+            throw new Error("A player choice is already pending");
+
+        const choice: CombatDamageChoice = {
+            ...details,
+            submit: (player, amounts) => {
+                if (game !== this || this.combatDamageChoice !== choice || player !== choice.player)
+                    return;
+
+                const assigned = [...amounts];
+                gameEventManager.addEvent(new GameEvent_SubmitCombatDamageChoice(choice, () => {
+                    if (this.combatDamageChoice !== choice || assigned.length !== choice.recipients.length
+                        || assigned.some(amount => !Number.isInteger(amount) || amount < 0)
+                        || assigned.reduce((total, amount) => total + amount, 0) !== choice.total)
+                        return false;
+
+                    this.combatDamageChoice = null;
+                    resume(assigned);
+                    return true;
+                }));
+            },
+        };
+        this.combatDamageChoice = choice;
+        gameEventManager.addEvent(new GameEvent_RequestCombatDamageChoice(choice));
     }
 
     addPlayer(deck: number[]): Player {
@@ -114,7 +145,7 @@ export default class Game {
             this.checkAutoSkip();
     }
     nextStep(doAutoSkip: boolean): boolean {
-        if (this.hasPendingPlayerInput)
+        if (this.hasPendingPlayerInput || this.currentStep().canEnd?.() === false)
             return false;
 
         this.endStep(this.currentStepIndex);
@@ -222,6 +253,7 @@ export default class Game {
     }
 
     reset() {
+        this.combatDamageChoice = null;
         CombatManager.reset();
     }
 }

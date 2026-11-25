@@ -1,4 +1,10 @@
 {
+    "banding": {
+        "keyword": "banding",
+        "parts": {
+            "AbilityPart_Banding": {}
+        }
+    },
     "defender": {
         "keyword": "defender",
         "parts": {

@@ -260,15 +260,23 @@ export default class UIRoot extends PIXI.Container {
             control.className = 'turn-control';
 
         gameEventManager.onPerformed(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
-        gameEventManager.onPerformed(GameEventType.StepStart, () => {
-            this.announceCardSelection();
-            const declaring = UICombat.declaresAt(game.currentStepIndex);
+        const syncTurnControls = () => {
+            const inCombatInput = UICombat.declaresAt(game.currentStepIndex) || game.pendingCombatDamageChoice;
             for (const control of turnControls) {
-                if (declaring)
+                if (inCombatInput)
                     control.hide();
                 else
                     control.show();
             }
+        };
+        gameEventManager.onPerformed(GameEventType.RequestCombatDamageChoice, () => {
+            removeCustomContextMenu();
+            syncTurnControls();
+        });
+        gameEventManager.onPerformed(GameEventType.SubmitCombatDamageChoice, syncTurnControls);
+        gameEventManager.onPerformed(GameEventType.StepStart, () => {
+            this.announceCardSelection();
+            syncTurnControls();
             currentStepLabel.text = Step.toString(game.currentStepIndex);
 
             const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;

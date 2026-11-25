@@ -193,3 +193,187 @@ test("can reassign and withdraw a block while keeping the previous assignment af
     edit.perform(playerB, [second]);
     expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
 });
+
+function addBandingCreature(player: Player) {
+    return addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ keyword: Keyword.Banding, parts: {} }],
+    }, player, player.battlefield);
+}
+
+test("validates and edits multiple bands during attacker declaration", () => {
+    const bander = addBandingCreature(playerA);
+    const secondBander = addBandingCreature(playerA);
+    const first = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const otherDefender = game.addPlayer(BASIC_DECK);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    expect(CombatManager.setAttackingBands(playerA, [[bander, first]])).toBe(false);
+    for (const attacker of [bander, secondBander, first, second])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+
+    expect(CombatManager.setAttackingBands(playerA, [[first, second]])).toBe(false);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, first, second]])).toBe(false);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, first], [bander, second]])).toBe(false);
+    expect(CombatManager.setAttackingBands(playerB, [[bander, first]])).toBe(false);
+    CombatManager.attackingCreatures.set(second, otherDefender);
+    expect(CombatManager.setAttackingBands(playerA, [[secondBander, second]])).toBe(false);
+    CombatManager.attackingCreatures.set(second, playerB);
+
+    expect(CombatManager.setAttackingBands(playerA, [[bander, secondBander, first]])).toBe(true);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, first], [secondBander, second]])).toBe(true);
+    expect(new PlayerActions.DeclareAttacker(bander).withdraw(playerA)).toBe(true);
+    expect(CombatManager.attackingBands).toEqual([new Set([secondBander, second])]);
+    expect(CombatManager.setAttackingBands(playerA, [[secondBander, first]])).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(CombatManager.setAttackingBands(playerA, [])).toBe(false);
+    expect(CombatManager.attackingBands).toEqual([new Set([secondBander, first])]);
+});
+
+test("a legal ground block also blocks a flyer in the band, even if the declared target leaves", () => {
+    const bander = addBandingCreature(playerA);
+    const flyer = addTestCard(cardData[AIR_ELEMENTAL], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [bander, flyer])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, flyer]])).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    const block = new PlayerActions.DeclareBlocker(blocker);
+    block.perform(playerB, [flyer]);
+    expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
+    block.perform(playerB, [bander]);
+    expect([...CombatManager.blockRelationships()]).toEqual([[blocker, bander], [blocker, flyer]]);
+    CombatManager.confirmBlocks();
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(bander, playerA.graveyard));
+    expect(CombatManager.attackingBands).toEqual([new Set([flyer])]);
+    expect([...CombatManager.blockRelationships()]).toEqual([[blocker, flyer]]);
+
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(flyer.damageTaken).toBe(2);
+    expect(blocker.retired).toBe(true);
+    expect([...CombatManager.blockRelationships()]).toEqual([]);
+    expect(CombatManager.isBlocked(flyer)).toBe(true);
+});
+
+test("a declared band persists after losing banding and an effect can block the whole band", () => {
+    const bander = addBandingCreature(playerA);
+    const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[AIR_ELEMENTAL], playerB, playerB.battlefield);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const member of [bander, attacker])
+        new PlayerActions.DeclareAttacker(member).perform(playerA);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, attacker]])).toBe(true);
+
+    const abilities = bander.abilities;
+    bander.abilities = [];
+    expect(game.nextStep(false)).toBe(false);
+    bander.abilities = abilities;
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    bander.abilities = [];
+    abilities.forEach(ability => ability.cleanup());
+
+    CombatManager.markBlocked(attacker);
+    expect(CombatManager.isBlocked(bander)).toBe(true);
+    expect(CombatManager.isBlocked(attacker)).toBe(true);
+    expect([...CombatManager.blockRelationships()]).toEqual([]);
+
+    new PlayerActions.DeclareBlocker(blocker).perform(playerB, [attacker]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(game.pendingCombatDamageChoice).toMatchObject({ player: playerB, source: blocker, recipients: [bander, attacker] });
+    game.pendingCombatDamageChoice.submit(playerB, [0, 4]);
+    expect(bander.zone).toBe(playerA.battlefield);
+    expect(attacker.retired).toBe(true);
+    expect(blocker.retired).toBe(true);
+});
+
+test("an attacking creature with banding lets the attacker assign the blocker's damage", () => {
+    const bander = addBandingCreature(playerA);
+    const partner = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [bander, partner])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+    expect(CombatManager.setAttackingBands(playerA, [[bander, partner]])).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    new PlayerActions.DeclareBlocker(blocker).perform(playerB, [partner]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    const choice = game.pendingCombatDamageChoice;
+    expect(choice).toMatchObject({ player: playerA, source: blocker, recipients: [bander, partner], total: 2 });
+    choice.submit(playerA, [2, 0]);
+    expect(bander.retired).toBe(true);
+    expect(partner.damageTaken).toBe(0);
+    expect(blocker.damageTaken).toBe(4);
+});
+
+test("a blocking creature with banding lets the defender assign the attacker's damage", () => {
+    const attacker = addTestCard({ ...cardData[GRIZZLY_BEARS], power: 4, toughness: 4 }, playerA, playerA.battlefield);
+    const bander = addBandingCreature(playerB);
+    const partner = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    for (const blocker of [bander, partner])
+        new PlayerActions.DeclareBlocker(blocker).perform(playerB, [attacker]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    const choice = game.pendingCombatDamageChoice;
+    expect(choice).toMatchObject({ player: playerB, source: attacker, recipients: [bander, partner], total: 4 });
+    choice.submit(playerB, [4, 0]);
+    expect(bander.retired).toBe(true);
+    expect(partner.damageTaken).toBe(0);
+    expect(attacker.damageTaken).toBe(4);
+});
+
+test("collects and validates normal damage splits before dealing all assigned damage together", () => {
+    const first = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blockers = Array.from({ length: 4 }, () => addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield));
+    blockers[0].damageTaken = 1;
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [first, second])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    blockers.forEach((blocker, index) => new PlayerActions.DeclareBlocker(blocker).perform(playerB, [index < 2 ? first : second]));
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
+    const choice = game.pendingCombatDamageChoice;
+    expect(choice).toMatchObject({ player: playerA, source: first, recipients: blockers.slice(0, 2), total: 2 });
+    expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+    expect(game.nextStep(false)).toBe(false);
+    expect(playerActionManager.getAvailableActions(playerA).size).toBe(0);
+    choice.submit(playerB, [1, 1]);
+    for (const amounts of [[2], [1, 0], [2, 1], [-1, 3], [0.5, 1.5], [NaN, 2]])
+        choice.submit(playerA, amounts);
+    expect(game.pendingCombatDamageChoice).toBe(choice);
+
+    choice.submit(playerA, [1, 1]);
+    const next = game.pendingCombatDamageChoice;
+    expect(next).toMatchObject({ player: playerA, source: second, recipients: blockers.slice(2), total: 2 });
+    expect(blockers.map(blocker => blocker.damageTaken)).toEqual([1, 0, 0, 0]);
+    expect(first.damageTaken).toBe(0);
+    choice.submit(playerA, [0, 2]);
+    expect(game.pendingCombatDamageChoice).toBe(next);
+
+    next.submit(playerA, [0, 2]);
+    expect(game.pendingCombatDamageChoice).toBeNull();
+    expect(game.currentStepIndex).toBe(StepIndex.EndOfCombat);
+    expect(blockers.map(blocker => blocker.damageTaken)).toEqual([2, 1, 0, 2]);
+    expect([first, second].map(attacker => attacker.damageTaken)).toEqual([4, 4]);
+    expect(playerA.graveyard.objects.map(object => object.card)).toEqual(expect.arrayContaining([first.card, second.card]));
+    expect(playerB.graveyard.objects.map(object => object.card)).toEqual(expect.arrayContaining([blockers[0].card, blockers[3].card]));
+});

@@ -11,6 +11,7 @@ interface Step {
 
     onStart(player: Player): void;
     onEnd(player: Player): void;
+    canEnd?(): boolean;
 }
 
 export class UntapStep implements Step {
@@ -95,7 +96,12 @@ export class DeclareAttackersStep implements Step {
         this.message = "Declare attackers";
         this.buttons = [["Finish declaring", this.onFinishDeclaring]];
     }
+    canEnd(): boolean {
+        return CombatManager.canConfirmAttackers();
+    }
+
     onEnd(): void {
+        CombatManager.confirmAttackers();
         // 508.1f
         for (const attacker of CombatManager.attackingCreatures.keys()) {
             gameEventManager.addEvent(new GameEvent_TapCard(attacker));
@@ -122,6 +128,7 @@ export class DeclareBlockersStep implements Step {
             game.activePlayerID = game.randomOpponent(player).id;
     }
     onEnd(player: Player): void {
+        CombatManager.confirmBlocks();
         game.activePlayerID = game.currentTurnPlayerID;
     }
 
@@ -139,12 +146,9 @@ export class CombatDamageStep implements Step {
     message: string = null;
     buttons: [string, () => void][] = [];
     onStart(player: Player): void {
-        // 510.1, 510.2
-        CombatManager.calculateAndAssignDamage();
-
-        // 510.3
         game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
+        // 510.1, 510.2: An assignment choice can pause this turn-based action.
+        CombatManager.assignCombatDamage();
     }
     onEnd(player: Player): void {}
 }
@@ -229,7 +233,7 @@ export enum PhaseIndex {
 }
 
 export namespace Step {
-    export const all = [
+    export const all: Step[] = [
         new UntapStep(),
         new UpkeepStep(),
         new DrawStep(),

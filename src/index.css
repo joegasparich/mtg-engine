@@ -111,6 +111,29 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 .card-selection-panel button:last-child:hover { background: #34665e; }
 .card-selection-panel button:disabled { opacity: .55; cursor: default; transform: none; }
 
+.combat-panel {
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+}
+
+.combat-damage-form label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.combat-damage-form input {
+    width: 3.5em;
+    padding: 3px 4px;
+    color: inherit;
+    background: #142d36;
+    border: 1px solid #54726d;
+    border-radius: 4px;
+}
+
 .testing-toggle {
     position: fixed;
     right: 16px;

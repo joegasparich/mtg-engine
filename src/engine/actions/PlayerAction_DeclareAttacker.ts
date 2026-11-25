@@ -19,7 +19,7 @@ export class PlayerAction_DeclareAttacker extends PlayerAction<Permanent> {
     }
 
     withdraw(player: Player): boolean {
-        return this.canEdit(player) && CombatManager.attackingCreatures.delete(this.object);
+        return this.canEdit(player) && CombatManager.removeFromCombat(this.object);
     }
 
     private canEdit(player: Player) {

@@ -5,10 +5,11 @@ import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_GoToNextStep } from "@engine/events";
+import type { CombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import type { GameEvent_StepEnd } from "@engine/events/GameEvent_Step";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
-import { StepIndex } from "@engine/Step";
+import { Step,StepIndex } from "@engine/Step";
 import { drawArrow } from "@ui/drawUtility";
 import type UICard from "@ui/UICard";
 import { UICardSelection } from "@ui/UICardSelection";
@@ -25,13 +26,22 @@ export class UICombat {
     private readonly links = new PIXI.Container<PIXI.Graphics>();
     private readonly badges = new Map<Permanent, PIXI.Container>();
     private readonly attackNumbers = new Map<Permanent, number>();
+    private readonly blockNumbers = new Map<Permanent, number>();
+    private blockLinks: [Permanent, Permanent][] = [];
     private readonly highlighted = new Set<UICard>();
     private readonly panel = document.createElement('section');
     private readonly heading = document.createElement('h2');
     private readonly status = document.createElement('p');
     private readonly instruction = document.createElement('p');
     private readonly removeBlock = document.createElement('button');
+    private readonly formBand = document.createElement('button');
+    private readonly cancelBand = document.createElement('button');
+    private readonly bandList = document.createElement('div');
     private readonly confirm = document.createElement('button');
+    private readonly damageForm = document.createElement('form');
+    private displayedDamageChoice?: CombatDamageChoice;
+    private formingBand = false;
+    private readonly bandSelection = new UICardSelection<Permanent>(() => this.sync());
     private selectedBlocker: Permanent | null = null;
     private readonly eligible: Set<Permanent> = new Set();
     private readonly legalTargets: Set<Permanent> = new Set();
@@ -47,7 +57,11 @@ export class UICombat {
 
     get cardSelection() {
         if (game.currentStepIndex === StepIndex.DeclareAttackers && !game.hasPendingPlayerInput)
-            return this.attackerSelection;
+            return this.formingBand ? this.bandSelection : this.attackerSelection;
+    }
+
+    get isSelectingAttackers() {
+        return this.cardSelection === this.attackerSelection;
     }
 
     constructor(private readonly root: UIRoot) {
@@ -63,8 +77,14 @@ export class UICombat {
         this.panel.hidden = true;
         this.removeBlock.textContent = 'Remove block';
         this.removeBlock.addEventListener('click', this.withdrawBlock);
+        this.cancelBand.textContent = 'Cancel band';
+        this.cancelBand.addEventListener('click', this.cancelBandSelection);
+        this.formBand.addEventListener('click', this.editBand);
+        this.bandList.className = 'combat-band-list';
+        this.damageForm.className = 'combat-damage-form';
         this.confirm.addEventListener('click', () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
-        this.panel.append(this.heading, this.status, this.instruction, this.removeBlock, this.confirm);
+        this.panel.append(this.heading, this.status, this.instruction, this.removeBlock,
+            this.bandList, this.formBand, this.cancelBand, this.confirm, this.damageForm);
         document.body.append(this.panel);
 
         gameEventManager.onPerformed(GameEventType.StepStart, () => {
@@ -76,8 +96,15 @@ export class UICombat {
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.sync);
         gameEventManager.onPerformed(GameEventType.TapCard, this.sync);
         gameEventManager.onPerformed(GameEventType.UntapCard, this.sync);
+        gameEventManager.onPerformed(GameEventType.RequestCombatDamageChoice, this.sync);
+        gameEventManager.onPerformed(GameEventType.SubmitCombatDamageChoice, this.sync);
         window.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && this.selectedBlocker) {
+            if (event.key !== 'Escape')
+                return;
+
+            if (this.formingBand) {
+                this.cancelBandSelection();
+            } else if (this.selectedBlocker) {
                 this.selectedBlocker = null;
                 this.sync();
             }
@@ -122,13 +149,39 @@ export class UICombat {
     }
 
     @autobind
+    private editBand() {
+        if (this.formingBand) {
+            const groups = CombatManager.attackingBands.map(band => [...band]);
+            if (!CombatManager.setAttackingBands(game.activePlayer(), [...groups, this.bandSelection.selection]))
+                return;
+        }
+
+        this.formingBand = !this.formingBand;
+        this.bandSelection.setCards([]);
+        this.sync();
+        this.root.focusCardSelection();
+    }
+
+    @autobind
+    private cancelBandSelection() {
+        this.formingBand = false;
+        this.bandSelection.setCards([]);
+        this.sync();
+        this.root.focusCardSelection();
+    }
+
+    @autobind
     private onStepEnd(event: GameEvent_StepEnd) {
         this.selectedBlocker = null;
         this.panel.hidden = true;
-        if (event.stepIndex === StepIndex.DeclareAttackers)
+        if (event.stepIndex === StepIndex.DeclareAttackers) {
+            this.formingBand = false;
+            this.bandSelection.setCards([]);
             this.attackerSelection.setCards([]);
+        }
         if (event.stepIndex === StepIndex.EndOfCombat) {
             this.attackNumbers.clear();
+            this.blockNumbers.clear();
             this.updateCards();
         }
     }
@@ -139,6 +192,7 @@ export class UICombat {
         const declaring = UICombat.declaresAt(step);
         const attacking = step === StepIndex.DeclareAttackers;
         const actor = game.activePlayer();
+        const damageChoice = game.pendingCombatDamageChoice;
         const attackers = CombatManager.attackingCreatures;
         const blockers = CombatManager.blockingCreatures;
 
@@ -154,8 +208,10 @@ export class UICombat {
         if (!this.eligible.has(this.selectedBlocker))
             this.selectedBlocker = null;
 
-        if (attacking)
+        if (attacking) {
             this.attackerSelection.setCards(new Set([...this.eligible, ...attackers.keys()]), attackers.keys());
+            this.syncBandControls();
+        }
 
         if (this.selectedBlocker) {
             for (const attacker of CombatManager.potentialBlockTargetsFor(this.selectedBlocker))
@@ -168,18 +224,29 @@ export class UICombat {
         }
         this.updateCards();
 
-        this.panel.hidden = !declaring;
+        this.panel.hidden = !declaring && !damageChoice;
+        this.removeBlock.hidden = !declaring || !this.selectedBlocker || !blockers.has(this.selectedBlocker);
+        this.bandList.hidden = !attacking || this.formingBand;
+        this.formBand.hidden = !attacking || (!this.formingBand && this.formBand.disabled);
+        this.cancelBand.hidden = !attacking || !this.formingBand;
+        this.confirm.hidden = !declaring || this.formingBand;
+        this.damageForm.hidden = !damageChoice;
+        this.syncDamageChoice(damageChoice);
         if (!declaring)
             return;
 
         const count = attacking ? attackers.size : blockers.size;
         const noun = attacking ? 'attacker' : 'block';
-        this.heading.textContent = attacking ? 'Declare attackers' : 'Declare blockers';
-        this.status.textContent = `Player ${actor?.id ?? '—'} · ${count} ${noun}${count === 1 ? '' : 's'} selected`;
+        this.heading.textContent = this.formingBand ? 'Form attacking band' : Step.toString(step);
+        const selection = this.formingBand ? `${this.bandSelection.count} in this band`
+            : `${count} ${noun}${count === 1 ? '' : 's'} selected`;
+        this.status.textContent = `Player ${actor?.id ?? '—'} · ${selection}`;
         this.confirm.textContent = count ? (attacking ? 'Confirm attackers' : 'Confirm blocks') : (attacking ? 'No attacks' : 'No blocks');
-        this.removeBlock.hidden = !this.selectedBlocker || !blockers.has(this.selectedBlocker);
+        this.confirm.disabled = attacking && !CombatManager.canConfirmAttackers();
         if (attacking) {
-            this.instruction.textContent = 'Select highlighted creatures to attack.';
+            this.instruction.textContent = this.formingBand
+                ? 'Choose which attackers join this band. Up to one can lack banding.'
+                : 'Select highlighted creatures to attack.';
         } else if (this.selectedBlocker) {
             this.instruction.textContent = `Click a highlighted attacker for ${this.selectedBlocker.name} to block. Esc cancels selection.`;
         } else {
@@ -187,20 +254,129 @@ export class UICombat {
         }
     }
 
+    private syncBandControls() {
+        const actor = game.activePlayer();
+        const bands = CombatManager.attackingBands;
+        const groups = bands.map(band => [...band]);
+        const members = new Set(groups.flat());
+        const available = [...CombatManager.attackingCreatures.keys()].filter(attacker => !members.has(attacker));
+        const canFormBand = (members: readonly Permanent[]) => CombatManager.canSetAttackingBands(actor, [...groups, members]);
+
+        this.formBand.textContent = this.formingBand ? 'Create band' : 'Form band';
+        if (this.formingBand) {
+            const chosen = this.bandSelection.selection.filter(card => available.includes(card));
+            const selectable = available.filter(attacker => !chosen.length || chosen.includes(attacker) || canFormBand([...chosen, attacker]));
+            this.bandSelection.setCards(selectable, chosen);
+            this.formBand.disabled = chosen.length < 2 || !canFormBand(chosen);
+        } else {
+            this.formBand.disabled = available.length < 2 || !available.some(attacker => canFormBand([attacker]));
+        }
+
+        this.bandList.replaceChildren(...groups.map((group, index) => {
+            const button = document.createElement('button');
+            button.textContent = `Disband ${index + 1}`;
+            button.setAttribute('aria-label', `Disband ${index + 1} (${group.map(card => card.name).join(', ')})`);
+            button.addEventListener('click', () => {
+                if (CombatManager.setAttackingBands(actor, groups.filter((_, i) => i !== index))) {
+                    this.sync();
+                    this.root.focusCardSelection();
+                }
+            });
+            return button;
+        }));
+    }
+
+    private syncDamageChoice(choice?: CombatDamageChoice) {
+        if (this.displayedDamageChoice === choice)
+            return;
+
+        this.displayedDamageChoice = choice;
+        this.damageForm.replaceChildren();
+        this.damageForm.onsubmit = null;
+        if (!choice)
+            return;
+
+        this.heading.textContent = 'Assign combat damage';
+        this.status.textContent = `Player ${choice.player.id} · ${this.combatantName(choice.source)}`;
+        this.instruction.textContent = `Divide ${choice.total} damage among these creatures.`;
+
+        const inputs = choice.recipients.map(recipient => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '0';
+            input.max = String(choice.total);
+            input.step = '1';
+            input.required = true;
+            input.value = '0';
+            const label = document.createElement('label');
+            label.append(this.combatantName(recipient), input);
+            this.damageForm.append(label);
+            return input;
+        });
+
+        const progress = document.createElement('p');
+        progress.setAttribute('aria-live', 'polite');
+        const submit = document.createElement('button');
+        submit.type = 'submit';
+        submit.textContent = 'Confirm damage';
+
+        const update = () => {
+            const assigned = inputs.reduce((total, input) => total + (input.valueAsNumber || 0), 0);
+            progress.textContent = `${assigned} of ${choice.total} assigned`;
+            submit.disabled = assigned !== choice.total || !this.damageForm.checkValidity();
+        };
+        for (const input of inputs)
+            input.addEventListener('input', update);
+        this.damageForm.append(progress, submit);
+        this.damageForm.onsubmit = event => {
+            event.preventDefault();
+            if (!submit.disabled)
+                choice.submit(choice.player, inputs.map(input => input.valueAsNumber));
+        };
+        update();
+        inputs[0].focus();
+    }
+
+    private combatantName(permanent: Permanent) {
+        return this.attackNumbers.has(permanent)
+            ? `${permanent.name} (attack ${this.attackNumbers.get(permanent)})`
+            : `${permanent.name} (blocker ${this.blockNumbers.get(permanent)})`;
+    }
+
     private updateCards() {
         const attackers = CombatManager.attackingCreatures;
-        const blockers = CombatManager.blockingCreatures;
+        const choice = game.pendingCombatDamageChoice;
+        const bandNumbers = new Map<Permanent, number>();
+        const bands = CombatManager.attackingBands;
+        bands.forEach((band, index) => {
+            for (const member of band)
+                bandNumbers.set(member, index + 1);
+        });
+        if (this.formingBand) {
+            for (const member of this.bandSelection.selection)
+                bandNumbers.set(member, bands.length + 1);
+        }
+
+        this.blockLinks = [...CombatManager.blockRelationships()];
+        const blockedAttackers = new Map<Permanent, Permanent[]>();
+        for (const [blocker, attacker] of this.blockLinks) {
+            const targets = blockedAttackers.get(blocker) ?? [];
+            targets.push(attacker);
+            blockedAttackers.set(blocker, targets);
+            if (!this.blockNumbers.has(blocker))
+                this.blockNumbers.set(blocker, this.blockNumbers.size + 1);
+        }
         const shown = new Set<UICard>();
 
-        for (const permanent of new Set([...this.eligible, ...attackers.keys(), ...blockers.keys()])) {
+        for (const permanent of new Set([...this.eligible, ...attackers.keys(), ...blockedAttackers.keys()])) {
             const view = this.root.getCardView(permanent);
             if (!view?.parent)
                 continue;
 
-            const target = blockers.get(permanent);
+            const target = CombatManager.blockingCreatures.get(permanent) ?? blockedAttackers.get(permanent)?.[0];
             const role = attackers.has(permanent) ? 'attack' : target ? 'block' : null;
-            let colour = role === 'attack' ? ATTACK_COLOUR : role === 'block' ? BLOCK_COLOUR : null;
-            if (this.legalTargets.has(permanent))
+            let colour = role === 'block' ? BLOCK_COLOUR : null;
+            if (this.legalTargets.has(permanent) || choice?.recipients.includes(permanent))
                 colour = TARGET_COLOUR;
             else if (this.selectedBlocker === permanent)
                 colour = BLOCK_COLOUR;
@@ -227,18 +403,19 @@ export class UICombat {
 
         for (const attacker of attackers.keys()) {
             const number = this.attackNumbers.get(attacker);
-            if (this.legalTargets.has(attacker))
-                this.addBadge(attacker, `Block attack ${number}`, TARGET_COLOUR);
-            else
-                this.addBadge(attacker, `Attack ${number}`, ATTACK_COLOUR);
+            const band = bandNumbers.get(attacker);
+            const legal = this.legalTargets.has(attacker);
+            const label = `${legal ? 'Block attack' : 'Attack'} ${number}${band ? ` - Band ${band}` : ''}`;
+            this.addBadge(attacker, label, legal ? TARGET_COLOUR : ATTACK_COLOUR);
         }
-        for (const [blocker, attacker] of blockers) {
-            const number = this.attackNumbers.get(attacker);
-            const label = this.selectedBlocker === blocker ? `Editing block ${number}` : `Blocks ${number}`;
+        for (const [blocker, targets] of blockedAttackers) {
+            const number = this.blockNumbers.get(blocker);
+            const attacks = targets.map(attacker => this.attackNumbers.get(attacker)).join(', ');
+            const label = this.selectedBlocker === blocker ? `Editing blocker ${number}` : `Blocker ${number} · ${attacks}`;
             this.addBadge(blocker, label, BLOCK_COLOUR);
-            this.links.addChild(new PIXI.Graphics());
         }
-        if (this.selectedBlocker && !blockers.has(this.selectedBlocker))
+        this.blockLinks.forEach(() => this.links.addChild(new PIXI.Graphics()));
+        if (this.selectedBlocker && !blockedAttackers.has(this.selectedBlocker))
             this.addBadge(this.selectedBlocker, 'Choose target', BLOCK_COLOUR);
     }
 
@@ -272,7 +449,7 @@ export class UICombat {
         }
 
         let index = 0;
-        for (const [blocker, attacker] of CombatManager.blockingCreatures) {
+        for (const [blocker, attacker] of this.blockLinks) {
             const link = this.links.children[index++];
             const from = this.badges.get(blocker);
             const to = this.badges.get(attacker);

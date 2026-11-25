@@ -135,5 +135,16 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Benalish Hero",
+        "image_url": "https://cards.scryfall.io/large/front/4/b/4b22eafa-c414-4eed-8dc1-d26b987b341c.jpg?1783919592",
+        "oracle_text": "Banding",
+        "type": "Creature",
+        "subtypes": ["Human", "Soldier"],
+        "cost": "{W}",
+        "power": 1,
+        "toughness": 1,
+        "abilities": [{ "keyword": "banding" }]
     }
 ]

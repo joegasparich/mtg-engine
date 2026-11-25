@@ -16,6 +16,7 @@ import { GlowFilter } from "pixi-filters";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
+const ATTACK_ANGLE = 10;
 const DRAG_THRESHOLD = 6;
 
 export default class UICard extends PIXI.Container {
@@ -122,7 +123,8 @@ export default class UICard extends PIXI.Container {
         const ease = 0.18;
         const group = this.battlefieldGroup;
         const dragging = group?.dragging ?? this.press?.dragging;
-        const restingAngle = this.object instanceof Permanent && this.object.tapped ? 90 : this.resting.angle;
+        const attackAngle = this.combatRole === 'attack' ? ATTACK_ANGLE : 0;
+        const restingAngle = this.object instanceof Permanent && this.object.tapped ? 90 : this.resting.angle + attackAngle;
         if (!dragging) {
             const position = group?.permanent === this ? group.position : this.position;
             const advance = this.combatAdvance();
@@ -148,9 +150,14 @@ export default class UICard extends PIXI.Container {
         const state = selection?.stateFor(this.object);
         const hasAction = playerActionManager.cardActionsForUI.get(this.object)?.length > 0;
         const normalHighlight = this.combatColour === undefined ? (hasAction ? 0xffffff : null) : this.combatColour;
-        const highlight = selection
-            ? state === 'selected' ? 0x64f2df : state === 'eligible' ? 0xe3c58a : null
-            : normalHighlight;
+        let highlight = normalHighlight;
+        if (selection) {
+            highlight = null;
+            if (state === 'eligible')
+                highlight = 0xe3c58a;
+            else if (state === 'selected' && !uiRoot.combat.isSelectingAttackers)
+                highlight = 0x64f2df;
+        }
         this.updateHighlight(highlight);
         if (this.halo.visible) {
             this.halo.width = this.art.width;
@@ -209,7 +216,7 @@ export default class UICard extends PIXI.Container {
             if (Math.hypot(dx, dy) < DRAG_THRESHOLD)
                 return;
 
-            if (game.pendingResolutionChoice) {
+            if (game.pendingResolutionChoice || game.pendingCombatDamageChoice) {
                 this.cancelPress();
                 return;
             }

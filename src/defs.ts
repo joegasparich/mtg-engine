@@ -36,6 +36,7 @@ export type AbilityDef = {
 };
 
 export enum Keyword {
+    Banding = "banding",
     Defender = "defender",
     Flying = "flying",
     Reach = "reach",
