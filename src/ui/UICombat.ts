@@ -4,7 +4,7 @@ import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engin
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_GoToNextStep } from "@engine/events";
+import { GameEvent_Advance } from "@engine/events";
 import type { CombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import type { GameEvent_StepEnd } from "@engine/events/GameEvent_Step";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -56,7 +56,7 @@ export class UICombat {
     });
 
     get cardSelection() {
-        if (game.currentStepIndex === StepIndex.DeclareAttackers && !game.hasPendingPlayerInput)
+        if (game.declarationPlayer && game.currentStepIndex === StepIndex.DeclareAttackers && !game.hasPendingPlayerInput)
             return this.formingBand ? this.bandSelection : this.attackerSelection;
     }
 
@@ -82,7 +82,7 @@ export class UICombat {
         this.formBand.addEventListener('click', this.editBand);
         this.bandList.className = 'combat-band-list';
         this.damageForm.className = 'combat-damage-form';
-        this.confirm.addEventListener('click', () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
+        this.confirm.addEventListener('click', () => gameEventManager.addEvent(new GameEvent_Advance()));
         this.panel.append(this.heading, this.status, this.instruction, this.removeBlock,
             this.bandList, this.formBand, this.cancelBand, this.confirm, this.damageForm);
         document.body.append(this.panel);
@@ -93,6 +93,7 @@ export class UICombat {
                 this.root.focusCardSelection();
         });
         gameEventManager.onPerformed(GameEventType.StepEnd, this.onStepEnd);
+        gameEventManager.onPerformed(GameEventType.PriorityChanged, this.sync);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.sync);
         gameEventManager.onPerformed(GameEventType.TapCard, this.sync);
         gameEventManager.onPerformed(GameEventType.UntapCard, this.sync);
@@ -111,12 +112,9 @@ export class UICombat {
         });
     }
 
-    static declaresAt(step: StepIndex) {
-        return step === StepIndex.DeclareAttackers || step === StepIndex.DeclareBlockers;
-    }
-
     handleBlockerClick(object: CardObject): boolean {
-        if (!(object instanceof Permanent) || game.hasPendingPlayerInput || game.currentStepIndex !== StepIndex.DeclareBlockers)
+        if (!(object instanceof Permanent) || !game.declarationPlayer || game.hasPendingPlayerInput
+            || game.currentStepIndex !== StepIndex.DeclareBlockers)
             return false;
 
         const actor = game.activePlayer();
@@ -189,8 +187,8 @@ export class UICombat {
     @autobind
     private sync() {
         const step = game.currentStepIndex;
-        const declaring = UICombat.declaresAt(step);
-        const attacking = step === StepIndex.DeclareAttackers;
+        const declaring = !!game.declarationPlayer;
+        const attacking = declaring && step === StepIndex.DeclareAttackers;
         const actor = game.activePlayer();
         const damageChoice = game.pendingCombatDamageChoice;
         const attackers = CombatManager.attackingCreatures;
@@ -226,6 +224,7 @@ export class UICombat {
 
         this.panel.hidden = !declaring && !damageChoice;
         this.removeBlock.hidden = !declaring || !this.selectedBlocker || !blockers.has(this.selectedBlocker);
+        this.removeBlock.textContent = blockers.get(this.selectedBlocker)?.size > 1 ? 'Remove blocks' : 'Remove block';
         this.bandList.hidden = !attacking || this.formingBand;
         this.formBand.hidden = !attacking || (!this.formingBand && this.formBand.disabled);
         this.cancelBand.hidden = !attacking || !this.formingBand;
@@ -235,20 +234,22 @@ export class UICombat {
         if (!declaring)
             return;
 
-        const count = attacking ? attackers.size : blockers.size;
+        const count = attacking ? attackers.size : [...blockers.values()].reduce((total, targets) => total + targets.size, 0);
         const noun = attacking ? 'attacker' : 'block';
         this.heading.textContent = this.formingBand ? 'Form attacking band' : Step.toString(step);
         const selection = this.formingBand ? `${this.bandSelection.count} in this band`
             : `${count} ${noun}${count === 1 ? '' : 's'} selected`;
         this.status.textContent = `Player ${actor?.id ?? '—'} · ${selection}`;
         this.confirm.textContent = count ? (attacking ? 'Confirm attackers' : 'Confirm blocks') : (attacking ? 'No attacks' : 'No blocks');
-        this.confirm.disabled = attacking && !CombatManager.canConfirmAttackers();
+        this.confirm.disabled = attacking ? !CombatManager.canConfirmAttackers() : !CombatManager.canConfirmBlocks();
         if (attacking) {
             this.instruction.textContent = this.formingBand
                 ? 'Choose which attackers join this band. Up to one can lack banding.'
                 : 'Select highlighted creatures to attack.';
         } else if (this.selectedBlocker) {
             this.instruction.textContent = `Click a highlighted attacker for ${this.selectedBlocker.name} to block. Esc cancels selection.`;
+        } else if (this.confirm.disabled) {
+            this.instruction.textContent = 'Assign every required block before confirming.';
         } else {
             this.instruction.textContent = 'Click a blue creature to block, then choose its attacker. Select an assigned blocker to edit it.';
         }
@@ -373,7 +374,8 @@ export class UICombat {
             if (!view?.parent)
                 continue;
 
-            const target = CombatManager.blockingCreatures.get(permanent) ?? blockedAttackers.get(permanent)?.[0];
+            const target = CombatManager.blockingCreatures.get(permanent)?.values().next().value
+                ?? blockedAttackers.get(permanent)?.[0];
             const role = attackers.has(permanent) ? 'attack' : target ? 'block' : null;
             let colour = role === 'block' ? BLOCK_COLOUR : null;
             if (this.legalTargets.has(permanent) || choice?.recipients.includes(permanent))

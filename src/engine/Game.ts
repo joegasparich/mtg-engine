@@ -1,10 +1,10 @@
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_DrawCards,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
+import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import { type CardChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
-import type { CardObject } from "@engine/GameObject";
+import { type CardObject,Spell } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Step,StepIndex } from "@engine/Step";
@@ -20,23 +20,47 @@ export default class Game {
     stack = new Stack();
 
     currentTurnPlayerID = 0;
-    activePlayerID = -1;
     turnNumber = 0;
     currentStepIndex = 0;
     landPlayedThisTurn = false;
     infiniteMana = false;
+    autoPassPriority = false;
     pendingTargeter: Targeter | null = null;
+    private priority: Player | null = null;
+    private pendingPriority: Player | null = null;
+    private passes = 0;
+    private autoAdvance = false;
+    private cleanupNeedsPriority = false;
+    declarationPlayer: Player | null = null;
     private resolutionChoice: ResolutionChoice | null = null;
     private combatDamageChoice: CombatDamageChoice | null = null;
 
     get pendingResolutionChoice() { return this.resolutionChoice; }
     get pendingCombatDamageChoice() { return this.combatDamageChoice; }
     get hasPendingPlayerInput() { return !!(this.pendingTargeter || this.resolutionChoice || this.combatDamageChoice); }
+    get priorityPlayer() { return this.hasPendingPlayerInput || this.stack.isResolving ? null : this.priority; }
+    get canEndTurn() {
+        return this.currentStepIndex === StepIndex.End && !this.stack.objects.length
+            && this.priorityPlayer === this.currentTurnPlayer();
+    }
 
     static init() {
+        if (game) {
+            for (const player of game.players) {
+                for (const zone of player.zones) {
+                    for (const object of zone.objects)
+                        object.abilities.forEach(ability => ability.cleanup());
+                }
+            }
+            for (const object of game.stack.objects) {
+                if (object instanceof Spell)
+                    object.abilities.forEach(ability => ability.cleanup());
+            }
+        }
         CombatManager.reset();
         game = new Game();
-        gameEventManager.startGame(() => game.settleState(), () => !!(game.pendingResolutionChoice || game.pendingCombatDamageChoice));
+        gameEventManager.startGame(() => game.settleState(),
+            () => !!(game.pendingResolutionChoice || game.pendingCombatDamageChoice), () => game.advanceWhileIdle());
     }
 
     requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void) {
@@ -106,13 +130,10 @@ export default class Game {
         return this.players[this.currentTurnPlayerID];
     }
     activePlayer(): Player | null {
-        if (this.activePlayerID < 0)
-            return null;
-
-        return this.players[this.activePlayerID];
+        return this.declarationPlayer ?? this.priorityPlayer;
     }
     randomOpponent(player: Player): Player {
-        return this.players[(player.id + 1) % 2]; // TODO: Randomize
+        return this.players[(player.id + 1) % this.players.length]; // TODO: Randomize
     }
 
     startGame(options?: GameOptions) {
@@ -132,7 +153,6 @@ export default class Game {
         }
 
         this.currentTurnPlayerID = 0;
-        this.activePlayerID = -1;
         this.turnNumber = 0;
         this.currentStepIndex = 0;
         this.landPlayedThisTurn = false;
@@ -140,16 +160,94 @@ export default class Game {
         gameEventManager.addEvent(new GameEvent_TurnStart(this.currentTurnPlayer()));
 
         this.startStep(this.currentStepIndex);
-
-        if (this.options.allowAutoSkip)
-            this.checkAutoSkip();
+        this.autoAdvance = this.options.allowAutoSkip;
+        this.checkState();
     }
-    nextStep(doAutoSkip: boolean): boolean {
-        if (this.hasPendingPlayerInput || this.currentStep().canEnd?.() === false)
+
+    advance(player: Player | null): boolean {
+        if (!this.options || this.hasPendingPlayerInput || this.stack.isResolving || player !== this.activePlayer())
             return false;
 
+        this.autoAdvance = this.options.allowAutoSkip;
+        if (this.declarationPlayer)
+            return this.confirmDeclaration();
+        if (player)
+            return this.passPriority(player);
+        if (this.currentStepIndex === StepIndex.Untap || this.currentStepIndex === StepIndex.Cleanup)
+            return this.nextStep(this.options.allowAutoSkip);
+        return false;
+    }
+
+    notePriorityAction() {
+        // 117.3c, 117.4: A player retains priority after acting and starts a new round of passes.
+        this.passes = 0;
+    }
+
+    private passPriority(player: Player): boolean {
+        this.passes++;
+        if (this.passes < this.players.length) {
+            this.priority = null;
+            this.pendingPriority = this.players[(player.id + 1) % this.players.length];
+            return true;
+        }
+
+        // 117.4: A full round of passes resolves one object or ends the step.
+        this.setPriority(null);
+        this.passes = 0;
+        if (this.stack.resolveTop(resolved => {
+            // A prevented zone change can leave the same spell on the stack.
+            if (!resolved)
+                this.autoAdvance = false;
+            this.pendingPriority = this.currentTurnPlayer();
+        }))
+            return true;
+
+        if (this.currentStepIndex === StepIndex.Cleanup) {
+            // 514.3a: Priority in cleanup is followed by another cleanup step.
+            this.endStep(this.currentStepIndex);
+            this.startStep(this.currentStepIndex);
+            return true;
+        }
+        return this.nextStep(this.autoAdvance, true);
+    }
+
+    private confirmDeclaration(): boolean {
+        const step = this.currentStep();
+        if (step.canConfirm?.() === false)
+            return false;
+
+        this.declarationPlayer = null;
+        step.confirm?.();
+        // 508.2, 509.2: The turn player gets priority after combat declarations.
+        this.pendingPriority = this.currentTurnPlayer();
+        return true;
+    }
+
+    private setPriority(player: Player | null) {
+        if (this.priority === player)
+            return;
+
+        this.priority = player;
+        gameEventManager.addEvent(new GameEvent_PriorityChanged(player));
+    }
+
+    nextStep(doAutoSkip: boolean, skipEmptyCombat = false): boolean {
+        if (this.hasPendingPlayerInput || this.stack.isResolving || this.stack.objects.length
+            || (this.declarationPlayer && !this.confirmDeclaration()))
+            return false;
+
+        this.setPriority(null);
+        this.pendingPriority = null;
+        this.passes = 0;
+        this.autoAdvance = doAutoSkip;
         this.endStep(this.currentStepIndex);
-        this.currentStepIndex++;
+        // 508.8: Without attackers, go straight from declare attackers to end of combat.
+        if (skipEmptyCombat && this.currentStepIndex === StepIndex.DeclareAttackers
+            && !CombatManager.declaredAnyAttackers && !CombatManager.attackingCreatures.size) {
+            this.currentStepIndex = StepIndex.EndOfCombat;
+        } else {
+            this.currentStepIndex++;
+        }
 
         // 103.8a
         if (this.currentStepIndex === StepIndex.Draw && this.turnNumber === 0 && this.players.length === 2)
@@ -166,9 +264,6 @@ export default class Game {
         }
 
         this.startStep(this.currentStepIndex);
-
-        if (doAutoSkip)
-            this.checkAutoSkip();
         return true;
     }
     skipToNextTurn(): boolean {
@@ -184,8 +279,7 @@ export default class Game {
 
         const advance = () => {
             if (this.currentStepIndex === index) {
-                if (autoSkip)
-                    this.checkAutoSkip();
+                this.autoAdvance = autoSkip;
                 return;
             }
 
@@ -195,27 +289,32 @@ export default class Game {
         gameEventManager.onIdle(advance);
         return true;
     }
-    canAutoSkip() {
-        // Stop at each turn's first main phase even when there are no playable cards.
-        if (this.hasPendingPlayerInput || this.currentStepIndex === StepIndex.Main)
+    private advanceWhileIdle(): boolean {
+        if (!this.autoAdvance || this.hasPendingPlayerInput || this.stack.isResolving)
             return false;
 
-        const player = this.activePlayer();
-        return !player || !playerActionManager.playerHasActions(player, true);
-    }
-    checkAutoSkip() {
-        gameEventManager.onIdle(() => {
-            if (this.canAutoSkip())
-                this.nextStep(true);
-        });
-    }
+        if (this.declarationPlayer)
+            return !playerActionManager.playerHasActions(this.declarationPlayer, true) && this.confirmDeclaration();
 
+        const player = this.priorityPlayer;
+        if (player) {
+            return !this.canEndTurn && (this.autoPassPriority || !playerActionManager.playerHasActions(player, true))
+                && this.passPriority(player);
+        }
+        return this.advance(null);
+    }
     private startStep(index: StepIndex) {
-        Step.all[index].onStart(this.currentTurnPlayer());
-        gameEventManager.addEvent(new GameEvent_StepStart(this.currentTurnPlayer(), index));
+        const player = this.currentTurnPlayer();
+        const step = Step.all[index];
+        this.cleanupNeedsPriority = false;
+        this.declarationPlayer = step.declarationPlayer?.(player) ?? null;
+        step.onStart?.(player);
+        if (!this.declarationPlayer && index !== StepIndex.Untap && index !== StepIndex.Cleanup)
+            this.pendingPriority = player;
+        gameEventManager.addEvent(new GameEvent_StepStart(player, index));
     }
     private endStep(index: StepIndex) {
-        Step.all[index].onEnd(this.currentTurnPlayer());
+        Step.all[index].onEnd?.(this.currentTurnPlayer());
 
         // 106.4
         for (const player of this.players) {
@@ -247,9 +346,24 @@ export default class Game {
         }
 
         // 117.5 and 704.3: Repeat the checks before putting waiting triggers on the stack.
-        if (actions.length && gameEventManager.performSimultaneous(actions))
+        const stateChanged = actions.length > 0 && gameEventManager.performSimultaneous(actions);
+        const triggersAdded = !stateChanged && !this.declarationPlayer && this.stack.putWaitingTriggersOnStack();
+        if (this.options && this.currentStepIndex === StepIndex.Cleanup && (stateChanged || triggersAdded))
+            this.cleanupNeedsPriority = true;
+        if (stateChanged || triggersAdded)
             return true;
-        return this.stack.putWaitingTriggersOnStack();
+
+        if (this.stack.isResolving)
+            return false;
+
+        if (this.pendingPriority || this.cleanupNeedsPriority) {
+            const player = this.pendingPriority ?? this.currentTurnPlayer();
+            this.pendingPriority = null;
+            this.cleanupNeedsPriority = false;
+            this.setPriority(player);
+            return true;
+        }
+        return false;
     }
 
     reset() {

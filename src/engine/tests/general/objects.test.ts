@@ -1,11 +1,12 @@
 import { PlayerActions } from "@engine/actions";
 import { GameEvent_ActivateAbility,GameEvent_ChangeCardZone,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import type { GameEvent_StackAbilityChanged } from "@engine/events/GameEvent_StackAbilityChanged";
 import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { Permanent,Spell,StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,moveTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,moveTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -95,8 +96,11 @@ test("a retired spell cannot resolve a second time", () => {
 });
 
 test("two nonmana activations of one permanent create independent stack objects", () => {
-    const player = game.addPlayer([FOREST]);
-    const opponent = game.addPlayer([FOREST]);
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    addTestCard(cardData[FOREST], player, player.library);
+    addTestCard(cardData[FOREST], opponent, opponent.library);
     const source = addTestCard({
         ...cardData[FOREST],
         abilities: [{
@@ -114,16 +118,32 @@ test("two nonmana activations of one permanent create independent stack objects"
     const second = new GameEvent_ActivateAbility(player, source, ability);
     let occurrences: StackAbility[];
     second.then(() => { occurrences = game.stack.objects.filter(object => object instanceof StackAbility); });
-    gameEventManager.addEvents([first, new GameEvent_UntapCard(source), second]);
+    const changes: GameEvent_StackAbilityChanged[] = [];
+    const recordChange = (event: GameEvent_StackAbilityChanged) => changes.push(event);
+    gameEventManager.onPerformed(GameEventType.StackAbilityChanged, recordChange);
+    try {
+        gameEventManager.addEvents([first, new GameEvent_UntapCard(source), second]);
 
-    expect(occurrences).toHaveLength(2);
-    expect(occurrences[0].id).not.toBe(occurrences[1].id);
-    expect(occurrences.map(object => object.source)).toEqual([source, source]);
-    expect(occurrences.map(object => object.ability.slate.RECIPIENT)).toEqual([[player], [opponent]]);
-    expect(occurrences.every(object => object.retired)).toBe(true);
-    expect(player.hand.objects).toHaveLength(1);
-    expect(opponent.hand.objects).toHaveLength(1);
-    expect(game.stack.objects).toHaveLength(0);
+        expect(occurrences).toHaveLength(2);
+        expect(occurrences[0].id).not.toBe(occurrences[1].id);
+        expect(occurrences.map(object => object.source)).toEqual([source, source]);
+        expect(occurrences.map(object => object.ability.slate.RECIPIENT)).toEqual([[player], [opponent]]);
+        passPriorityRound();
+        expect(occurrences[0].retired).toBe(false);
+        expect(occurrences[1].retired).toBe(true);
+        passPriorityRound();
+        expect(occurrences.every(object => object.retired)).toBe(true);
+        expect(player.hand.objects).toHaveLength(1);
+        expect(opponent.hand.objects).toHaveLength(1);
+        expect(game.stack.objects).toHaveLength(0);
+    } finally {
+        gameEventManager.offPerformed(GameEventType.StackAbilityChanged, recordChange);
+    }
+
+    const [lower, upper] = occurrences;
+    expect(changes.map(({ ability, onStack }) => [ability.id, onStack])).toEqual([
+        [lower.id, true], [upper.id, true], [upper.id, false], [lower.id, false],
+    ]);
 });
 
 test("an enters trigger resolves with its original controller after its source leaves", () => {
@@ -155,6 +175,7 @@ test("an enters trigger resolves with its original controller after its source l
     expect(trigger.controller).toBe(player);
     expect(trigger.ability.slate.ENTERED).toEqual([enter.newObject]);
     expect(source.retired).toBe(true);
+    game.stack.resolveAll();
     expect(trigger.retired).toBe(true);
     expect(player.hand.objects).toHaveLength(1);
     expect(opponent.hand.objects).toHaveLength(0);

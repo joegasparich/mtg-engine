@@ -106,7 +106,7 @@ export default class UICard extends PIXI.Container {
         if (this.press?.dragging)
             return;
 
-        if (hovered)
+        if (hovered && this.object.zone !== game.stack)
             uiRoot.cardOverlay.attach(this.artwork);
         else if (this.artwork.parentRenderLayer)
             uiRoot.cardOverlay.detach(this.artwork);
@@ -133,7 +133,7 @@ export default class UICard extends PIXI.Container {
         }
         this.angle += ((dragging && !group ? 0 : restingAngle) - this.angle) * ease;
 
-        const preview = this.hovered && !dragging;
+        const preview = this.hovered && !dragging && this.object.zone !== game.stack;
         const lifted = preview && this.object.zone instanceof Hand;
         // Rotate the lift back into zone coordinates so the card moves straight up.
         const lift = lifted ? -95 : 0;
@@ -246,7 +246,8 @@ export default class UICard extends PIXI.Container {
             return;
 
         this.press = { pointerId: event.pointerId, origin: event.global.clone(), dragging: false };
-        pixi.stage.on('globalpointermove', this.onDrag);
+        if (this.object.zone instanceof Hand || this.battlefieldGroup)
+            pixi.stage.on('globalpointermove', this.onDrag);
         pixi.canvas.addEventListener('pointercancel', this.onPointerCancel);
         window.addEventListener('blur', this.cancelPress);
     }

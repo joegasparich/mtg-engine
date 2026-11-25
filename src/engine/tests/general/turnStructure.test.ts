@@ -1,5 +1,5 @@
 import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
-import { GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
@@ -106,7 +106,7 @@ test("turn and phase controls wait for a pending target choice", () => {
     gameEventManager.addEvent(new GameEvent_GoToNextPhase());
     gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
-    game.checkAutoSkip();
+    game.checkState();
     expect(game.currentStepIndex).toBe(StepIndex.Main);
     expect(game.turnNumber).toBe(0);
 
@@ -115,24 +115,16 @@ test("turn and phase controls wait for a pending target choice", () => {
     expect(game.turnNumber).toBe(1);
 });
 
-test("should autoskip steps with no player actions", () => {
-    const nextStepSpy = vi.spyOn(game, "nextStep");
-
-    game.startGame({ allowAutoSkip: true });
-
+test("auto-skip stops for land plays in both main phases", () => {
+    game.startGame({allowAutoSkip: true});
     expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(nextStepSpy).toHaveBeenCalledTimes(3);
 
-    gameEventManager.addEvent(new GameEvent_GoToNextStep());
-
+    gameEventManager.addEvent(new GameEvent_Advance());
     expect(game.currentStepIndex).toBe(StepIndex.SecondMain);
-    expect(nextStepSpy).toHaveBeenCalledTimes(9);
 
-    gameEventManager.addEvent(new GameEvent_GoToNextStep());
-
-    expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(nextStepSpy).toHaveBeenCalledTimes(15);
-    expect(game.turnNumber).toBe(1);
+    gameEventManager.addEvent(new GameEvent_Advance());
+    expect(game.currentStepIndex).toBe(StepIndex.End);
+    expect(game.turnNumber).toBe(0);
 });
 
 test("auto-skip finishes the next player's draw before entering their main phase", () => {
@@ -181,23 +173,31 @@ test("auto-skip sees lands untap before checking the next player's spells", () =
     expect(playerActionManager.cardActionsForUI.has(goblin)).toBe(true);
 });
 
-test("auto-skip pauses at each main phase when no one can act", () => {
+test.each([false, true])("empty turns stop for confirmation with dev auto-pass %s", autoPassPriority => {
     player.library.objects.length = 0;
     const opponent = game.addPlayer([]);
-    game.startGame({allowAutoSkip: true});
-    expect(game.currentTurnPlayer()).toBe(player);
-    expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(game.turnNumber).toBe(0);
+    const steps: StepIndex[] = [];
+    const recordStep = (event: GameEvent_StepStart) => steps.push(event.stepIndex);
+    gameEventManager.onPerformed(GameEventType.StepStart, recordStep);
+    try {
+        game.autoPassPriority = autoPassPriority;
+        game.startGame({allowAutoSkip: true});
+        expect(game.currentTurnPlayer()).toBe(player);
+        expect(game.currentStepIndex).toBe(StepIndex.End);
+        expect(game.turnNumber).toBe(0);
+        expect(steps).toContain(StepIndex.Main);
+        expect(steps).toContain(StepIndex.SecondMain);
+        expect(steps).not.toContain(StepIndex.DeclareBlockers);
+        expect(steps).not.toContain(StepIndex.CombatDamage);
 
-    gameEventManager.addEvent(new GameEvent_GoToNextStep());
-    expect(game.currentTurnPlayer()).toBe(opponent);
-    expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(game.turnNumber).toBe(1);
-
-    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    expect(game.currentTurnPlayer()).toBe(player);
-    expect(game.currentStepIndex).toBe(StepIndex.Main);
-    expect(game.turnNumber).toBe(2);
+        gameEventManager.addEvent(new GameEvent_Advance());
+        expect(game.currentTurnPlayer()).toBe(opponent);
+        expect(game.currentStepIndex).toBe(StepIndex.End);
+        expect(game.turnNumber).toBe(1);
+        expect(steps).toContain(StepIndex.Cleanup);
+    } finally {
+        gameEventManager.offPerformed(GameEventType.StepStart, recordStep);
+    }
 });
 
 test.each([StepIndex.Upkeep, StepIndex.Main, StepIndex.Cleanup])("both mana pools empty after step %s", step => {
@@ -235,4 +235,25 @@ test.each([
     expect(bears.map(permanent => permanent.damageTaken)).toEqual([0, 0]);
     expect(bears.map(permanent => permanent.zone)).toEqual([player.battlefield, opponent.battlefield]);
     expect(player.hand.objects).toEqual(hand);
+});
+
+test("cleanup callbacks run once after damage clears and before the step start event", () => {
+    game.startGame();
+    const bear = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    bear.damageTaken = 1;
+    const cleanup = vi.fn(() => expect(bear.damageTaken).toBe(0));
+    gameEventManager.onGamePerformed(GameEventType.Cleanup, cleanup, { once: true });
+
+    const onStepStart = (event: GameEvent_StepStart) => {
+        if (event.stepIndex === StepIndex.Cleanup)
+            expect(cleanup).toHaveBeenCalledTimes(1);
+    };
+    gameEventManager.onPerformed(GameEventType.StepStart, onStepStart);
+    try {
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        expect(game.turnNumber).toBe(1);
+    } finally {
+        gameEventManager.offPerformed(GameEventType.StepStart, onStepStart);
+    }
 });

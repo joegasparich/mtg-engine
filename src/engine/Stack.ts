@@ -1,6 +1,7 @@
 import type { ActionTarget } from "@engine/actions";
 import { Ability,HardcodedSignals } from "@engine/abilities";
 import { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
+import { GameEvent_StackAbilityChanged } from "@engine/events/GameEvent_StackAbilityChanged";
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject,Spell,StackAbility } from "@engine/GameObject";
@@ -14,6 +15,23 @@ export class Stack extends Zone<Spell | StackAbility> {
     private completeResolution?: () => void;
     private readonly waitingTriggers: StackAbility[] = [];
 
+    get isResolving() { return this.resolutionScheduled || !!this.completeResolution; }
+
+    override onEnter(object: Spell | StackAbility) {
+        super.onEnter(object);
+        if (object instanceof StackAbility)
+            gameEventManager.addEvent(new GameEvent_StackAbilityChanged(object, true));
+    }
+
+    override onLeave(object: Spell | StackAbility) {
+        if (object.zone !== this)
+            return;
+
+        super.onLeave(object);
+        if (object instanceof StackAbility)
+            gameEventManager.addEvent(new GameEvent_StackAbilityChanged(object, false));
+    }
+
     spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = []): boolean {
         if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
             return false;
@@ -23,8 +41,12 @@ export class Stack extends Zone<Spell | StackAbility> {
         if (targeter ? !targeter.validateTargets(targets) : targets.length > 0)
             return false;
 
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets }));
-        return true;
+        const move = new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets });
+        if (gameEventManager.performingEvents)
+            return gameEventManager.performImmediate(move);
+
+        gameEventManager.addEvent(move);
+        return !!move.newObject;
     }
 
     abilityActivated(caster: Player, ability: Ability) {
@@ -42,19 +64,26 @@ export class Stack extends Zone<Spell | StackAbility> {
 
         for (const trigger of triggers)
             this.onEnter(trigger);
-        this.resolveAll();
         return true;
     }
 
     resolveAll() {
-        if (this.resolutionScheduled)
-            return;
+        this.resolveTop(resolved => {
+            if (resolved)
+                this.resolveAll();
+        });
+    }
+
+    resolveTop(onFinished: (resolved: boolean) => void): boolean {
+        if (this.isResolving || !this.objects.length)
+            return false;
 
         this.resolutionScheduled = true;
         gameEventManager.onIdle(() => {
             const top = this.objects.at(-1);
             if (!top) {
                 this.resolutionScheduled = false;
+                onFinished(false);
                 return;
             }
 
@@ -74,11 +103,10 @@ export class Stack extends Zone<Spell | StackAbility> {
 
             gameEventManager.onIdle(() => {
                 this.resolutionScheduled = false;
-                // A prevented move must not cause the same spell to resolve again.
-                if (this.objects.length > 0 && !this.objects.includes(top))
-                    this.resolveAll();
+                onFinished(!this.objects.includes(top));
             });
         });
+        return true;
     }
 
     resolveSpell(spell: Spell) {

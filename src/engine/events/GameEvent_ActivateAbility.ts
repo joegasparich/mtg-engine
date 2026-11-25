@@ -23,12 +23,13 @@ export class GameEvent_ActivateAbility extends GameEvent {
     }
 
     perform(): boolean {
-        if (game.hasPendingPlayerInput || !this.permanent.zone || this.permanent.controller !== this.player
-            || !this.permanent.abilities.includes(this.ability) || !this.ability.activatable || !this.ability.canActivate())
+        if (this.permanent.controller !== this.player || !this.permanent.canActivate(this.ability))
             return false;
 
         if (!this.ability.payActivationCost())
             return false;
+
+        game.notePriorityAction();
 
         // 605.3b
         if (this.ability.def.isManaAbility) {
@@ -39,8 +40,6 @@ export class GameEvent_ActivateAbility extends GameEvent {
         // Add ability to stack
         game.stack.abilityActivated(this.player, this.ability);
 
-        // TODO: pass priority
-        game.stack.resolveAll();
         return true;
     }
 }

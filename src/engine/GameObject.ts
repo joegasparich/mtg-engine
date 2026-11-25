@@ -9,7 +9,7 @@ import { game } from "@engine/Game";
 import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { Battlefield,Hand,Zone } from "@engine/Zone";
+import { Battlefield,Zone } from "@engine/Zone";
 import { type AbilityDef,type CardColour,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
@@ -111,23 +111,19 @@ export class CardObject extends GameObject {
     }
 
     canPlay() {
-        if (game.hasPendingPlayerInput)
+        if (this.zone !== this.owner.hand || game.priorityPlayer !== this.owner)
             return false;
 
-        if (!(this.zone instanceof Hand) || game.activePlayer() !== this.owner)
+        // 117.1a and 116.2a: Other spells and land plays use main-phase timing.
+        if (this.type !== CardType.Instant && (this.owner !== game.currentTurnPlayer() || game.stack.objects.length
+            || (game.currentStepIndex !== StepIndex.Main && game.currentStepIndex !== StepIndex.SecondMain)))
             return false;
 
-        if (game.currentStepIndex != StepIndex.Main && game.currentStepIndex != StepIndex.SecondMain)
-            return false;
+        if (this.type === CardType.Land)
+            return !game.landPlayedThisTurn;
 
-        if (this.type === CardType.Land) {
-            return this.zone === this.owner.hand
-                && this.owner === game.currentTurnPlayer()
-                && game.stack.objects.length === 0
-                && !game.landPlayedThisTurn;
-        }
-
-        return this.spellTargeter?.hasLegalTargets() ?? true;
+        return this.abilities.every(ability => ability.parts.every(part => part.canCast?.() ?? true))
+            && (this.spellTargeter?.hasLegalTargets() ?? true);
     }
 
     get spellTargeter(): AbilityPart_Target | undefined {
@@ -200,13 +196,8 @@ export class Permanent extends CardObject {
     }
 
     canActivate(ability: Ability) {
-        if (game.hasPendingPlayerInput || game.activePlayer() != this.controller)
-            return false;
-
-        if (!ability.activatable)
-            return false;
-
-        return ability.canActivate();
+        return this.zone === this.controller.battlefield && game.priorityPlayer === this.controller
+            && this.abilities.includes(ability) && ability.activatable && ability.canActivate();
     }
 
     hasLegalAttachment(): boolean {

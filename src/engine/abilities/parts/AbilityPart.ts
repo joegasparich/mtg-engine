@@ -8,6 +8,7 @@ export abstract class AbilityPart {
     resolvePermanentSpell?(spell: Spell): GameEvent;
     checkState?(actions: GameEvent[]): void;
     canAttachTo?(target: Permanent): boolean;
+    canCast?(): boolean;
     onAttachmentChanged?(): void;
 
     setup(ability: Ability) {

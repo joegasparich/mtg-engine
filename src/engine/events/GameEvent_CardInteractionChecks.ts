@@ -36,3 +36,23 @@ export class GameEvent_DeclareBlocker extends GameEvent {
         super();
     }
 }
+
+export class GameEvent_CheckBlockLimit extends GameEvent {
+    type = GameEventType.CheckBlockLimit;
+    label = "";
+    maxAttackers = 1;
+
+    constructor(readonly blocker: Permanent) {
+        super();
+    }
+}
+
+export class GameEvent_CheckRequiredBlock extends GameEvent {
+    type = GameEventType.CheckRequiredBlock;
+    label = "";
+    required = false;
+
+    constructor(readonly blocker: Permanent, readonly attacker: Permanent) {
+        super();
+    }
+}

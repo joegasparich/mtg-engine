@@ -8,7 +8,7 @@ import Game,{ game } from "@engine/Game";
 import { Spell,StackAbility } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -45,7 +45,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
     const [casterLandInHand] = hand(caster, 1);
     const [activeDiscard, activeKeep] = hand(active, 2);
     const [nextDiscard, nextKeep] = hand(next, 2);
-    const source = addTestCard(testSpell, caster, caster.hand);
+    const source = addTestCard({ ...testSpell, type: CardType.Instant }, caster, caster.hand);
     const otherSpell = addTestCard({ ...testSpell, abilities: [] }, caster, caster.hand);
     const stale = addTestCard(forest, active, active.hand);
     moveTestCard(stale, active.library);
@@ -64,6 +64,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
     try {
         // Deliberately resolve a spell controlled by a player other than the active player.
         gameEventManager.addEvent(new GameEvent_CastSpell(caster, source));
+        passPriorityRound();
         const first = game.pendingResolutionChoice;
         expect(first).toMatchObject({ player: active, options: activeLands, count: 2, visibility: "public", earlierChoices: [] });
 
@@ -117,6 +118,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
 test("defers state-based actions and waiting triggers until the paused spell finishes", () => {
     const caster = game.addPlayer([]);
     const opponent = game.addPlayer([]);
+    startMainPhase();
     const [sacrificed] = lands(caster, 1);
     const doomed = addTestCard(bears, caster, caster.battlefield);
     const [discarded, kept] = hand(caster, 2);
@@ -134,13 +136,15 @@ test("defers state-based actions and waiting triggers until the paused spell fin
     gameEventManager.onPerformed(GameEventType.SacrificePermanent, onSacrifice);
     try {
         gameEventManager.addEvent(new GameEvent_CastSpell(caster, source));
-        game.checkState();
+        passPriorityRound();
         expect(game.pendingResolutionChoice?.options).toEqual([discarded, kept]);
         expect(game.stack.objects).toEqual([expect.objectContaining({ card: source.card })]);
         expect(doomed.zone).toBe(caster.battlefield);
         expect(caster.library.objects).toEqual([triggerDraw]);
 
         game.pendingResolutionChoice.submit(caster, [discarded]);
+        expect(game.stack.objects).toEqual([expect.any(StackAbility)]);
+        passPriorityRound();
         expect(game.stack.objects).toHaveLength(0);
         expect(caster.graveyard.objects.map(card => card.card)).toEqual([sacrificed.card, discarded.card, source.card, doomed.card]);
         expect(caster.hand.objects.map(card => card.card)).toEqual([kept.card, triggerDraw.card]);
@@ -152,6 +156,7 @@ test("defers state-based actions and waiting triggers until the paused spell fin
 test("a stack ability can also wait for a required choice", () => {
     const player = game.addPlayer([]);
     const opponent = game.addPlayer([]);
+    startMainPhase();
     const [discarded, kept] = hand(player, 2);
     hand(opponent, 1);
     const source = addTestCard({
@@ -165,6 +170,7 @@ test("a stack ability can also wait for a required choice", () => {
     gameEventManager.addEvent(new GameEvent_ActivateAbility(player, source, source.abilities[0]));
     expect(game.stack.objects).toEqual([expect.any(StackAbility)]);
     expect(source.tapped).toBe(true);
+    passPriorityRound();
     game.pendingResolutionChoice.submit(player, [discarded]);
 
     expect(game.stack.objects).toHaveLength(0);

@@ -12,10 +12,11 @@ export class PlayerAction_DeclareAttacker extends PlayerAction<Permanent> {
     }
 
     perform(player: Player, _targets?: ActionTarget[]) {
-        if (!this.canEdit(player) || !CombatManager.canAttack(this.object))
+        const defender = CombatManager.defendingPlayer;
+        if (!defender || !this.canEdit(player) || !CombatManager.canAttack(this.object))
             return;
 
-        CombatManager.attackingCreatures.set(this.object, game.randomOpponent(player));
+        CombatManager.attackingCreatures.set(this.object, defender);
     }
 
     withdraw(player: Player): boolean {
@@ -24,6 +25,6 @@ export class PlayerAction_DeclareAttacker extends PlayerAction<Permanent> {
 
     private canEdit(player: Player) {
         return !game.hasPendingPlayerInput && game.currentStepIndex === StepIndex.DeclareAttackers
-            && player === game.activePlayer() && player === this.object.controller;
+            && player === game.declarationPlayer && player === this.object.controller;
     }
 }

@@ -6,6 +6,71 @@ import Game,{ game } from "@engine/Game";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
+test("a one-shot game listener waits for a matching event and cancels before calling back", () => {
+    Game.init();
+    const skipped = new GameEvent_Log(GameEventType.Log, "Skip");
+    const matching = new GameEvent_Log(GameEventType.Log, "Match");
+    const callback = vi.fn(() => gameEventManager.performImmediate(matching));
+    gameEventManager.onGamePerformed(GameEventType.Log, callback, {
+        once: true,
+        matches: event => event.label === matching.label,
+    });
+
+    gameEventManager.addEvent(skipped);
+    expect(callback).not.toHaveBeenCalled();
+    gameEventManager.addEvent(matching);
+    expect(callback).toHaveBeenCalledExactlyOnceWith(matching);
+});
+
+test("cancelled game listeners and listeners from a previous game do not observe events", () => {
+    Game.init();
+    const cancelled = vi.fn();
+    const cancel = gameEventManager.onGamePerformed(GameEventType.Log, cancelled);
+    cancel();
+    cancel();
+    const oldGameListener = vi.fn();
+    const stopOldGameListener = gameEventManager.onGamePerformed(GameEventType.Log, oldGameListener);
+    const applicationListener = vi.fn();
+    gameEventManager.onPerformed(GameEventType.Log, applicationListener);
+    const beforeReset = new GameEvent_Log(GameEventType.Log, "Before reset");
+    const afterReset = new GameEvent_Log(GameEventType.Log, "After reset");
+    try {
+        gameEventManager.addEvent(beforeReset);
+        Game.init();
+        const newGameListener = vi.fn();
+        const stopNewGameListener = gameEventManager.onGamePerformed(GameEventType.Log, newGameListener);
+        stopOldGameListener();
+        gameEventManager.addEvent(afterReset);
+        stopNewGameListener();
+
+        expect(cancelled).not.toHaveBeenCalled();
+        expect(oldGameListener).toHaveBeenCalledExactlyOnceWith(beforeReset);
+        expect(newGameListener).toHaveBeenCalledExactlyOnceWith(afterReset);
+        expect(applicationListener.mock.calls).toEqual([[beforeReset], [afterReset]]);
+    } finally {
+        gameEventManager.offPerformed(GameEventType.Log, applicationListener);
+    }
+});
+
+test("a game listener registered while observing a simultaneous batch sees only later events", () => {
+    Game.init();
+    const later = new GameEvent_Log(GameEventType.Log, "Later");
+    const addedDuringDispatch = vi.fn();
+    let cancel: () => void;
+    gameEventManager.onGamePerformed(GameEventType.Log, () => {
+        cancel = gameEventManager.onGamePerformed(GameEventType.Log, addedDuringDispatch);
+    }, { once: true });
+
+    gameEventManager.performSimultaneous([
+        new GameEvent_Log(GameEventType.Log, "First"),
+        new GameEvent_Log(GameEventType.Log, "Second"),
+    ]);
+    expect(addedDuringDispatch).not.toHaveBeenCalled();
+    gameEventManager.addEvent(later);
+    expect(addedDuringDispatch).toHaveBeenCalledExactlyOnceWith(later);
+    cancel();
+});
+
 test.each(["queued", "immediate"])("event checks can replace a %s event and add another to the batch", execution => {
     const original = new GameEvent_Log(GameEventType.Log, "Original");
     const replacement = new GameEvent_Log(GameEventType.Log, "Replacement");

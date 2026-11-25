@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 
-import { GameEvent_GoToNextStep } from "@engine/events";
+import { GameEvent_Advance } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import UIRoot,{ initRenderer, uiRoot } from "@ui/UIRoot";
@@ -33,7 +33,7 @@ export async function startGame() {
 
     window.addEventListener("keyup", (e) => {
         if (e.key === " " && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement))
-            gameEventManager.addEvent(new GameEvent_GoToNextStep());
+            gameEventManager.addEvent(new GameEvent_Advance());
     });
 
     const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));

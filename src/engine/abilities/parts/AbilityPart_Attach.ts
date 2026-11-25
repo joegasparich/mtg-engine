@@ -18,16 +18,17 @@ export class AbilityPart_Attach extends AbilityPart_Effect {
     target: GrammarKey;
     saveAs?: string;
     targetValidator?: TargetValidator;
+    private stopListening?: () => void;
 
     setup(ability: Ability) {
         super.setup(ability);
         if (ability.source.zone instanceof Battlefield)
-            gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
+            this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
     }
 
-    cleanup(ability: Ability) {
-        if (ability.source.zone instanceof Battlefield)
-            gameEventManager.offPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
+    cleanup() {
+        this.stopListening?.();
+        this.stopListening = undefined;
     }
 
     perform(effect: OneShotEffect) {

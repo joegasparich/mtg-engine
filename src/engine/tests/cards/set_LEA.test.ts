@@ -1,15 +1,16 @@
 import playerActionManager from "@engine/actions/PlayerActionManager";
+import { PlayerActions } from "@engine/actions";
 import type { CardObject,Permanent } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -49,6 +50,7 @@ describe("Ancestral Recall", () => {
 
         request.onTargeted([target]);
         request.onTargeted([target]);
+        passPriorityRound();
 
         expect(resolveSpell).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ card: recall.card, targets: [target] }));
         expect(game.pendingTargeter).toBeNull();
@@ -78,6 +80,7 @@ describe("Ancestral Recall", () => {
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, afterDraw);
         try {
             beginCasting().onTargeted([opponent]);
+            passPriorityRound();
         } finally {
             gameEventManager.offPerformed(GameEventType.ChangeCardZone, afterDraw);
         }
@@ -99,6 +102,7 @@ describe("Ancestral Recall", () => {
         expect(island.tapped).toBe(false);
         expect(recall.zone).toBe(caster.hand);
         request.onTargeted([opponent]);
+        passPriorityRound();
         expect(opponent.hand.objects).toHaveLength(10);
     });
 
@@ -116,6 +120,7 @@ describe("Ancestral Recall", () => {
         expect(opponent.hand.objects).toHaveLength(7);
 
         beginCasting().onTargeted([opponent]);
+        passPriorityRound();
         expect(caster.graveyard.objects.map(object => object.card)).toContain(recall.card);
         expect(caster.manaPool[ManaColour.U]).toBe(0);
         expect(opponent.hand.objects).toHaveLength(10);
@@ -160,6 +165,7 @@ describe("Animate Wall", () => {
         const request = beginCasting();
         expect(plains.tapped).toBe(false);
         request.onTargeted([wall]);
+        passPriorityRound();
         expect(plains.tapped).toBe(true);
         const attached = caster.battlefield.objects.find(object => object.card === aura.card);
         expect(attached?.attachedTo).toBe(wall);
@@ -196,6 +202,7 @@ describe("Animate Wall", () => {
         expect(plains.tapped).toBe(false);
         expect(aura.zone).toBe(caster.hand);
         request.onTargeted([legalWall]);
+        passPriorityRound();
         expect(caster.battlefield.objects.find(object => object.card === aura.card)?.attachedTo).toBe(legalWall);
     });
 });
@@ -236,6 +243,7 @@ describe("Black Ward", () => {
         expect(plains.tapped).toBe(false);
 
         request.onTargeted([creature]);
+        passPriorityRound();
         expect(game.pendingTargeter).toBeNull();
         expect(plains.tapped).toBe(true);
         expect(caster.manaPool[ManaColour.W]).toBe(0);
@@ -346,6 +354,7 @@ describe("Armageddon", () => {
         try {
             const [action] = playerActionManager.getCardActions(armageddon, caster);
             action.perform(caster);
+            passPriorityRound();
 
             expect(onDestroy).toHaveBeenCalledTimes(casterLands.length + 1);
             expect(game.pendingTargeter).toBeNull();
@@ -363,6 +372,7 @@ describe("Armageddon", () => {
         caster.manaPool[ManaColour.W] = 4;
         const [action] = playerActionManager.getCardActions(armageddon, caster);
         action.perform(caster);
+        passPriorityRound();
 
         expect(game.pendingTargeter).toBeNull();
         expect(game.stack.objects).toHaveLength(0);
@@ -384,6 +394,7 @@ describe("Balance", () => {
         const [action] = playerActionManager.getCardActions(balance, caster);
         expect(action).toBeDefined();
         action.perform(caster);
+        passPriorityRound();
     }
 
     beforeEach(() => {
@@ -493,5 +504,122 @@ describe("Balance", () => {
         } finally {
             gameEventManager.offPerformed(GameEventType.RequestResolutionChoice, onChoice);
         }
+    });
+});
+
+describe("Blaze of Glory", () => {
+    let attacker: Player;
+    let defender: Player;
+
+    function addCard<T extends CardObject>(name: string, owner: Player, zone: Zone<T>) {
+        return addTestCard(cardData.find(card => card.name === name), owner, zone);
+    }
+
+    function declareAttackers(creatures: readonly Permanent[]) {
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        for (const creature of creatures)
+            new PlayerActions.DeclareAttacker(creature).perform(attacker);
+        gameEventManager.addEvent(new GameEvent_Advance());
+    }
+
+    beforeEach(() => {
+        Game.init();
+        attacker = game.addPlayer([]);
+        defender = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    test("the defender can cast after attackers are declared and must block each legal attacker", () => {
+        const blaze = addCard("Blaze of Glory", defender, defender.hand);
+        const plains = addCard("Plains", defender, defender.battlefield);
+        const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
+        blocker.toughness = 6;
+        const bystander = addCard("Grizzly Bears", defender, defender.battlefield);
+        const first = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
+        const second = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
+        const flyer = addCard("Air Elemental", attacker, attacker.battlefield);
+        declareAttackers([first, second, flyer]);
+
+        expect(game.currentStepIndex).toBe(StepIndex.DeclareAttackers);
+        expect([first.tapped, second.tapped, flyer.tapped]).toEqual([true, true, true]);
+        gameEventManager.addEvent(new GameEvent_Advance(attacker));
+        expect(game.priorityPlayer).toBe(defender);
+        new PlayerActions.PlayCard(blaze).perform(defender);
+        game.pendingTargeter.onTargeted([blocker]);
+        expect(plains.tapped).toBe(true);
+        expect(game.stack.objects).toMatchObject([{ card: blaze.card, targets: [blocker] }]);
+        expect(CombatManager.blockLimit(blocker)).toBe(1);
+        passPriorityRound();
+        expect(CombatManager.blockLimit(blocker)).toBe(Infinity);
+        expect(CombatManager.blockLimit(bystander)).toBe(1);
+        passPriorityRound();
+
+        expect(game.declarationPlayer).toBe(defender);
+        const block = new PlayerActions.DeclareBlocker(blocker);
+        block.perform(defender, [first]);
+        block.perform(defender, [flyer]);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        expect(game.declarationPlayer).toBe(defender);
+        expect(CombatManager.blockingCreatures.get(blocker)).toEqual(new Set([first]));
+
+        block.perform(defender, [second]);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        expect(game.priorityPlayer).toBe(attacker);
+        expect([...CombatManager.blockRelationships()]).toEqual([[blocker, first], [blocker, second]]);
+        passPriorityRound();
+        expect(game.pendingCombatDamageChoice).toMatchObject({ player: defender, source: blocker, recipients: [first, second], total: 2 });
+        game.pendingCombatDamageChoice.submit(defender, [1, 1]);
+        expect(blocker.damageTaken).toBe(2);
+        expect(attacker.graveyard.objects.map(object => object.card)).toEqual([first.card, second.card]);
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+        expect(CombatManager.blockLimit(blocker)).toBe(Infinity);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        expect(CombatManager.blockLimit(blocker)).toBe(1);
+        expect(blocker.abilities).toHaveLength(0);
+    });
+
+    test("can target a tapped defending creature before attacks but only during the casting window", () => {
+        const blaze = addCard("Blaze of Glory", attacker, attacker.hand);
+        const lateBlaze = addCard("Blaze of Glory", attacker, attacker.hand);
+        const first = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
+        const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
+        const land = addCard("Plains", defender, defender.battlefield);
+        blocker.tapped = true;
+        game.infiniteMana = true;
+        expect(playerActionManager.getCardActions(blaze, attacker)).toEqual([]);
+        gameEventManager.addEvent(new GameEvent_CastSpell(attacker, blaze, [blocker]));
+        expect(blaze.zone).toBe(attacker.hand);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.BeginningOfCombat));
+
+        new PlayerActions.PlayCard(blaze).perform(attacker);
+        const request = game.pendingTargeter;
+        request.onTargeted([first]);
+        request.onTargeted([land]);
+        expect(game.pendingTargeter).toBe(request);
+        request.onTargeted([blocker]);
+        passPriorityRound();
+        expect(CombatManager.blockLimit(blocker)).toBe(Infinity);
+
+        declareAttackers([first]);
+        passPriorityRound();
+        expect(CombatManager.potentialBlockTargetsFor(blocker)).toEqual([]);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        expect(game.priorityPlayer).toBe(attacker);
+        expect(game.currentStepIndex).toBe(StepIndex.DeclareBlockers);
+        expect(playerActionManager.getCardActions(lateBlaze, attacker)).toEqual([]);
+    });
+
+    test("loses its target if the creature leaves and returns before resolution", () => {
+        const blaze = addCard("Blaze of Glory", attacker, attacker.hand);
+        const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.BeginningOfCombat));
+        gameEventManager.addEvent(new GameEvent_CastSpell(attacker, blaze, [blocker]));
+        const returned = moveTestCard(moveTestCard(blocker, defender.graveyard), defender.battlefield);
+
+        passPriorityRound();
+        expect(CombatManager.blockLimit(returned)).toBe(1);
+        expect(returned.abilities).toHaveLength(0);
+        expect(attacker.graveyard.objects.map(object => object.card)).toEqual([blaze.card]);
     });
 });

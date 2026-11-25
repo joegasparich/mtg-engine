@@ -88,7 +88,7 @@ test("defender prevents attacking and allows blocking", () => {
     const [block] = playerActionManager.getCardActions(defender, playerA);
     expect(block).toBeInstanceOf(PlayerActions.DeclareBlocker);
     block.perform(playerA, [attacker]);
-    expect(CombatManager.blockingCreatures.get(defender)).toBe(attacker);
+    expect(CombatManager.blockingCreatures.get(defender)).toEqual(new Set([attacker]));
 });
 
 test("defender only intercepts attacker checks on the battlefield", () => {
@@ -178,10 +178,10 @@ test("can reassign and withdraw a block while keeping the previous assignment af
     const edit = new PlayerActions.DeclareBlocker(blocker);
     edit.perform(playerB, [first]);
     edit.perform(playerB, [flying]);
-    expect(CombatManager.blockingCreatures.get(blocker)).toBe(first);
+    expect(CombatManager.blockingCreatures.get(blocker)).toEqual(new Set([first]));
 
     edit.perform(playerB, [second]);
-    expect([...CombatManager.blockingCreatures]).toEqual([[blocker, second]]);
+    expect([...CombatManager.blockingCreatures]).toEqual([[blocker, new Set([second])]]);
     expect(edit.withdraw(playerA)).toBe(false);
     expect(edit.withdraw(playerB)).toBe(true);
     expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
@@ -192,6 +192,32 @@ test("can reassign and withdraw a block while keeping the previous assignment af
     expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
     edit.perform(playerB, [second]);
     expect(CombatManager.blockingCreatures.has(blocker)).toBe(false);
+});
+
+test("permission to block multiple attackers leaves the choice of blocks to the defender", () => {
+    const first = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blocker = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: { AbilityPart_BlockAnyNumber: {} } }],
+    }, playerB, playerB.battlefield);
+
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [first, second])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    expect(CombatManager.canConfirmBlocks()).toBe(true);
+    const block = new PlayerActions.DeclareBlocker(blocker);
+    block.perform(playerB, [first]);
+    expect(CombatManager.canConfirmBlocks()).toBe(true);
+    block.perform(playerB, [second]);
+    expect(CombatManager.blockingCreatures.get(blocker)).toEqual(new Set([first, second]));
+
+    gameEventManager.addEvent(new GameEvent_ChangeCardZone(first, playerA.graveyard));
+    expect(CombatManager.blockingCreatures.get(blocker)).toEqual(new Set([second]));
+    expect(CombatManager.canConfirmBlocks()).toBe(true);
 });
 
 function addBandingCreature(player: Player) {

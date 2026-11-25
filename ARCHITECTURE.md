@@ -11,7 +11,7 @@ The TypeScript engine owns the game state and enforces the rules. The PixiJS fro
 | **Effect** | Carries out a resolving instruction or applies an ongoing grant, restriction, or exception. | Armageddon produces a batch of destruction events. Black Ward grants an ability while attached. |
 | **Game event** | Represents a proposed operation, a legality check, or a notification. Successful operations publish what happened. | `GameEvent_ChangeCardZone` moves a card. `GameEvent_CheckTarget` checks a proposed target. `GameEvent_StepStart` announces a step. |
 
-When a player casts Ancestral Recall, the play action submits a cast event, the stack resolves the spell's ability, and the resulting effect submits a draw instruction. An untap, a turn-based draw, and paying a tap cost enter the event manager directly as rules operations. Combat declaration actions edit the pending attack and block assignments through the combat system. [Play action](src/engine/actions/PlayerAction_PlayCard.ts) · [Event manager](src/engine/events/GameEventManager.ts)
+When a player casts Ancestral Recall, the play action submits a cast event to put the spell on the stack. Once all players pass priority in succession, the spell resolves and its effect submits a draw instruction. An untap, a turn-based draw, and paying a tap cost enter the event manager directly as rules operations. Combat declaration actions edit the pending attack and block assignments through the combat system. [Play action](src/engine/actions/PlayerAction_PlayCard.ts) · [Event manager](src/engine/events/GameEventManager.ts)
 
 ## How abilities work
 
@@ -23,7 +23,7 @@ When a player casts Ancestral Recall, the play action submits a cast event, the 
 
 **One-shot effects** carry the originating ability into the events they produce. `emit` queues an event, `performImmediate` applies it inline, and `performSimultaneous` applies the whole batch before notifying listeners. Ancestral Recall queues a draw instruction and each individual draw reads the current top card. Armageddon destroys all affected lands in one batch. See rules 609.1, 610.1, 121.2, and 608.2f. [Effects system](src/engine/effects/EffectSystem.ts) · [Draw events](src/engine/events/GameEvent_DrawCard.ts)
 
-**Continuous effects** start when their source ability becomes active and are cleaned up when it stops applying. Black Ward's grant follows reattachment and ends when the Aura leaves or loses the granting ability. See rule 611.3. [Continuous effect part](src/engine/abilities/parts/AbilityPart_ContinuousEffect.ts) · [Attachment grant](src/engine/abilities/parts/AbilityPart_GrantAttachedAbility.ts)
+**Continuous effects** can come from a static ability or from a resolving spell or ability. Black Ward's grant follows reattachment and ends when the Aura leaves or loses the granting ability. Blaze of Glory's ability part registers its grant for removal during cleanup. See rules 611.2–3 and 514.2. [Continuous effect part](src/engine/abilities/parts/AbilityPart_ContinuousEffect.ts) · [Temporary grants](src/engine/abilities/parts/effect/AbilityPart_Effect_GrantAbilityUntilEndOfTurn.ts)
 
 ### Continuous effect kinds
 
@@ -49,6 +49,10 @@ Black Ward uses the same override mechanism for attachment checks. Its override 
 
 `addEvent` and `addEvents` append to the pending queue and run effect checks on it. If the event loop is idle, it starts draining immediately. The loop takes the pending events as a batch and runs them in order. Events queued during that batch wait for the next pass. When an event succeeds, the manager calls its `onPerformed` listeners and then its `then` callback. [Event manager](src/engine/events/GameEventManager.ts)
 
+Use `onGamePerformed(type, callback, options)` for subscriptions owned by the current game. It returns a function that cancels the subscription. Use `matches` to filter events, and set `once` to detach the callback on its first match. Starting a new game drops these subscriptions. A subscription created during notification starts observing with the next event or simultaneous batch. [Event manager](src/engine/events/GameEventManager.ts)
+
+Blaze of Glory uses a one-shot `Cleanup` subscription to revoke its grant alongside marked damage removal under rule 514.2. An ability that triggers on a later event uses its subscription to queue a stack object with `Stack.abilityTriggered`. Delayed triggers capture their source and controller when created under rule 603.7. When several events match simultaneously, rule 603.7b can require the controller to choose the event. [Stack](src/engine/Stack.ts) · [Comprehensive Rules](ref/MagicCompRules.txt)
+
 The loop checks for work from top to bottom.
 
 1. **Queued events.** Drain any new batch first, including choice submissions. Once the queue is empty, a pending resolution or combat damage choice pauses the loop.
@@ -56,6 +60,7 @@ The loop checks for work from top to bottom.
 3. **`continueResolution` callbacks.** Advance the current spell or ability to its next instruction.
 4. **Game state checks.** Finish any current stack resolution, perform applicable state-based actions until stable, and put waiting triggers on the stack. [Game state checks](src/engine/Game.ts)
 5. **`onIdle` callbacks.** Start work that needs a settled game state, such as resolving the next object on the stack or advancing a step. [Stack](src/engine/Stack.ts) · [Turn progression](src/engine/Game.ts)
+6. **Automatic progression.** Confirm an empty combat declaration or pass priority if the player has no available action other than mana abilities. The dev checkbox can pass even when actions are available. The turn player still confirms the end of the turn. [Turn progression](src/engine/Game.ts)
 
 After each `onResolved`, `continueResolution`, or `onIdle` callback, the loop starts again at the top of the list. Balance schedules its next instruction with `continueResolution` so it counts cards after the previous instruction's moves and their queued follow-ups. [Balance effect](src/engine/abilities/parts/effect/AbilityPart_Effect_EqualizeCards.ts)
 
@@ -64,8 +69,8 @@ After each `onResolved`, `continueResolution`, or `onIdle` callback, the loop st
 | System | Responsibility |
 | --- | --- |
 | **Cards, objects, and zones** | `Card` holds a card's definition and owner across zone changes. `CardObject` is its current rules object, with `Spell` and `Permanent` as specialized forms. A zone change creates a new object under rule 400.7. Targets and attachments track the rules object. [Game objects](src/engine/GameObject.ts) · [Zones](src/engine/Zone.ts) |
-| **Turns and state-based actions** | `Game` owns the players, turn, current step, and pending choices. `Step` runs turn-based actions such as untapping and clearing marked damage during cleanup. [Game](src/engine/Game.ts) · [Steps](src/engine/Step.ts) |
-| **Stack and choices** | The stack holds spells and separate occurrences of activated or triggered abilities. The current engine schedules resolution automatically and rechecks spell targets at resolution. Targeting gathers casting input, while resolution and combat damage choices can pause processing and resume after a valid submission. [Stack](src/engine/Stack.ts) · [Choices](src/engine/Game.ts) |
+| **Turns and priority** | `Game` owns the players, turn, current step, and priority. `Step` runs turn-based actions before granting priority. The turn player gets priority after declarations and after each resolution. See rule 117. [Game](src/engine/Game.ts) · [Steps](src/engine/Step.ts) |
+| **Stack and choices** | The stack holds spells and separate occurrences of activated or triggered abilities. Consecutive passes resolve one stack object or end the step if the stack is empty. The stack rechecks spell targets at resolution. Choices pause processing until the acting player submits valid input. [Stack](src/engine/Stack.ts) · [Choices](src/engine/Game.ts) |
 | **Mana** | `ManaUtility` parses mana costs and handles payment. `PlayerActionManager` checks available mana and can activate eligible mana abilities to pay for a spell. Mana pools empty at step boundaries. [Mana](src/engine/mana.ts) · [Actions and autopay](src/engine/actions/PlayerActionManager.ts) |
 | **Combat** | `CombatManager` validates and tracks attackers, blockers, and bands. It gathers damage assignments, retains their sources for checks such as protection, and deals damage among combatants in one batch. [Combat manager](src/engine/CombatManager.ts) |
 | **Browser UI** | `UIRoot` reacts to engine events and coordinates card views, targeting, and choice dialogs. `UICombat` renders declarations and gathers damage assignments. `UIEventManager` carries frontend interactions such as card clicks. [UI root](src/ui/UIRoot.ts) · [Combat UI](src/ui/UICombat.ts) · [UI events](src/ui/UIEventManager.ts) |

@@ -12,7 +12,11 @@ export enum GameEventType {
     TurnStart,
     StepStart,
     StepEnd,
+    Cleanup,
+    Advance,
+    PriorityChanged,
     CastSpell,
+    StackAbilityChanged,
     ChangeCardZone,
     ActivateAbility,
     TapCard,
@@ -21,6 +25,8 @@ export enum GameEventType {
     DestroyPermanent,
     DeclareAttacker,
     DeclareBlocker,
+    CheckBlockLimit,
+    CheckRequiredBlock,
     StartTargeting,
     PlayLand,
     DetachPermanent,
@@ -68,17 +74,27 @@ export class GameEvent_Log extends GameEvent {
 
 type Listener = (event: GameEvent) => void;
 
+interface GameSubscriptionOptions<T extends GameEvent> {
+    once?: boolean;
+    matches?: (event: T) => boolean;
+}
+
 class GameEventManager {
     readonly effects = new EffectSystem(this);
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
+    private readonly gameListenersByType = new Map<GameEventType, Set<Listener>>();
     private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
     private readonly resolutionSteps: (() => void)[] = [];
     private readonly idleCallbacks: (() => void)[] = [];
     private settleState?: () => boolean;
     private waitingForChoice?: () => boolean;
+    private advanceWhileIdle?: () => boolean;
 
-    startGame(settle: () => boolean, waitingForChoice: () => boolean) {
+    startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean) {
+        for (const listeners of this.gameListenersByType.values())
+            listeners.clear();
+        this.gameListenersByType.clear();
         this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
         this.eventsResolvedCallback.length = 0;
@@ -86,6 +102,7 @@ class GameEventManager {
         this.idleCallbacks.length = 0;
         this.settleState = settle;
         this.waitingForChoice = waitingForChoice;
+        this.advanceWhileIdle = advanceWhileIdle;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -97,6 +114,24 @@ class GameEventManager {
 
     offPerformed(eventType: GameEventType, listener: Listener) {
         this.eventPerformedListenersByType.get(eventType).delete(listener);
+    }
+
+    onGamePerformed<T extends GameEvent>(eventType: GameEventType, listener: (event: T) => void,
+        { once, matches }: GameSubscriptionOptions<T> = {}): () => void {
+        const listeners = this.gameListenersByType.get(eventType) ?? new Set<Listener>();
+        this.gameListenersByType.set(eventType, listeners);
+
+        const notify: Listener = event => {
+            if (!listeners.has(notify) || matches?.(event as T) === false)
+                return;
+
+            if (once)
+                cancel();
+            listener(event as T);
+        };
+        const cancel = () => { listeners.delete(notify); };
+        listeners.add(notify);
+        return cancel;
     }
 
     onCheck(listener: CheckListener) {
@@ -158,7 +193,9 @@ class GameEventManager {
         this.checkForEffects(events);
         // 704.3: Commit the whole batch before any listener observes its results.
         const performed = events.filter(event => event.perform());
-        performed.forEach(event => this.notifyPerformed(event));
+        const notifications = performed.map(event => ({ event, listeners: this.getGameListeners(event) }));
+        for (const { event, listeners } of notifications)
+            this.notifyPerformed(event, listeners);
         return performed.some(event => event.isAction);
     }
 
@@ -207,6 +244,8 @@ class GameEventManager {
                     continue;
                 } else if (this.idleCallbacks.length > 0) {
                     this.idleCallbacks.shift()();
+                } else if (this.advanceWhileIdle?.()) {
+                    continue;
                 } else {
                     break;
                 }
@@ -224,7 +263,16 @@ class GameEventManager {
         return true;
     }
 
-    private notifyPerformed(event: GameEvent) {
+    private getGameListeners(event: GameEvent): Listener[] {
+        // 603.7a: A registration made during dispatch starts with a later event.
+        const types = new Set([event.type, ...(event.additionalPerformedTypes ?? []), GameEventType.All]);
+        return [...types].flatMap(type => [...(this.gameListenersByType.get(type) ?? [])]);
+    }
+
+    private notifyPerformed(event: GameEvent, gameListeners = this.getGameListeners(event)) {
+        for (const listener of gameListeners)
+            listener(event);
+
         this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
         for (const type of event.additionalPerformedTypes ?? [])
             this.eventPerformedListenersByType.get(type)?.forEach(listener => listener(event));

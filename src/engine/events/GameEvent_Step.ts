@@ -3,6 +3,29 @@ import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Step,StepIndex } from "@engine/Step";
 
+export class GameEvent_Advance extends GameEvent {
+    type = GameEventType.Advance;
+    label = "Advance game";
+
+    constructor(readonly player = game.activePlayer()) {
+        super();
+    }
+
+    perform(): boolean {
+        return game.advance(this.player);
+    }
+}
+
+export class GameEvent_PriorityChanged extends GameEvent {
+    type = GameEventType.PriorityChanged;
+    label: string;
+
+    constructor(readonly player: Player | null) {
+        super();
+        this.label = player ? `Player ${player.id} received priority` : "Priority cleared";
+    }
+}
+
 export class GameEvent_GoToNextStep extends GameEvent {
     constructor() {
         super();
@@ -97,5 +120,23 @@ export class GameEvent_StepEnd extends GameEvent {
         this.stepIndex = step;
 
         this.label = `Player ${this.player.id} exited step ${Step.toString(this.stepIndex)}`;
+    }
+}
+
+export class GameEvent_Cleanup extends GameEvent {
+    type = GameEventType.Cleanup;
+    label = "Clear damage and end temporary effects";
+
+    constructor(readonly player: Player) {
+        super();
+    }
+
+    perform(): boolean {
+        // 514.2: Damage clears and temporary effects end as the same turn-based action.
+        for (const player of game.players) {
+            for (const permanent of player.battlefield.objects)
+                permanent.damageTaken = 0;
+        }
+        return true;
     }
 }

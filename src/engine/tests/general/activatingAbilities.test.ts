@@ -5,7 +5,7 @@ import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS,startMainPhase } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -46,6 +46,7 @@ test("a mana ability taps its land and resolves without touching the stack", () 
 });
 
 test("two queued activations cannot pay with the same tap", () => {
+    startMainPhase();
     const forest = addTestCard(cardData[FOREST], player, player.battlefield);
     const ability = forest.abilities[0];
     gameEventManager.addEvents([

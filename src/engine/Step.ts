@@ -1,212 +1,87 @@
 import { CombatManager } from "@engine/CombatManager";
-import { game } from "@engine/Game";
 import Player from "@engine/Player";
-import { GameEvent_DrawCard,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import { GameEvent_Cleanup,GameEvent_DrawCard,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
-import { autobind } from "@utility/typeUtility";
 
 interface Step {
-    message: string | null;
-    buttons: [string, (() => void)][]
-
-    onStart(player: Player): void;
-    onEnd(player: Player): void;
-    canEnd?(): boolean;
+    onStart?(player: Player): void;
+    onEnd?(player: Player): void;
+    declarationPlayer?(player: Player): Player | null;
+    canConfirm?(): boolean;
+    confirm?(): void;
 }
 
 export class UntapStep implements Step {
-    message: string = null;
-    buttons: [label: string, action: () => void][] = [];
-
     onStart(player: Player): void {
-        // Does not give priority: 502.4
-        game.activePlayerID = -1;
-
         // 502.3
         for (const permanent of player.battlefield.objects) {
             if (permanent.tapped)
                 gameEventManager.addEvent(new GameEvent_UntapCard(permanent));
         }
     }
-
-    onEnd(player: Player): void {}
-}
-
-export class UpkeepStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
-    onStart(player: Player): void {
-        // 503.1
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-    }
-    onEnd(player: Player): void {}
 }
 
 export class DrawStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
     onStart(player: Player): void {
         // 504.1
         gameEventManager.addEvent(new GameEvent_DrawCard(player));
-
-        // 504.2
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
     }
-    onEnd(player: Player): void {}
-}
-
-export class MainStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
-    onStart(player: Player): void {
-        // 505.6
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-    }
-    onEnd(player: Player): void {}
 }
 
 export class BeginningOfCombatStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
     onStart(player: Player): void {
-        CombatManager.attackingPlayer = game.currentTurnPlayer();
-        // 507.2
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
+        CombatManager.attackingPlayer = player;
     }
-    onEnd(player: Player): void {}
 }
 
 export class DeclareAttackersStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
-    onStart(player: Player): void {
-        // 508.1
-        this.message = "Declare attackers";
-        this.buttons = [["Finish declaring", this.onFinishDeclaring]];
+    declarationPlayer(player: Player): Player {
+        return player;
     }
-    canEnd(): boolean {
+
+    canConfirm(): boolean {
         return CombatManager.canConfirmAttackers();
     }
 
-    onEnd(): void {
+    confirm(): void {
         CombatManager.confirmAttackers();
         // 508.1f
-        for (const attacker of CombatManager.attackingCreatures.keys()) {
+        for (const attacker of CombatManager.attackingCreatures.keys())
             gameEventManager.addEvent(new GameEvent_TapCard(attacker));
-        }
-    }
-
-    @autobind
-    onFinishDeclaring() {
-        game.nextStep(game.options.allowAutoSkip);
     }
 }
 
 export class DeclareBlockersStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-
-    onStart(player: Player): void {
-        // 509.1
-        this.message = "Declare blockers";
-        this.buttons = [["Finish declaring", this.onFinishDeclaring]];
-
-        // TODO: Remove once priority is in
-        if (game.players.length > 1)
-            game.activePlayerID = game.randomOpponent(player).id;
+    declarationPlayer(): Player | null {
+        return CombatManager.defendingPlayer;
     }
-    onEnd(player: Player): void {
+
+    canConfirm(): boolean {
+        return CombatManager.canConfirmBlocks();
+    }
+
+    confirm(): void {
         CombatManager.confirmBlocks();
-        game.activePlayerID = game.currentTurnPlayerID;
-    }
-
-    @autobind
-    onFinishDeclaring() {
-        // 508.2
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-
-        game.nextStep(game.options.allowAutoSkip);
     }
 }
 
 export class CombatDamageStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-    onStart(player: Player): void {
-        game.activePlayerID = game.currentTurnPlayerID;
-        // 510.1, 510.2: An assignment choice can pause this turn-based action.
+    onStart(): void {
+        // 510.1–2: An assignment choice can pause this turn-based action.
         CombatManager.assignCombatDamage();
     }
-    onEnd(player: Player): void {}
 }
 
 export class EndOfCombatStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-    onStart(player: Player): void {
-        // 511.1
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-    }
-    onEnd(player: Player): void {
+    onEnd(): void {
         CombatManager.reset();
     }
 }
 
-export class SecondMainStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-    onStart(player: Player) {
-        // 505.6
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-    }
-    onEnd(player: Player) {}
-}
-
-export class EndStep implements Step {
-    message: string = null;
-    buttons: [string, () => void][] = [];
-    onStart(player: Player) {
-        // 513.1
-
-        game.activePlayerID = game.currentTurnPlayerID;
-        // TODO: Pass priority
-    }
-    onEnd(player: Player) {}
-}
-
 export class CleanupStep implements Step {
-    message: string | null = null;
-    buttons: [string, () => void][] = [];
-
-    onStart(): void {
-        game.activePlayerID = -1;
-
-        // 514.2
-        for (const player of game.players) {
-            for (const permanent of player.battlefield.objects) {
-                permanent.damageTaken = 0;
-            }
-        }
+    onStart(player: Player): void {
+        gameEventManager.performImmediate(new GameEvent_Cleanup(player));
     }
-
-    onEnd(): void {}
 }
 
 export enum StepIndex {
@@ -235,16 +110,16 @@ export enum PhaseIndex {
 export namespace Step {
     export const all: Step[] = [
         new UntapStep(),
-        new UpkeepStep(),
+        {},
         new DrawStep(),
-        new MainStep(),
+        {},
         new BeginningOfCombatStep(),
         new DeclareAttackersStep(),
         new DeclareBlockersStep(),
         new CombatDamageStep(),
         new EndOfCombatStep(),
-        new SecondMainStep(),
-        new EndStep(),
+        {},
+        {},
         new CleanupStep(),
     ];
 

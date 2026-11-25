@@ -6,7 +6,7 @@ import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -20,11 +20,6 @@ beforeEach(async () => {
 function addForestToHand(owner: Player) {
     const forest = addTestCard(cardData[FOREST], owner, owner.hand);
     return forest;
-}
-
-function startMainPhase() {
-    game.startGame();
-    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
 }
 
 test.each([StepIndex.Main, StepIndex.SecondMain])("plays the first land directly onto the battlefield in main phase step %s", step => {
@@ -185,12 +180,13 @@ test("a spell action from the previous turn cannot spend either player's mana", 
 });
 
 test("should cast creature spell from hand (bypassing cost)", () => {
+    startMainPhase();
     const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
 
     const cardEnteredStack = vi.spyOn(game.stack, "resolveSpell");
     gameEventManager.addEvent(new GameEvent_CastSpell(player, bears));
 
-    // Test stack resolved properly
+    passPriorityRound();
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
 
     // Check card entered battlefield
@@ -234,7 +230,7 @@ test("should play creature card from hand with sufficient mana", () => {
 
     (new PlayerActions.PlayCard(bears)).perform(player);
 
-    // Check stack resolved properly
+    passPriorityRound();
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
 
     // Check mana paid properly
@@ -262,7 +258,7 @@ test("should play creature card from hand with excess mana", () => {
 
     (new PlayerActions.PlayCard(bears)).perform(player);
 
-    // Check stack resolved properly
+    passPriorityRound();
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
 
     // Check mana paid properly
@@ -291,7 +287,7 @@ test("should play creature card from hand with generic mana", () => {
 
     (new PlayerActions.PlayCard(bears)).perform(player);
 
-    // Test stack resolved properly
+    passPriorityRound();
     expect(cardEnteredStack).toHaveBeenCalledTimes(1);
 
     // Test mana paid properly

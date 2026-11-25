@@ -33,7 +33,7 @@ export class AbilityPart_Target extends AbilityPart {
         this.ability.slate[this.saveAs] = targets;
     }
 
-    private canTarget(target: ActionTarget): boolean {
+    protected canTarget(target: ActionTarget): boolean {
         if (target instanceof Player)
             return this.validTargets.includes(TargetTypeKeys.Player) && game.players.includes(target);
 

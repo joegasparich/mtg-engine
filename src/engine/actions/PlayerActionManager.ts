@@ -100,11 +100,12 @@ class PlayerActionManager {
                 }
             }
 
-            if (game.currentStepIndex == StepIndex.DeclareAttackers && CombatManager.canAttack(object)) {
+            if (actor === game.declarationPlayer && game.currentStepIndex === StepIndex.DeclareAttackers
+                && CombatManager.defendingPlayer && CombatManager.canAttack(object)) {
                 cardActions.push(new PlayerActions.DeclareAttacker(object));
             }
 
-            if (game.currentStepIndex == StepIndex.DeclareBlockers && CombatManager.canBlockAnyAttackers(object)) {
+            if (actor === game.declarationPlayer && game.currentStepIndex === StepIndex.DeclareBlockers && CombatManager.canBlockAnyAttackers(object)) {
                 cardActions.push(new PlayerActions.DeclareBlocker(object));
             }
         }

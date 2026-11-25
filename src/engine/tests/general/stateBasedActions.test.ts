@@ -3,7 +3,7 @@ import gameEventManager,{ type EventCheck,GameEvent_Log,GameEventType } from "@e
 import Game,{ game } from "@engine/Game";
 import { type CardObject,Spell,StackAbility } from "@engine/GameObject";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS,passPriorityRound } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -116,6 +116,7 @@ test("a host and its Aura are dealt with before a waiting trigger is put on the 
     try {
         gameEventManager.addEvent(enter);
         expect(removed).toEqual([host, attached]);
+        game.stack.resolveAll();
         expect(player.hand.objects).toHaveLength(1);
     } finally {
         gameEventManager.offPerformed(GameEventType.ChangeCardZone, observeZoneChange);
@@ -128,6 +129,7 @@ test("cleanup checks state-based actions after removing marked damage", () => {
     const survivor = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
     game.startGame();
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+    expect(game.currentStepIndex).toBe(StepIndex.End);
 
     const lowerToughnessDuringCleanup = (event: GameEvent_StepStart) => {
         if (event.stepIndex === StepIndex.Cleanup)
@@ -137,9 +139,13 @@ test("cleanup checks state-based actions after removing marked damage", () => {
     try {
         survivor.damageTaken = 1;
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        expect(game.currentStepIndex).toBe(StepIndex.Cleanup);
         expect(player.battlefield.objects).toEqual([survivor]);
         expect(survivor.damageTaken).toBe(0);
-        expect(game.activePlayer()).toBeNull();
+        expect(game.priorityPlayer).toBe(player);
+        passPriorityRound();
+        expect(game.currentStepIndex).toBe(StepIndex.Cleanup);
+        expect(game.priorityPlayer).toBeNull();
     } finally {
         gameEventManager.offPerformed(GameEventType.StepStart, lowerToughnessDuringCleanup);
     }

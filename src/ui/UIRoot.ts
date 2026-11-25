@@ -3,7 +3,7 @@ import * as PIXI from "pixi.js";
 import { ActionTarget,Targeter,TargetType } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
-import { GameEvent_ChangeCardZone,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,type GameEvent_TurnStart } from "@engine/events";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,type GameEvent_TurnStart } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -20,6 +20,7 @@ import uiEventManager,{ UIEvent_CardClicked,UIEventType } from "@ui/UIEventManag
 import { UICombat } from "@ui/UICombat";
 import { UIPlayer } from "@ui/UIPlayer";
 import { UIResolutionChoice } from "@ui/UIResolutionChoice";
+import { UIStack } from "@ui/UIStack";
 import { UIZone } from "@ui/UIZone";
 import { autobind } from "@utility/typeUtility";
 
@@ -175,6 +176,7 @@ export default class UIRoot extends PIXI.Container {
     cardToUICard = new Map<number, UICard>();
 
     private readonly zones = new Map<Zone, UIZone<PIXI.Container>>();
+    private readonly stack: UIStack;
     readonly cardOverlay = new PIXI.RenderLayer();
     readonly combat: UICombat;
     private resolutionChoice?: UIResolutionChoice;
@@ -196,22 +198,34 @@ export default class UIRoot extends PIXI.Container {
         this.cardOverlay.eventMode = 'none';
         pixi.stage.addChild(this.cardOverlay);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
-        pixi.renderer.on('resize', this.layoutPlayers);
+        pixi.renderer.on('resize', this.layoutBoard);
         this.combat = new UICombat(this);
+        this.stack = new UIStack(game.stack, this);
+        this.zones.set(game.stack, this.stack);
+        pixi.stage.addChild(this.stack);
         this.setupCardSelectionKeyboard();
 
-        const infiniteMana = document.createElement('input');
-        infiniteMana.type = 'checkbox';
-        infiniteMana.checked = game.infiniteMana;
-        infiniteMana.addEventListener('change', () => {
-            game.infiniteMana = infiniteMana.checked;
+        const devControls = document.createElement('div');
+        devControls.className = 'testing-controls';
+        const addDevCheckbox = (text: string, checked: boolean, onChange: (enabled: boolean) => void) => {
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = checked;
+            input.addEventListener('change', () => onChange(input.checked));
+            const label = document.createElement('label');
+            label.className = 'testing-toggle';
+            label.append(input, text);
+            devControls.append(label);
+        };
+        addDevCheckbox('Infinite mana (testing)', game.infiniteMana, enabled => {
+            game.infiniteMana = enabled;
             playerActionManager.refreshCardActionsForUI();
         });
-        const testingToggle = document.createElement('label');
-        testingToggle.className = 'testing-toggle';
-        testingToggle.title = 'Both players can cast spells without spending mana';
-        testingToggle.append(infiniteMana, 'Infinite mana (testing)');
-        document.body.append(testingToggle);
+        addDevCheckbox('Auto-pass priority (testing)', game.autoPassPriority, enabled => {
+            game.autoPassPriority = enabled;
+            game.checkState();
+        });
+        document.body.append(devControls);
 
         gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
             removeCustomContextMenu();
@@ -249,79 +263,46 @@ export default class UIRoot extends PIXI.Container {
             document.body.classList.remove('resolving-choice');
         });
 
-        // TODO: Probably need to clean these up
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
         const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
-        const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
-        const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()));
-        const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
-        const turnControls = [turnLabel, currentStepLabel, nextStepButton, nextPhaseButton, endTurnButton];
+        const advanceButton = new DOMButton("", { top: '175px', left: '25px' },
+            () => gameEventManager.addEvent(new GameEvent_Advance()));
+        const turnControls = [turnLabel, currentStepLabel, advanceButton];
         for (const control of turnControls)
             control.className = 'turn-control';
 
-        gameEventManager.onPerformed(GameEventType.TurnStart, (event: GameEvent_TurnStart) => turnLabel.text = `Player ${event.player.id}'s turn`);
         const syncTurnControls = () => {
-            const inCombatInput = UICombat.declaresAt(game.currentStepIndex) || game.pendingCombatDamageChoice;
+            const hidden = game.declarationPlayer || game.pendingCombatDamageChoice;
             for (const control of turnControls) {
-                if (inCombatInput)
+                if (hidden)
                     control.hide();
                 else
                     control.show();
             }
+            const priority = game.priorityPlayer;
+            currentStepLabel.text = Step.toString(game.currentStepIndex);
+            advanceButton.text = game.canEndTurn ? "End turn"
+                : priority ? `Player ${priority.id} · Pass priority` : "Next step";
         };
+        gameEventManager.onPerformed(GameEventType.TurnStart, (event: GameEvent_TurnStart) => turnLabel.text = `Player ${event.player.id}'s turn`);
+        gameEventManager.onPerformed(GameEventType.PriorityChanged, () => {
+            removeCustomContextMenu();
+            syncTurnControls();
+        });
         gameEventManager.onPerformed(GameEventType.RequestCombatDamageChoice, () => {
             removeCustomContextMenu();
             syncTurnControls();
         });
         gameEventManager.onPerformed(GameEventType.SubmitCombatDamageChoice, syncTurnControls);
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, syncTurnControls);
+        gameEventManager.onPerformed(GameEventType.StackAbilityChanged, syncTurnControls);
         gameEventManager.onPerformed(GameEventType.StepStart, () => {
             this.announceCardSelection();
             syncTurnControls();
-            currentStepLabel.text = Step.toString(game.currentStepIndex);
-
-            const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
-            nextPhaseButton.text = `Skip to ${Step.toStringPhase(nextPhase)}`;
         });
+        gameEventManager.onPerformed(GameEventType.StepEnd, removeCustomContextMenu);
 
         pixi.stage.addEventListener('pointermove', (e) => this.mousePos.copyFrom(e.global));
-
-        // TODO: Move this out
-        {
-            const stepMessageLabel = new DOMLabel("", { top: '0', left: '0', right: '0'});
-            stepMessageLabel.className = "message";
-            stepMessageLabel.hide();
-
-            // TODO: Multiple buttons
-            const stepActions = new DOMButton("", { top: '75px', left: '45%', right: '45%' }, null);
-            stepActions.hide();
-
-            gameEventManager.onPerformed(GameEventType.StepStart, () => {
-                if (UICombat.declaresAt(game.currentStepIndex))
-                    return;
-
-                const message = game.currentStep().message;
-                if (message) {
-                    stepMessageLabel.text = message;
-                    stepMessageLabel.show();
-                }
-                const action = game.currentStep().buttons[0];
-                if (action) {
-                    stepActions.text = action[0];
-                    stepActions.onClick = action[1];
-                    stepActions.show();
-                }
-            });
-
-            gameEventManager.onPerformed(GameEventType.StepEnd, event => {
-                removeCustomContextMenu();
-                stepMessageLabel.text = null;
-                stepMessageLabel.hide();
-
-                stepActions.text = null;
-                stepActions.onClick = null;
-                stepActions.hide();
-            });
-        }
     }
 
     handleCardClick(object: CardObject) {
@@ -454,15 +435,16 @@ export default class UIRoot extends PIXI.Container {
         this.players.push(uiPlayer);
         this.playerToUIPlayer.set(player, uiPlayer);
         this.uiPlayerToPlayer.set(uiPlayer, player);
-        this.layoutPlayers();
+        this.layoutBoard();
     }
 
     @autobind
-    private layoutPlayers() {
+    private layoutBoard() {
         this.players.forEach((player, index) => {
             player.position.set(pixi.screen.width / 2, index === 0 ? pixi.screen.height : 0);
             player.hand.updatePositions();
         });
+        this.stack.layout();
     }
 
     @autobind

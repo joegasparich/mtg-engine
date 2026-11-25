@@ -19,11 +19,10 @@ export class PlayerAction_DeclareBlocker extends PlayerAction<Permanent> {
 
     perform(player: Player, targets?: ActionTarget[]) {
         const target = targets?.[0];
-        if (!this.canEdit(player) || !(target instanceof Permanent)
-            || !CombatManager.canBlockAttacker(this.object, target))
+        if (!this.canEdit(player) || !(target instanceof Permanent))
             return;
 
-        CombatManager.blockingCreatures.set(this.object, target);
+        CombatManager.assignBlock(this.object, target);
     }
 
     withdraw(player: Player): boolean {
@@ -32,6 +31,6 @@ export class PlayerAction_DeclareBlocker extends PlayerAction<Permanent> {
 
     private canEdit(player: Player) {
         return !game.hasPendingPlayerInput && game.currentStepIndex === StepIndex.DeclareBlockers
-            && player === game.activePlayer() && player === this.object.controller;
+            && player === game.declarationPlayer && player === this.object.controller;
     }
 }

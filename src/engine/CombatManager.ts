@@ -1,5 +1,5 @@
 import { AbilityPart_Banding } from "@engine/abilities/parts/AbilityPart_Banding";
-import { GameEvent_DeclareAttacker,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { GameEvent_CheckBlockLimit,GameEvent_CheckRequiredBlock,GameEvent_DeclareAttacker,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
 import { GameEvent_CheckCombatDamageChooser } from "@engine/events/GameEvent_CombatDamageChoice";
 import { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { Permanent } from "@engine/GameObject";
@@ -7,20 +7,23 @@ import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
 import gameEventManager from "@engine/events/GameEventManager";
-import { StepIndex } from "@engine/Step";
 import { CardType } from "~/defs";
 
 export class CombatManager {
     static attackingPlayer: Player;
     static readonly attackingCreatures = new Map<Permanent, Player>();
-    static readonly blockingCreatures = new Map<Permanent, Permanent>();
+    static readonly blockingCreatures = new Map<Permanent, Set<Permanent>>();
     private static bands: Set<Permanent>[] = [];
     private static readonly effectiveBlocks = new Map<Permanent, Set<Permanent>>();
     private static readonly blockedAttackers = new Set<Permanent>();
     private static attackersConfirmed = false;
+    static declaredAnyAttackers = false;
     private static blocksConfirmed = false;
 
     static get attackingBands(): readonly ReadonlySet<Permanent>[] { return this.bands; }
+    static get defendingPlayer(): Player | null {
+        return this.attackingPlayer && game.players.length > 1 ? game.randomOpponent(this.attackingPlayer) : null;
+    }
 
     static reset() {
         CombatManager.attackingPlayer = null;
@@ -30,6 +33,7 @@ export class CombatManager {
         CombatManager.effectiveBlocks.clear();
         CombatManager.blockedAttackers.clear();
         CombatManager.attackersConfirmed = false;
+        CombatManager.declaredAnyAttackers = false;
         CombatManager.blocksConfirmed = false;
     }
 
@@ -50,8 +54,8 @@ export class CombatManager {
         }
 
         CombatManager.blockedAttackers.delete(permanent);
-        for (const [blocker, attacker] of CombatManager.blockingCreatures) {
-            if (attacker === permanent)
+        for (const [blocker, attackers] of CombatManager.blockingCreatures) {
+            if (attackers.delete(permanent) && !attackers.size)
                 CombatManager.blockingCreatures.delete(blocker);
         }
         for (const attackers of CombatManager.effectiveBlocks.values())
@@ -60,8 +64,7 @@ export class CombatManager {
     }
 
     static canSetAttackingBands(player: Player, groups: readonly (readonly Permanent[])[]): boolean {
-        return game.currentStepIndex === StepIndex.DeclareAttackers && !game.hasPendingPlayerInput
-            && player === game.activePlayer() && player === CombatManager.attackingPlayer
+        return !game.hasPendingPlayerInput && player === game.declarationPlayer && player === CombatManager.attackingPlayer
             && !CombatManager.attackersConfirmed && CombatManager.validBands(player, groups);
     }
 
@@ -99,14 +102,63 @@ export class CombatManager {
 
     static confirmAttackers() {
         CombatManager.attackersConfirmed = true;
+        CombatManager.declaredAnyAttackers = CombatManager.attackingCreatures.size > 0;
+    }
+
+    static blockLimit(blocker: Permanent): number {
+        const check = new GameEvent_CheckBlockLimit(blocker);
+        gameEventManager.checkEvent(check);
+        return check.maxAttackers;
+    }
+
+    static assignBlock(blocker: Permanent, attacker: Permanent) {
+        if (!CombatManager.canBlockAttacker(blocker, attacker))
+            return;
+
+        const limit = CombatManager.blockLimit(blocker);
+        const assigned = CombatManager.blockingCreatures.get(blocker) ?? new Set<Permanent>();
+        if (limit === 1) {
+            assigned.clear();
+        } else if (assigned.size >= limit) {
+            return;
+        }
+        assigned.add(attacker);
+        CombatManager.blockingCreatures.set(blocker, assigned);
+    }
+
+    static canConfirmBlocks(): boolean {
+        const defender = CombatManager.defendingPlayer;
+        if (!defender)
+            return true;
+
+        for (const blocker of defender.battlefield.objects) {
+            const limit = CombatManager.blockLimit(blocker);
+            const assigned = CombatManager.blockingCreatures.get(blocker);
+            const legal = CombatManager.potentialBlockTargetsFor(blocker);
+            // 509.1a–b: Each declared block must obey the creature's limit and restrictions.
+            if (assigned && (assigned.size > limit || [...assigned].some(attacker => !legal.includes(attacker))))
+                return false;
+
+            const required = legal.filter(attacker => {
+                const check = new GameEvent_CheckRequiredBlock(blocker, attacker);
+                gameEventManager.checkEvent(check);
+                return check.required;
+            });
+            // 509.1c: Satisfy as many requirements as restrictions allow.
+            if (required.filter(attacker => assigned?.has(attacker)).length < Math.min(limit, required.length))
+                return false;
+        }
+        return true;
     }
 
     static confirmBlocks() {
         if (CombatManager.blocksConfirmed)
             return;
 
-        for (const [blocker, attacker] of CombatManager.blockingCreatures)
-            CombatManager.markBlocked(attacker, blocker);
+        for (const [blocker, attackers] of CombatManager.blockingCreatures) {
+            for (const attacker of attackers)
+                CombatManager.markBlocked(attacker, blocker);
+        }
         CombatManager.blocksConfirmed = true;
     }
 
@@ -137,8 +189,9 @@ export class CombatManager {
 
     static *blockRelationships(): IterableIterator<[Permanent, Permanent]> {
         if (!CombatManager.blocksConfirmed) {
-            for (const [blocker, attacker] of CombatManager.blockingCreatures) {
-                for (const member of CombatManager.bandMembers(attacker))
+            for (const [blocker, attackers] of CombatManager.blockingCreatures) {
+                const members = new Set([...attackers].flatMap(attacker => [...CombatManager.bandMembers(attacker)]));
+                for (const member of members)
                     yield [blocker, member];
             }
         } else {
@@ -183,7 +236,7 @@ export class CombatManager {
     }
 
     static canBlockAnyAttackers(blocker: Permanent) {
-        if (!CombatManager.canBlock(blocker))
+        if (!CombatManager.canBlock(blocker) || CombatManager.blockLimit(blocker) <= 0)
             return false;
 
         for (const attacker of CombatManager.attackingCreatures.keys()) {

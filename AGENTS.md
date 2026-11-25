@@ -1,5 +1,6 @@
 - You can find the official rules under ref/MagicCompRules.txt
 - Where appropriate, reference the magic rule number
+- Please use enums instead of strings where applicable
 
 # Implementing Cards
 - We are implementing Limited Edition Alpha cards, but use artwork from the 30th anniversary set since the text is accurate https://scryfall.com/sets/30a

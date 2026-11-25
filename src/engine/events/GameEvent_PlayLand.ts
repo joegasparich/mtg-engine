@@ -19,6 +19,7 @@ export class GameEvent_PlayLand extends GameEvent {
             return false;
 
         game.landPlayedThisTurn = true;
+        game.notePriorityAction();
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(this.handObject, this.player.battlefield));
         return true;
     }

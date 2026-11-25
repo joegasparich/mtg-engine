@@ -178,5 +178,30 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Blaze of Glory",
+        "image_url": "https://cards.scryfall.io/large/front/5/f/5f56a2c7-40d3-4c9a-a742-0ad4e574c28c.jpg?1783919592",
+        "oracle_text": "Cast this spell only during combat before blockers are declared.\nTarget creature defending player controls can block any number of creatures this turn. It blocks each attacking creature this turn if able.",
+        "type": "Instant",
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_CastDuringSteps": { "steps": ["BeginningOfCombat", "DeclareAttackers"] },
+                    "AbilityPart_TargetDefendingCreature": { "saveAs": "BLOCKER" },
+                    "AbilityPart_Effect_GrantAbilityUntilEndOfTurn": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "target": "BLOCKER",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_BlockAnyNumber": {},
+                                "AbilityPart_BlockEachAttacker": {}
+                            }
+                        }
+                    }
+                }
+            }
+        ]
     }
 ]

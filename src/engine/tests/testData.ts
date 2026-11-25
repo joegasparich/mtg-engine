@@ -1,9 +1,11 @@
 import Card from "@engine/Card";
-import { GameEvent_ChangeCardZone } from "@engine/events";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import type { Zone } from "@engine/Zone";
+import { StepIndex } from "@engine/Step";
 import type { CardDef } from "~/defs";
 import { cardData } from "~/index";
 
@@ -15,6 +17,19 @@ export const AIR_ELEMENTAL = cardData.findIndex(c => c.name == "Air Elemental");
 export const ANCESTRAL_RECALL = cardData.findIndex(c => c.name == "Ancestral Recall");
 
 export const BASIC_DECK = [FOREST, FOREST, FOREST, FOREST, FOREST, FOREST, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS, GRIZZLY_BEARS];
+
+export function startMainPhase() {
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+}
+
+export function passPriorityRound() {
+    for (let count = 0; count < game.players.length; count++) {
+        expect(game.priorityPlayer).toBeTruthy();
+        gameEventManager.addEvent(new GameEvent_Advance());
+    }
+}
+
 export function moveTestCard<T extends CardObject>(object: CardObject, zone: Zone<T>): T {
     const event = new GameEvent_ChangeCardZone(object, zone);
     gameEventManager.addEvent(event);

@@ -1,4 +1,4 @@
-import { addTestCard } from "@engine/tests/testData";
+import { addTestCard,startMainPhase } from "@engine/tests/testData";
 import { GameEvent_ActivateAbility } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -12,6 +12,7 @@ beforeEach(async () => {
     Game.init();
     game.players.length = 0;
     player = game.addPlayer([]);
+    startMainPhase();
 });
 
 test.each([
