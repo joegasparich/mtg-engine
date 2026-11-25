@@ -23,7 +23,7 @@ export class PlayerAction_DeclareAttacker extends PlayerAction<Permanent> {
     }
 
     private canEdit(player: Player) {
-        return !game.pendingTargeter && game.currentStepIndex === StepIndex.DeclareAttackers
+        return !game.hasPendingPlayerInput && game.currentStepIndex === StepIndex.DeclareAttackers
             && player === game.activePlayer() && player === this.object.controller;
     }
 }

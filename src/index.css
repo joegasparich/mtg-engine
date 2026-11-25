@@ -74,7 +74,22 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 .spell-target-dialog h2 { margin: 0 0 16px; font-size: 18px; }
 .spell-target-choices { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.combat-panel {
+.private-card-handoff::backdrop { background: #081b24; }
+.earlier-public-choices { margin: 0 0 8px; padding-inline-start: 18px; font-size: 12px; }
+.resolving-choice .turn-control,
+.resolving-choice .testing-toggle,
+.resolving-choice .combat-panel { visibility: hidden; }
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.card-selection-panel {
     position: fixed;
     z-index: 1;
     top: 20px;
@@ -88,12 +103,13 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
     box-shadow: 0 6px 24px #0006;
 }
 
-.combat-panel h2 { margin: 0 0 5px; font-size: 16px; color: #f6b96c; }
-.combat-panel p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
-.combat-panel [role="status"] { font-weight: 700; }
-.combat-panel button { margin: 0 5px 4px 0; padding: 6px 8px; font-size: 12px; }
-.combat-panel button:last-child { background: #28554e; border-color: #83e6de; }
-.combat-panel button:last-child:hover { background: #34665e; }
+.card-selection-panel h2 { margin: 0 0 5px; font-size: 16px; color: #f6b96c; }
+.card-selection-panel p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+.card-selection-panel [role="status"] { font-weight: 700; }
+.card-selection-panel button { margin: 0 5px 4px 0; padding: 6px 8px; font-size: 12px; }
+.card-selection-panel button:last-child { background: #28554e; border-color: #83e6de; }
+.card-selection-panel button:last-child:hover { background: #34665e; }
+.card-selection-panel button:disabled { opacity: .55; cursor: default; transform: none; }
 
 .testing-toggle {
     position: fixed;

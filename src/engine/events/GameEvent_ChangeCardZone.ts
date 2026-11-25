@@ -64,3 +64,39 @@ export class GameEvent_DestroyPermanent extends GameEvent_ChangeCardZone {
         return true;
     }
 }
+
+export class GameEvent_SacrificePermanent extends GameEvent_ChangeCardZone {
+    type = GameEventType.SacrificePermanent;
+    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
+
+    constructor(readonly player: Player, readonly permanent: Permanent) {
+        super(permanent, permanent.owner.graveyard);
+    }
+
+    perform(): boolean {
+        // 701.21a: Only a permanent's controller can sacrifice it.
+        if (this.permanent.controller !== this.player || !(this.permanent.zone instanceof Battlefield) || !super.perform())
+            return false;
+
+        this.label = `Player ${this.player.id} sacrificed ${this.permanent.logName}`;
+        return true;
+    }
+}
+
+export class GameEvent_DiscardCard extends GameEvent_ChangeCardZone {
+    type = GameEventType.DiscardCard;
+    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
+
+    constructor(readonly player: Player, readonly cardObject: CardObject) {
+        super(cardObject, player.graveyard);
+    }
+
+    perform(): boolean {
+        // 701.9a: Discard from the owner's hand.
+        if (this.cardObject.owner !== this.player || this.cardObject.zone !== this.player.hand || !super.perform())
+            return false;
+
+        this.label = `Player ${this.player.id} discarded ${this.cardObject.logName}`;
+        return true;
+    }
+}

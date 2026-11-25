@@ -31,7 +31,7 @@ export class PlayerAction_DeclareBlocker extends PlayerAction<Permanent> {
     }
 
     private canEdit(player: Player) {
-        return !game.pendingTargeter && game.currentStepIndex === StepIndex.DeclareBlockers
+        return !game.hasPendingPlayerInput && game.currentStepIndex === StepIndex.DeclareBlockers
             && player === game.activePlayer() && player === this.object.controller;
     }
 }

@@ -53,7 +53,7 @@ class PlayerActionManager {
 
     public refreshCardActionsForUI() {
         const player = game.activePlayer();
-        this.cardActionsForUI = player && !game.pendingTargeter
+        this.cardActionsForUI = player && !game.hasPendingPlayerInput
             ? this.getAvailableActions(player)
             : new Map();
     }
@@ -82,7 +82,7 @@ class PlayerActionManager {
     public getCardActions(object: CardObject, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
         const cardActions: PlayerAction[] = [];
 
-        if (!actor || game.pendingTargeter || actor !== game.activePlayer())
+        if (!actor || game.hasPendingPlayerInput || actor !== game.activePlayer())
             return [];
 
         if (object.zone === actor.hand && object.owner === actor) {
@@ -209,7 +209,7 @@ class PlayerActionManager {
     public startTargeting(source: CardObject, targetTypes: TargetTypeKeys[], count: number,
                    validateTargets: (targets: ActionTarget[]) => boolean,
                    onTargeted: (targets: ActionTarget[]) => void) {
-        if (game.pendingTargeter)
+        if (game.hasPendingPlayerInput)
             return;
 
         const targetType = targetTypes.reduce((a, b) => a | TargetTypesMap[b], TargetType.None);

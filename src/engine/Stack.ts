@@ -2,6 +2,7 @@ import type { ActionTarget } from "@engine/actions";
 import { Ability,HardcodedSignals } from "@engine/abilities";
 import { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
 import gameEventManager from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
 import { CardObject,Spell,StackAbility } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { Zone } from "@engine/Zone";
@@ -10,10 +11,11 @@ import { CardType } from "~/defs";
 export class Stack extends Zone<Spell | StackAbility> {
     name = "Stack";
     private resolutionScheduled = false;
+    private completeResolution?: () => void;
     private readonly waitingTriggers: StackAbility[] = [];
 
     spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = []): boolean {
-        if (handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
+        if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
             return false;
 
         // 601.2c
@@ -63,7 +65,7 @@ export class Stack extends Zone<Spell | StackAbility> {
                 else {
                     top.resolve();
                     // 608.2n: The ability ceases to exist at the end of resolution.
-                    gameEventManager.onResolved(() => this.onLeave(top));
+                    this.completeResolution = () => this.onLeave(top);
                 }
             } catch (error) {
                 this.resolutionScheduled = false;
@@ -80,19 +82,29 @@ export class Stack extends Zone<Spell | StackAbility> {
     }
 
     resolveSpell(spell: Spell) {
-        if (spell.zone !== this)
+        if (spell.zone !== this || this.completeResolution || game.pendingResolutionChoice)
             return;
+
+        if (!gameEventManager.performingEvents) {
+            gameEventManager.onIdle(() => this.resolveSpell(spell));
+            return;
+        }
 
         switch (spell.type) {
             case CardType.Creature:
             case CardType.Enchantment:
             case CardType.Artifact: {
                 if (this.resolveSpellEffects(spell)) {
-                    const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
-                    const event = resolver?.resolvePermanentSpell(spell)
-                        ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
-                    // 608.3b–c: Validate and commit permanent entry in the same resolution.
-                    gameEventManager.performImmediate(event);
+                    this.completeResolution = () => {
+                        if (spell.zone !== this)
+                            return;
+
+                        const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
+                        const event = resolver?.resolvePermanentSpell(spell)
+                            ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
+                        // 608.3b–c: Validate and commit permanent entry in the same resolution.
+                        gameEventManager.performImmediate(event);
+                    };
                     return;
                 }
                 break;
@@ -104,7 +116,21 @@ export class Stack extends Zone<Spell | StackAbility> {
             default:
                 return;
         }
-        gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.owner.graveyard));
+        // 608.2n: Move the spell after the last instruction and its follow-ups.
+        this.completeResolution = () => {
+            if (spell.zone === this)
+                gameEventManager.addEvent(new GameEvent_ChangeCardZone(spell, spell.owner.graveyard));
+        };
+    }
+
+    finishResolution(): boolean {
+        const complete = this.completeResolution;
+        if (!complete)
+            return false;
+
+        this.completeResolution = undefined;
+        complete();
+        return true;
     }
 
     private resolveSpellEffects(spell: Spell): boolean {

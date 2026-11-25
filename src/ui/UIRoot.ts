@@ -5,6 +5,7 @@ import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
+import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
@@ -15,14 +16,10 @@ import DOMButton from "@ui/dom/DOMButton";
 import DOMLabel from "@ui/dom/DOMLabel";
 import { drawArrow } from "@ui/drawUtility";
 import UICard from "@ui/UICard";
-import uiEventManager,{
-UIEvent_CardClicked,
-UIEvent_CardDeselected,
-UIEvent_CardSelected,
-UIEventType
-} from "@ui/UIEventManager";
+import uiEventManager,{ UIEvent_CardClicked,UIEventType } from "@ui/UIEventManager";
 import { UICombat } from "@ui/UICombat";
 import { UIPlayer } from "@ui/UIPlayer";
+import { UIResolutionChoice } from "@ui/UIResolutionChoice";
 import { UIZone } from "@ui/UIZone";
 import { autobind } from "@utility/typeUtility";
 
@@ -180,6 +177,12 @@ export default class UIRoot extends PIXI.Container {
     private readonly zones = new Map<Zone, UIZone<PIXI.Container>>();
     readonly cardOverlay = new PIXI.RenderLayer();
     readonly combat: UICombat;
+    private resolutionChoice?: UIResolutionChoice;
+    private readonly selectionStatus = document.createElement('p');
+
+    get cardSelection() {
+        return this.resolutionChoice ? this.resolutionChoice.cardSelection : this.combat.cardSelection;
+    }
 
     mousePos = new PIXI.Point();
 
@@ -195,6 +198,7 @@ export default class UIRoot extends PIXI.Container {
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
         pixi.renderer.on('resize', this.layoutPlayers);
         this.combat = new UICombat(this);
+        this.setupCardSelectionKeyboard();
 
         const infiniteMana = document.createElement('input');
         infiniteMana.type = 'checkbox';
@@ -230,17 +234,36 @@ export default class UIRoot extends PIXI.Container {
             );
         });
 
+        gameEventManager.onPerformed(GameEventType.RequestResolutionChoice, (event: GameEvent_RequestResolutionChoice) => {
+            removeCustomContextMenu();
+            this.resolutionChoice?.close();
+            document.body.classList.add('resolving-choice');
+            this.selectionStatus.textContent = '';
+            this.resolutionChoice = new UIResolutionChoice(this, event.choice);
+            this.resolutionChoice.open();
+        });
+        gameEventManager.onPerformed(GameEventType.SubmitResolutionChoice, () => {
+            this.resolutionChoice?.close();
+            this.resolutionChoice = undefined;
+            this.selectionStatus.textContent = '';
+            document.body.classList.remove('resolving-choice');
+        });
+
         // TODO: Probably need to clean these up
         const turnLabel = new DOMLabel("", { top: '125px', left: '25px' });
         const currentStepLabel = new DOMLabel("", { top: '150px', left: '25px' });
         const nextStepButton = new DOMButton("Next step", { top: '175px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextStep()));
         const nextPhaseButton = new DOMButton("Next phase", { top: '225px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextPhase()));
         const endTurnButton = new DOMButton("End turn", { top: '275px', left: '25px' }, () => gameEventManager.addEvent(new GameEvent_GoToNextTurn()));
+        const turnControls = [turnLabel, currentStepLabel, nextStepButton, nextPhaseButton, endTurnButton];
+        for (const control of turnControls)
+            control.className = 'turn-control';
 
         gameEventManager.onPerformed(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
         gameEventManager.onPerformed(GameEventType.StepStart, () => {
+            this.announceCardSelection();
             const declaring = UICombat.declaresAt(game.currentStepIndex);
-            for (const control of [turnLabel, currentStepLabel, nextStepButton, nextPhaseButton, endTurnButton]) {
+            for (const control of turnControls) {
                 if (declaring)
                     control.hide();
                 else
@@ -251,9 +274,6 @@ export default class UIRoot extends PIXI.Container {
             const nextPhase = (Step.phaseIndex(game.currentStepIndex) + 1) % Step.NUM_PHASES;
             nextPhaseButton.text = `Skip to ${Step.toStringPhase(nextPhase)}`;
         });
-
-        uiEventManager.on(UIEventType.CardSelected, (event: UIEvent_CardSelected) => this.getCardView(event.object)?.setSelected(true));
-        uiEventManager.on(UIEventType.CardDeselected, (event: UIEvent_CardDeselected) => this.getCardView(event.object)?.setSelected(false));
 
         pixi.stage.addEventListener('pointermove', (e) => this.mousePos.copyFrom(e.global));
 
@@ -294,6 +314,70 @@ export default class UIRoot extends PIXI.Container {
                 stepActions.hide();
             });
         }
+    }
+
+    handleCardClick(object: CardObject) {
+        if (this.cardSelection?.toggle(object)) {
+            this.announceCardSelection();
+            return;
+        }
+        if (!this.resolutionChoice && !this.combat.handleBlockerClick(object))
+            uiEventManager.fire(new UIEvent_CardClicked(object));
+    }
+
+    focusCardSelection() {
+        if (this.cardSelection?.focusedCard)
+            pixi.canvas.focus();
+        this.announceCardSelection();
+    }
+
+    setVisibleHands(only?: Player | null) {
+        for (const { player, hand } of this.players) {
+            for (const view of hand.children)
+                view.clearPreview();
+            hand.visible = only === undefined || only === player;
+        }
+    }
+
+    private setupCardSelectionKeyboard() {
+        const canvas = pixi.canvas;
+        canvas.tabIndex = 0;
+        canvas.setAttribute('aria-label', 'Game board. Use arrow keys and Space when choosing cards.');
+        this.selectionStatus.className = 'visually-hidden';
+        this.selectionStatus.setAttribute('role', 'status');
+        document.body.append(this.selectionStatus);
+
+        canvas.addEventListener('focus', () => this.announceCardSelection());
+        canvas.addEventListener('keydown', event => {
+            const selection = this.cardSelection;
+            if (!selection)
+                return;
+
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown')
+                selection.moveFocus(1);
+            else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
+                selection.moveFocus(-1);
+            else if (event.key === ' ' || event.key === 'Enter') {
+                if (!event.repeat)
+                    selection.toggle(selection.focusedCard);
+            } else {
+                return;
+            }
+            event.preventDefault();
+            this.announceCardSelection();
+        });
+        canvas.addEventListener('keyup', event => {
+            if (event.key === ' ' && this.cardSelection)
+                event.stopPropagation();
+        });
+    }
+
+    private announceCardSelection() {
+        const selection = this.cardSelection;
+        const card = selection?.focusedCard;
+        this.selectionStatus.textContent = card
+            ? `${card.name}${card instanceof Permanent && card.tapped ? ', tapped' : ''}${selection.stateFor(card) === 'selected' ? ', selected' : ''}`
+            : '';
     }
 
     private showPlayerTargetDialog(request: Targeter) {
@@ -389,7 +473,6 @@ export default class UIRoot extends PIXI.Container {
                 source.removeCard(view);
             }
             view.object = newObject;
-            view.setSelected(false);
             destination?.addCard(view, origin);
         } else if (destination) {
             view = new UICard(newObject);

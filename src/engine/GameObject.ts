@@ -69,7 +69,7 @@ export class CardObject extends GameObject {
     }
 
     canPlay() {
-        if (game.pendingTargeter)
+        if (game.hasPendingPlayerInput)
             return false;
 
         if (!(this.zone instanceof Hand) || game.activePlayer() !== this.owner)
@@ -135,7 +135,7 @@ export class Permanent extends CardObject {
     }
 
     canActivate(ability: Ability) {
-        if (game.activePlayer() != this.controller)
+        if (game.hasPendingPlayerInput || game.activePlayer() != this.controller)
             return false;
 
         if (!ability.activatable)

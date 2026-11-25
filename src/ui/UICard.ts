@@ -9,7 +9,6 @@ import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
 import { Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
 import type { BattlefieldCardGroup } from "@ui/UIBattlefield";
-import uiEventManager,{ UIEvent_CardClicked } from "@ui/UIEventManager";
 import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
 import { loadImageFromExternalUrl } from "@utility/imageUtility";
 import { autobind } from "@utility/typeUtility";
@@ -27,6 +26,7 @@ export default class UICard extends PIXI.Container {
 
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
+    private focusOutline?: PIXI.Graphics;
     private glowFilter?: GlowFilter;
 
     private resting = { x: 0, y: 0, angle: 0 };
@@ -37,7 +37,6 @@ export default class UICard extends PIXI.Container {
     private combatColour?: number | null;
     private combatStartedAt = 0;
     private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    private isSelected = false;
     private press?: { pointerId: number; origin: PIXI.Point; dragging: boolean };
 
     public layout(x: number, y: number, angle = 0) {
@@ -145,12 +144,29 @@ export default class UICard extends PIXI.Container {
         this.art.width += (CARD_WIDTH * size - this.art.width) * ease;
         this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
 
+        const selection = uiRoot.cardSelection;
+        const state = selection?.stateFor(this.object);
         const hasAction = playerActionManager.cardActionsForUI.get(this.object)?.length > 0;
-        const highlight = this.isSelected ? 0x00FFFF : hasAction ? 0xFFFFFF : null;
-        this.updateHighlight(this.combatColour === undefined ? highlight : this.combatColour);
+        const normalHighlight = this.combatColour === undefined ? (hasAction ? 0xffffff : null) : this.combatColour;
+        const highlight = selection
+            ? state === 'selected' ? 0x64f2df : state === 'eligible' ? 0xe3c58a : null
+            : normalHighlight;
+        this.updateHighlight(highlight);
         if (this.halo.visible) {
             this.halo.width = this.art.width;
             this.halo.height = this.art.height;
+        }
+
+        const focused = selection?.focusedCard === this.object && document.activeElement === pixi.canvas;
+        if (focused && !this.focusOutline) {
+            this.focusOutline = new PIXI.Graphics().roundRect(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, 8)
+                .stroke({ color: 0xffffff, width: 2 });
+            this.artwork.addChild(this.focusOutline);
+        }
+        if (this.focusOutline) {
+            this.focusOutline.visible = focused;
+            this.focusOutline.width = this.art.width + 8;
+            this.focusOutline.height = this.art.height + 8;
         }
     }
 
@@ -182,10 +198,6 @@ export default class UICard extends PIXI.Container {
         return { x: dx * scale, y: dy * scale };
     }
 
-    public setSelected(selected: boolean) {
-        this.isSelected = selected;
-    }
-
     @autobind
     private onDrag(event: PIXI.FederatedPointerEvent) {
         if (!this.press || event.pointerId !== this.press.pointerId)
@@ -196,6 +208,11 @@ export default class UICard extends PIXI.Container {
             const dy = event.global.y - this.press.origin.y;
             if (Math.hypot(dx, dy) < DRAG_THRESHOLD)
                 return;
+
+            if (game.pendingResolutionChoice) {
+                this.cancelPress();
+                return;
+            }
 
             if (this.battlefieldGroup && !this.battlefieldGroup.beginDrag(this, this.press.origin)) {
                 this.cancelPress();
@@ -270,8 +287,7 @@ export default class UICard extends PIXI.Container {
         if (!dragging) {
             if (releasedOnCard) {
                 this.setHovered(event.pointerType !== 'touch');
-                if (!uiRoot.combat.handleCardClick(this.object))
-                    uiEventManager.fire(new UIEvent_CardClicked(this.object));
+                uiRoot.handleCardClick(this.object);
             }
             return;
         }

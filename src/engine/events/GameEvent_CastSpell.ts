@@ -20,7 +20,7 @@ export class GameEvent_CastSpell extends GameEvent {
     }
 
     perform(): boolean {
-        if (game.pendingTargeter || !game.stack.spellCast(this.caster, this.handObject, this.targets))
+        if (!game.stack.spellCast(this.caster, this.handObject, this.targets))
             return false;
 
         // TODO: Pass priority to the next player

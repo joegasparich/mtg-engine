@@ -23,7 +23,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
     }
 
     perform(): boolean {
-        if (game.pendingTargeter || !this.permanent.zone || this.permanent.controller !== this.player
+        if (game.hasPendingPlayerInput || !this.permanent.zone || this.permanent.controller !== this.player
             || !this.permanent.abilities.includes(this.ability) || !this.ability.activatable || !this.ability.canActivate())
             return false;
 

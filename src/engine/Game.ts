@@ -1,7 +1,9 @@
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
+import { type CardChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import type { CardObject } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Step,StepIndex } from "@engine/Step";
@@ -23,10 +25,43 @@ export default class Game {
     landPlayedThisTurn = false;
     infiniteMana = false;
     pendingTargeter: Targeter | null = null;
+    private resolutionChoice: ResolutionChoice | null = null;
+
+    get pendingResolutionChoice() { return this.resolutionChoice; }
+    get hasPendingPlayerInput() { return !!(this.pendingTargeter || this.resolutionChoice); }
 
     static init() {
         game = new Game();
-        gameEventManager.setStateSettlement(() => game.settleState());
+        gameEventManager.startGame(() => game.settleState(), () => game.pendingResolutionChoice !== null);
+    }
+
+    requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void) {
+        if (this.hasPendingPlayerInput)
+            throw new Error("A player choice is already pending");
+
+        const optionZones = new Map(details.options.map(card => [card, card.zone]));
+        const choice: ResolutionChoice = {
+            ...details,
+            submit: (player, cards) => {
+                if (game !== this || this.resolutionChoice !== choice || player !== choice.player)
+                    return;
+
+                const selected = [...cards];
+                const event = new GameEvent_SubmitResolutionChoice(choice, () => {
+                    if (this.resolutionChoice !== choice || selected.length !== choice.count
+                        || new Set(selected).size !== selected.length
+                        || selected.some(card => !card.zone || optionZones.get(card) !== card.zone))
+                        return false;
+
+                    this.resolutionChoice = null;
+                    return true;
+                });
+                event.then(() => resume(selected));
+                gameEventManager.addEvent(event);
+            },
+        };
+        this.resolutionChoice = choice;
+        gameEventManager.addEvent(new GameEvent_RequestResolutionChoice(choice));
     }
 
     addPlayer(deck: number[]): Player {
@@ -79,7 +114,7 @@ export default class Game {
             this.checkAutoSkip();
     }
     nextStep(doAutoSkip: boolean): boolean {
-        if (this.pendingTargeter)
+        if (this.hasPendingPlayerInput)
             return false;
 
         this.endStep(this.currentStepIndex);
@@ -131,7 +166,7 @@ export default class Game {
     }
     canAutoSkip() {
         // Stop at each turn's first main phase even when there are no playable cards.
-        if (this.pendingTargeter || this.currentStepIndex === StepIndex.Main)
+        if (this.hasPendingPlayerInput || this.currentStepIndex === StepIndex.Main)
             return false;
 
         const player = this.activePlayer();
@@ -167,6 +202,9 @@ export default class Game {
     }
 
     private settleState(): boolean {
+        if (this.stack.finishResolution())
+            return true;
+
         // 502.4: The untap step has no priority check. Cleanup still checks under 514.3a.
         if (this.options && this.currentStepIndex === StepIndex.Untap)
             return false;

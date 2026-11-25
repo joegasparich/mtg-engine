@@ -114,5 +114,26 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Balance",
+        "image_url": "https://cards.scryfall.io/large/front/5/0/5086b4dc-8066-4487-bd09-a04432291a54.jpg?1783919592",
+        "oracle_text": "Each player chooses a number of lands they control equal to the number of lands controlled by the player who controls the fewest, then sacrifices the rest. Players discard cards and sacrifice creatures the same way.",
+        "type": "Sorcery",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Effect_EqualizeCards": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "phases": [
+                            { "action": "sacrifice", "cardType": "Land" },
+                            { "action": "discard" },
+                            { "action": "sacrifice", "cardType": "Creature" }
+                        ]
+                    }
+                }
+            }
+        ]
     }
 ]

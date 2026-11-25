@@ -24,6 +24,10 @@ export enum GameEventType {
     StartTargeting,
     PlayLand,
     DetachPermanent,
+    SacrificePermanent,
+    DiscardCard,
+    RequestResolutionChoice,
+    SubmitResolutionChoice,
 }
 
 export abstract class GameEvent {
@@ -84,11 +88,18 @@ class GameEventManager {
     private readonly checkRemovalOverrides = new Set<CheckRemovalOverride>();
     private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
+    private readonly resolutionSteps: (() => void)[] = [];
     private readonly idleCallbacks: (() => void)[] = [];
     private settleState?: () => boolean;
+    private waitingForResolutionInput?: () => boolean;
 
-    setStateSettlement(settle: () => boolean) {
+    startGame(settle: () => boolean, waitingForResolutionInput: () => boolean) {
+        this.activeEvents.length = 0;
+        this.eventsResolvedCallback.length = 0;
+        this.resolutionSteps.length = 0;
+        this.idleCallbacks.length = 0;
         this.settleState = settle;
+        this.waitingForResolutionInput = waitingForResolutionInput;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -171,6 +182,11 @@ class GameEventManager {
         this.performAllEvents();
     }
 
+    continueResolution(callback: () => void) {
+        this.resolutionSteps.push(callback);
+        this.performAllEvents();
+    }
+
     onIdle(callback: () => void) {
         this.idleCallbacks.push(callback);
         this.performAllEvents();
@@ -221,8 +237,13 @@ class GameEventManager {
                     for (const event of events) {
                         this.performEvent(event);
                     }
+                } else if (this.waitingForResolutionInput?.()) {
+                    // 117.2e: Process input events while keeping the current resolution open.
+                    break;
                 } else if (this.eventsResolvedCallback.length > 0) {
                     this.eventsResolvedCallback.shift()();
+                } else if (this.resolutionSteps.length > 0) {
+                    this.resolutionSteps.shift()();
                 } else if (this.settleState?.()) {
                     continue;
                 } else if (this.idleCallbacks.length > 0) {

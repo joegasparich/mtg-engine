@@ -11,13 +11,13 @@ import { game } from "@engine/Game";
 import { StepIndex } from "@engine/Step";
 import { drawArrow } from "@ui/drawUtility";
 import type UICard from "@ui/UICard";
+import { UICardSelection } from "@ui/UICardSelection";
 import UIRoot,{ pixi } from "@ui/UIRoot";
 import { autobind } from "@utility/typeUtility";
 
 const ATTACK_COLOUR = 0xf6b96c;
 const BLOCK_COLOUR = 0x83e6de;
 const TARGET_COLOUR = 0xffe6a6;
-const ELIGIBLE_ATTACK_COLOUR = 0xca925f;
 const ELIGIBLE_BLOCK_COLOUR = 0x6ba9ae;
 
 export class UICombat {
@@ -35,6 +35,20 @@ export class UICombat {
     private selectedBlocker: Permanent | null = null;
     private readonly eligible: Set<Permanent> = new Set();
     private readonly legalTargets: Set<Permanent> = new Set();
+    private readonly attackerSelection = new UICardSelection<Permanent>((card, selected) => {
+        const action = new PlayerAction_DeclareAttacker(card);
+        const actor = game.activePlayer();
+        if (selected)
+            action.perform(actor);
+        else
+            action.withdraw(actor);
+        this.sync();
+    });
+
+    get cardSelection() {
+        if (game.currentStepIndex === StepIndex.DeclareAttackers && !game.hasPendingPlayerInput)
+            return this.attackerSelection;
+    }
 
     constructor(private readonly root: UIRoot) {
         this.overlay.eventMode = 'none';
@@ -44,7 +58,7 @@ export class UICombat {
 
         this.heading.id = 'combat-heading';
         this.status.setAttribute('role', 'status');
-        this.panel.className = 'combat-panel';
+        this.panel.className = 'card-selection-panel combat-panel';
         this.panel.setAttribute('aria-labelledby', this.heading.id);
         this.panel.hidden = true;
         this.removeBlock.textContent = 'Remove block';
@@ -53,7 +67,11 @@ export class UICombat {
         this.panel.append(this.heading, this.status, this.instruction, this.removeBlock, this.confirm);
         document.body.append(this.panel);
 
-        gameEventManager.onPerformed(GameEventType.StepStart, this.sync);
+        gameEventManager.onPerformed(GameEventType.StepStart, () => {
+            this.sync();
+            if (this.cardSelection)
+                this.root.focusCardSelection();
+        });
         gameEventManager.onPerformed(GameEventType.StepEnd, this.onStepEnd);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.sync);
         gameEventManager.onPerformed(GameEventType.TapCard, this.sync);
@@ -70,21 +88,12 @@ export class UICombat {
         return step === StepIndex.DeclareAttackers || step === StepIndex.DeclareBlockers;
     }
 
-    handleCardClick(object: CardObject): boolean {
-        if (!(object instanceof Permanent) || game.pendingTargeter || !UICombat.declaresAt(game.currentStepIndex))
+    handleBlockerClick(object: CardObject): boolean {
+        if (!(object instanceof Permanent) || game.hasPendingPlayerInput || game.currentStepIndex !== StepIndex.DeclareBlockers)
             return false;
 
         const actor = game.activePlayer();
-        if (game.currentStepIndex === StepIndex.DeclareAttackers) {
-            if (!this.eligible.has(object) && !CombatManager.attackingCreatures.has(object))
-                return false;
-
-            const action = new PlayerAction_DeclareAttacker(object);
-            if (CombatManager.attackingCreatures.has(object))
-                action.withdraw(actor);
-            else
-                action.perform(actor);
-        } else if (this.eligible.has(object)) {
+        if (this.eligible.has(object)) {
             this.selectedBlocker = this.selectedBlocker === object ? null : object;
         } else if (this.selectedBlocker && CombatManager.attackingCreatures.has(object)) {
             if (!this.legalTargets.has(object)) {
@@ -116,6 +125,8 @@ export class UICombat {
     private onStepEnd(event: GameEvent_StepEnd) {
         this.selectedBlocker = null;
         this.panel.hidden = true;
+        if (event.stepIndex === StepIndex.DeclareAttackers)
+            this.attackerSelection.setCards([]);
         if (event.stepIndex === StepIndex.EndOfCombat) {
             this.attackNumbers.clear();
             this.updateCards();
@@ -143,6 +154,9 @@ export class UICombat {
         if (!this.eligible.has(this.selectedBlocker))
             this.selectedBlocker = null;
 
+        if (attacking)
+            this.attackerSelection.setCards(new Set([...this.eligible, ...attackers.keys()]), attackers.keys());
+
         if (this.selectedBlocker) {
             for (const attacker of CombatManager.potentialBlockTargetsFor(this.selectedBlocker))
                 this.legalTargets.add(attacker);
@@ -165,7 +179,7 @@ export class UICombat {
         this.confirm.textContent = count ? (attacking ? 'Confirm attackers' : 'Confirm blocks') : (attacking ? 'No attacks' : 'No blocks');
         this.removeBlock.hidden = !this.selectedBlocker || !blockers.has(this.selectedBlocker);
         if (attacking) {
-            this.instruction.textContent = 'Click a gold creature to attack. Click it again to undo.';
+            this.instruction.textContent = 'Select highlighted creatures to attack.';
         } else if (this.selectedBlocker) {
             this.instruction.textContent = `Click a highlighted attacker for ${this.selectedBlocker.name} to block. Esc cancels selection.`;
         } else {
@@ -190,8 +204,8 @@ export class UICombat {
                 colour = TARGET_COLOUR;
             else if (this.selectedBlocker === permanent)
                 colour = BLOCK_COLOUR;
-            else if (this.eligible.has(permanent) && !role && !this.selectedBlocker)
-                colour = game.currentStepIndex === StepIndex.DeclareAttackers ? ELIGIBLE_ATTACK_COLOUR : ELIGIBLE_BLOCK_COLOUR;
+            else if (this.eligible.has(permanent) && !role && !this.selectedBlocker && game.currentStepIndex === StepIndex.DeclareBlockers)
+                colour = ELIGIBLE_BLOCK_COLOUR;
 
             view.setCombatDisplay(role, colour, this.root.getCardView(target));
             shown.add(view);
