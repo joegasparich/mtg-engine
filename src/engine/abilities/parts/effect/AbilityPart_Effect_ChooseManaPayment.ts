@@ -8,7 +8,8 @@ import { AbilityPart_Effect } from "./AbilityPart_Effect";
 @RegisterAbilityPart
 export class AbilityPart_Effect_ChooseManaPayment extends AbilityPart_Effect {
     cost: string;
-    onDeclineSignal: string;
+    onPaySignal?: string;
+    onDeclineSignal?: string;
 
     perform() {
         const { ability } = this;
@@ -17,11 +18,15 @@ export class AbilityPart_Effect_ChooseManaPayment extends AbilityPart_Effect {
             return;
 
         const cost = ManaUtility.parseManaString<ManaCost>(this.cost);
-        const decline = () => ability.fireSignal(this.onDeclineSignal);
+        const signalResult = (decision: ManaPaymentDecision) => {
+            const signal = decision === ManaPaymentDecision.Pay ? this.onPaySignal : this.onDeclineSignal;
+            if (signal)
+                ability.fireSignal(signal);
+        };
 
-        // 118.3, 118.12a: Pay the optional cost during resolution if possible and chosen.
+        // 118.3, 118.12, 608.2g: Pay the optional cost during resolution if possible and chosen.
         if (!playerActionManager.canAutoPayManaCost(cost, player)) {
-            decline();
+            signalResult(ManaPaymentDecision.Decline);
             return;
         }
 
@@ -33,10 +38,8 @@ export class AbilityPart_Effect_ChooseManaPayment extends AbilityPart_Effect {
             cost: this.cost,
             submit: (actor, decision) => {
                 currentGame.submitResolutionChoice(choice, actor, () => decision === ManaPaymentDecision.Decline
-                    || (decision === ManaPaymentDecision.Pay && playerActionManager.payManaCost(cost, player)), () => {
-                    if (decision === ManaPaymentDecision.Decline)
-                        decline();
-                });
+                    || (decision === ManaPaymentDecision.Pay && playerActionManager.payManaCost(cost, player)),
+                () => signalResult(decision));
             },
         };
         currentGame.openResolutionChoice(choice);

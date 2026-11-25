@@ -1,4 +1,5 @@
 import { PlayerActions } from "@engine/actions";
+import { TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToStep } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -36,7 +37,10 @@ test("black spells cannot choose protected targets and targets are rechecked on 
         name: "Test targeted destruction",
         type: CardType.Sorcery,
         abilities: [{ parts: {
-            AbilityPart_Target: { saveAs: "CHOSEN", validTargets: ["Card"], onBattlefield: true, targetValidator: { cardType: CardType.Creature } },
+            AbilityPart_Target: {
+                saveAs: "CHOSEN", validTargets: [TargetTypeKeys.Card],
+                targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+            },
             AbilityPart_Effect_DestroyPermanents: destroyChosen,
         } }],
     };

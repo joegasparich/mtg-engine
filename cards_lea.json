@@ -510,12 +510,59 @@
                     "AbilityPart_Target": {
                         "saveAs": "TARGET_CREATURE",
                         "validTargets": ["Card"],
-                        "onBattlefield": true,
-                        "targetValidator": { "cardType": "Creature" }
+                        "targetValidator": { "cardType": "Creature", "onBattlefield": true }
                     },
                     "AbilityPart_Effect_Regenerate": {
                         "inSignal": "SPELL_RESOLVE",
                         "recipient": "TARGET_CREATURE"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Disenchant",
+        "image_url": "https://cards.scryfall.io/large/front/3/2/32e297a1-914f-48bb-9ff9-1fca9603a203.jpg?1783919584",
+        "oracle_text": "Destroy target artifact or enchantment.",
+        "type": "Instant",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "saveAs": "TARGET_PERMANENT",
+                        "validTargets": ["Card"],
+                        "targetValidator": { "cardTypes": ["Artifact", "Enchantment"], "onBattlefield": true }
+                    },
+                    "AbilityPart_Effect_DestroyPermanents": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "permanentsFrom": "TARGET_PERMANENT"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Farmstead",
+        "image_url": "https://cards.scryfall.io/large/front/0/b/0b4a1194-ce5d-4491-9700-1a1abc6ee8e4.jpg?1783919584",
+        "oracle_text": "Enchant land\nEnchanted land has \"At the beginning of your upkeep, you may pay {W}{W}. If you do, you gain 1 life.\"",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Land" }
+                    },
+                    "AbilityPart_GrantAttachedAbility": {
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "controllerOnly": true },
+                                "AbilityPart_Effect_ChooseManaPayment": { "cost": "{W}{W}", "onPaySignal": "GAIN_LIFE" },
+                                "AbilityPart_Effect_GainLife": { "inSignal": "GAIN_LIFE", "target": "CONTROLLER", "amount": 1 }
+                            }
+                        }
                     }
                 }
             }

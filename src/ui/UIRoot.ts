@@ -299,6 +299,8 @@ export default class UIRoot extends PIXI.Container {
         gameEventManager.onPerformed(GameEventType.TurnStart, (event: GameEvent_TurnStart) => turnLabel.text = `Player ${event.player.id}'s turn`);
         gameEventManager.onPerformed(GameEventType.PriorityChanged, () => {
             removeCustomContextMenu();
+            for (const player of this.lifeTotals.keys())
+                this.updateLifeTotal(player);
             syncTurnControls();
         });
         gameEventManager.onPerformed(GameEventType.RequestCombatDamageChoice, () => {
@@ -462,8 +464,9 @@ export default class UIRoot extends PIXI.Container {
 
     private updateLifeTotal(player: Player) {
         const label = this.lifeTotals.get(player);
-        if (label)
-            label.textContent = `Player ${player.id} · ${player.life} life`;
+        const text = `Player ${player.id} · ${player.life} life`;
+        if (label && label.textContent !== text)
+            label.textContent = text;
     }
 
     @autobind

@@ -13,8 +13,166 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { BasicLandType,CardType,Keyword } from "~/defs";
+import { BasicLandType,type CardDef,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+describe("Disenchant", () => {
+    const def = cardData.find(card => card.name === "Disenchant");
+    const castle = cardData.find(card => card.name === "Castle");
+    const artifact: CardDef = { ...castle, name: "Test artifact", type: CardType.Artifact, abilities: [] };
+    const plains = cardData.find(card => card.name === "Plains");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    test.each([artifact, castle])("casts for {1}{W} and destroys $name", targetDef => {
+        const card = addTestCard(def, caster, caster.hand);
+        const whiteSource = addTestCard(plains, caster, caster.battlefield);
+        const target = addTestCard(targetDef, opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+
+        const genericSource = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const cardInHand = addTestCard(targetDef, opponent, opponent.hand);
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([creature])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([cardInHand])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([])).toBe(false);
+        game.pendingTargeter.onTargeted([target]);
+        expect(whiteSource.tapped && genericSource.tapped).toBe(true);
+        expect(target.zone).toBe(opponent.battlefield);
+
+        passPriorityRound();
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([target.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+    });
+
+    test("fails to destroy a target that leaves and returns before resolution", () => {
+        const card = addTestCard(def, caster, caster.hand);
+        const target = addTestCard(castle, opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, card, [target])).toBe(true);
+        const returned = moveTestCard(moveTestCard(target, opponent.hand), opponent.battlefield);
+
+        passPriorityRound();
+        expect(returned.zone).toBe(opponent.battlefield);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+    });
+});
+
+describe("Farmstead", () => {
+    const def = cardData.find(card => card.name === "Farmstead");
+    const plains = cardData.find(card => card.name === "Plains");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    function beginNextUpkeep() {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+    }
+
+    function enchant(land: Permanent) {
+        const card = addTestCard(def, caster, caster.hand);
+        expect(game.stack.spellCast(caster, card, [land])).toBe(true);
+        passPriorityRound();
+        return caster.battlefield.objects.find(object => object.card === card.card);
+    }
+
+    test("casts for {W}{W}{W} and grants the upkeep payment to the enchanted land's controller", () => {
+        const card = addTestCard(def, caster, caster.hand);
+        const land = addTestCard(plains, opponent, opponent.battlefield);
+        const otherWhiteSource = addTestCard(plains, opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const landInHand = addTestCard(plains, opponent, opponent.hand);
+        const first = addTestCard(plains, caster, caster.battlefield);
+        const second = addTestCard(plains, caster, caster.battlefield);
+        const forest = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+
+        const third = addTestCard(plains, caster, caster.battlefield);
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([creature])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([landInHand])).toBe(false);
+        game.pendingTargeter.onTargeted([land]);
+        expect([first.tapped, second.tapped, third.tapped, forest.tapped]).toEqual([true, true, true, false]);
+        passPriorityRound();
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(land);
+
+        beginNextUpkeep();
+        expect(game.stack.objects).toEqual([expect.objectContaining({ source: land, controller: opponent })]);
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        passPriorityRound();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice).toMatchObject({ player: opponent, cost: "{W}{W}" });
+        choice.submit(caster, ManaPaymentDecision.Pay);
+        expect(game.pendingManaPaymentChoice).toBe(choice);
+        expect(opponent.life).toBe(20);
+        choice.submit(opponent, ManaPaymentDecision.Pay);
+        expect(opponent.life).toBe(21);
+        expect(caster.life).toBe(20);
+        expect(land.tapped && otherWhiteSource.tapped).toBe(true);
+        expect(opponent.manaPool[ManaColour.W]).toBe(0);
+        expect(game.stack.objects).toHaveLength(0);
+
+        beginNextUpkeep();
+        expect(game.currentTurnPlayer()).toBe(caster);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test.each([true, false])("leaves the Aura attached without gaining life when payment is skipped (can pay: %s)", canPay => {
+        const land = addTestCard(plains, opponent, opponent.battlefield);
+        const secondLand = addTestCard(canPay ? plains : cardData[FOREST], opponent, opponent.battlefield);
+        const aura = enchant(land);
+
+        beginNextUpkeep();
+        passPriorityRound();
+        if (canPay) {
+            expect(game.pendingManaPaymentChoice).toMatchObject({ player: opponent });
+            game.pendingManaPaymentChoice.submit(opponent, ManaPaymentDecision.Decline);
+        }
+
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(aura.zone).toBe(caster.battlefield);
+        expect(aura.attachedTo).toBe(land);
+        expect(opponent.life).toBe(20);
+        expect(land.tapped || secondLand.tapped).toBe(false);
+    });
+
+    test("resolves an existing upkeep trigger after the Aura is destroyed and stops granting new ones", () => {
+        const land = addTestCard(plains, opponent, opponent.battlefield);
+        addTestCard(plains, opponent, opponent.battlefield);
+        const aura = enchant(land);
+        beginNextUpkeep();
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(aura));
+        expect(land.abilities.every(ability => ability.grantedBy !== aura)).toBe(true);
+
+        passPriorityRound();
+        game.pendingManaPaymentChoice.submit(opponent, ManaPaymentDecision.Pay);
+        expect(opponent.life).toBe(21);
+
+        beginNextUpkeep();
+        beginNextUpkeep();
+        expect(game.currentTurnPlayer()).toBe(opponent);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+});
 
 describe("Death Ward", () => {
     const deathWard = cardData.find(card => card.name === "Death Ward");
@@ -36,8 +194,8 @@ describe("Death Ward", () => {
         const plains = addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield);
         const removal = addTestCard({ ...deathWard, name: "Test destruction spell", abilities: [{ parts: {
             AbilityPart_Target: {
-                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card], onBattlefield: true,
-                targetValidator: { cardType: CardType.Creature },
+                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card],
+                targetValidator: { cardType: CardType.Creature, onBattlefield: true },
             },
             AbilityPart_Effect_DestroyPermanents: { inSignal: "SPELL_RESOLVE", permanentsFrom: "TARGET" },
         } }] }, opponent, opponent.hand);

@@ -1,5 +1,5 @@
 import { PlayerActions } from "@engine/actions";
-import playerActionManager from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { GameEvent_CastSpell,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_PlayLand } from "@engine/events";
 import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -7,6 +7,7 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -21,6 +22,28 @@ function addForestToHand(owner: Player) {
     const forest = addTestCard(cardData[FOREST], owner, owner.hand);
     return forest;
 }
+
+test("target card types accept any listed type and still enforce other target filters", () => {
+    const creature = cardData[GRIZZLY_BEARS];
+    const target = addTestCard(creature, player, player.battlefield);
+    const spell = addTestCard({
+        ...creature, type: CardType.Instant, abilities: [{ parts: {
+            AbilityPart_Target: {
+                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card],
+                targetValidator: { cardTypes: [CardType.Creature, CardType.Artifact], onBattlefield: true, tapped: true },
+            },
+        } }],
+    }, player, player.hand);
+    const { spellTargeter } = spell;
+
+    expect(spellTargeter.validateTargets([target])).toBe(false);
+    target.tapped = true;
+    expect(spellTargeter.validateTargets([target])).toBe(true);
+    target.type = CardType.Artifact;
+    expect(spellTargeter.validateTargets([target])).toBe(true);
+    target.type = CardType.Enchantment;
+    expect(spellTargeter.validateTargets([target])).toBe(false);
+});
 
 test.each([StepIndex.Main, StepIndex.SecondMain])("plays the first land directly onto the battlefield in main phase step %s", step => {
     game.startGame();

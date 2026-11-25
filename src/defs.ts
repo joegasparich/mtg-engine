@@ -38,6 +38,8 @@ export type CardColour = (typeof cardColours)[number];
 
 export type TargetValidator = {
     cardType?: CardType;
+    cardTypes?: readonly CardType[];
+    onBattlefield?: boolean;
     cardSubtype?: string;
     // Match the subtype before continuous type changes are applied.
     baseSubtype?: string;

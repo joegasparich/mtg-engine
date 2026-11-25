@@ -83,4 +83,9 @@ test("selection from the shared stack supports spells and stack abilities", () =
     expect(selectObjectsFromZone(ability, {
         zone: ZoneKind.Stack, targetValidator: { cardType: CardType.Creature },
     })).toEqual([spell]);
+    const cardTypes = [CardType.Creature, CardType.Artifact];
+    expect(selectObjectsFromZone(ability, { zone: ZoneKind.Stack, targetValidator: { cardTypes } })).toEqual([spell]);
+    const targetValidator = { cardTypes, onBattlefield: true };
+    expect(selectObjectsFromZone(ability, { zone: ZoneKind.Stack, targetValidator })).toEqual([]);
+    expect(selectObjectsFromZone(ability, { zone: ZoneKind.Battlefield, targetValidator })).toEqual([source]);
 });

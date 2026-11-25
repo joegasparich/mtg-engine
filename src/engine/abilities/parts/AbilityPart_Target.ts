@@ -6,7 +6,6 @@ import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
 import Player from "@engine/Player";
-import { Battlefield } from "@engine/Zone";
 import type { TargetValidator } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
@@ -15,7 +14,6 @@ export class AbilityPart_Target extends AbilityPart {
     saveAs: string;
     validTargets: TargetTypeKeys[];
     count = 1;
-    onBattlefield = false;
     targetValidator?: TargetValidator;
 
     hasLegalTargets(): boolean {
@@ -38,7 +36,6 @@ export class AbilityPart_Target extends AbilityPart {
             return this.validTargets.includes(TargetTypeKeys.Player) && game.players.includes(target);
 
         return this.validTargets.includes(TargetTypeKeys.Card) && target instanceof CardObject && Boolean(target.zone)
-            && (!this.onBattlefield || target.zone instanceof Battlefield)
             && matchesTargetValidator(target, this)
             && gameEventManager.checkEvent(new GameEvent_CheckTarget(this.ability.source, target));
     }

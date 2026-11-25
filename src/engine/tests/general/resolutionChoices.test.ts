@@ -1,11 +1,13 @@
-import playerActionManager from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import {
     CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,
     GameEvent_DiscardCard,GameEvent_GoToStep,GameEvent_PlayLand,GameEvent_SacrificePermanent,
+    GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,
 } from "@engine/events";
 import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { Spell,StackAbility } from "@engine/GameObject";
+import { ManaColour } from "@engine/mana";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
@@ -31,6 +33,40 @@ function hand(player: Player, count: number) {
 }
 
 beforeEach(() => Game.init());
+
+test("an optional payment runs its success effect once after the cost is paid", () => {
+    const caster = game.addPlayer([]);
+    const recipient = game.addPlayer([]);
+    startMainPhase();
+    const [first, second] = lands(caster, 2);
+    const spell = addTestCard({
+        ...testSpell, abilities: [{ parts: {
+            AbilityPart_Target: { saveAs: "RECIPIENT", validTargets: [TargetTypeKeys.Player] },
+            AbilityPart_Effect_ChooseManaPayment: { inSignal: "SPELL_RESOLVE", cost: "{G}{G}", onPaySignal: "PAID" },
+            AbilityPart_Effect_GainLife: { inSignal: "PAID", target: "RECIPIENT", amount: 3 },
+        } }],
+    }, caster, caster.hand);
+    expect(game.stack.spellCast(caster, spell, [recipient])).toBe(true);
+    passPriorityRound();
+    const choice = game.pendingManaPaymentChoice;
+    expect(choice).toMatchObject({ player: caster, cost: "{G}{G}" });
+
+    gameEventManager.addEvent(new GameEvent_TapCard(second));
+    choice.submit(caster, ManaPaymentDecision.Pay);
+    expect(game.pendingManaPaymentChoice).toBe(choice);
+    expect(first.tapped).toBe(false);
+    expect(recipient.life).toBe(20);
+
+    gameEventManager.addEvent(new GameEvent_UntapCard(second));
+    choice.submit(caster, ManaPaymentDecision.Pay);
+    choice.submit(caster, ManaPaymentDecision.Pay);
+    expect(game.pendingManaPaymentChoice).toBeNull();
+    expect(caster.life).toBe(20);
+    expect(recipient.life).toBe(23);
+    expect(first.tapped && second.tapped).toBe(true);
+    expect(caster.manaPool[ManaColour.G]).toBe(0);
+    expect(game.stack.objects).toHaveLength(0);
+});
 
 test("collects multiplayer choices in turn order and commits each batch simultaneously", () => {
     const caster = game.addPlayer([]);
