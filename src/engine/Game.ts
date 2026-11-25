@@ -63,7 +63,8 @@ export default class Game {
             () => !!(game.pendingResolutionChoice || game.pendingCombatDamageChoice), () => game.advanceWhileIdle());
     }
 
-    requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void) {
+    requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void,
+        isStillEligible?: (card: CardObject) => boolean) {
         if (this.hasPendingPlayerInput)
             throw new Error("A player choice is already pending");
 
@@ -78,7 +79,9 @@ export default class Game {
                 const event = new GameEvent_SubmitResolutionChoice(choice, () => {
                     if (this.resolutionChoice !== choice || selected.length !== choice.count
                         || new Set(selected).size !== selected.length
-                        || selected.some(card => !card.zone || optionZones.get(card) !== card.zone))
+                        || selected.some(card => !optionZones.has(card) || (isStillEligible
+                            ? !isStillEligible(card)
+                            : !card.zone || optionZones.get(card) !== card.zone)))
                         return false;
 
                     this.resolutionChoice = null;

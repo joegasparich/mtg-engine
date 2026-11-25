@@ -7,7 +7,7 @@ import { cardData } from "~/index";
 export default class Player {
     id: number;
 
-    life: 20;
+    life = 20;
     manaPool: ManaAmount = [0, 0, 0, 0, 0, 0];
 
     library: Library = new Library();

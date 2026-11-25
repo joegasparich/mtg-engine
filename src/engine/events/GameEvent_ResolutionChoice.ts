@@ -7,17 +7,29 @@ export type PublicCardSelection = {
     readonly cards: readonly CardObject[];
 };
 
+export enum CardChoicePresentation {
+    Board,
+    SingleCardList,
+}
+
+export enum CardChoiceVisibility {
+    Public = "public",
+    Private = "private",
+}
+
 type CardChoiceDetails = {
     readonly player: Player;
     readonly sourceName: string;
     readonly prompt: string;
     readonly options: readonly CardObject[];
-    readonly count: number;
-};
+} & (
+    { readonly count: number; readonly presentation?: CardChoicePresentation.Board }
+    | { readonly count: 1; readonly presentation: CardChoicePresentation.SingleCardList }
+);
 
 export type CardChoice = CardChoiceDetails & (
-    { readonly visibility: "public"; readonly earlierChoices: readonly PublicCardSelection[] }
-    | { readonly visibility: "private" }
+    { readonly visibility: CardChoiceVisibility.Public; readonly earlierChoices: readonly PublicCardSelection[] }
+    | { readonly visibility: CardChoiceVisibility.Private }
 );
 
 export type ResolutionChoice = CardChoice & {

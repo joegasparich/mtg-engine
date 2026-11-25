@@ -1,5 +1,5 @@
-import type { ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
-import { Permanent } from "@engine/GameObject";
+import { CardChoicePresentation,CardChoiceVisibility,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
 
@@ -8,12 +8,10 @@ export class UIResolutionChoice {
     private readonly status = document.createElement("p");
     private readonly confirm = document.createElement("button");
     private readonly selection: UICardSelection;
+    private readonly optionsList?: HTMLUListElement;
     private handoff?: HTMLDialogElement;
 
     constructor(private readonly root: UIRoot, private readonly choice: ResolutionChoice) {
-        this.selection = new UICardSelection(() => this.update(), choice.count);
-        this.selection.setCards(choice.options);
-
         const heading = document.createElement("h2");
         heading.id = "resolution-choice-heading";
         heading.textContent = `${choice.sourceName} · Player ${choice.player.id}`;
@@ -21,10 +19,40 @@ export class UIResolutionChoice {
         prompt.textContent = choice.prompt;
         this.panel.className = "card-selection-panel resolution-choice-panel";
         this.panel.setAttribute("aria-labelledby", heading.id);
-        this.status.setAttribute("role", "status");
-        this.panel.append(heading, prompt, this.status);
+        this.panel.append(heading, prompt);
 
-        if (choice.visibility === "public" && choice.earlierChoices.length) {
+        if (choice.presentation === CardChoicePresentation.SingleCardList) {
+            const select = (card: CardObject) => choice.submit(choice.player, [card]);
+            this.selection = new UICardSelection((card, selected) => {
+                if (selected)
+                    select(card);
+                this.selection.setCards(choice.options);
+            }, choice.count);
+            this.selection.setCards(choice.options);
+            const list = this.optionsList = document.createElement("ul");
+            list.className = "resolution-card-options";
+            for (const card of choice.options) {
+                const item = document.createElement("li");
+                const option = document.createElement("button");
+                const player = card.controller ?? card.owner;
+                const location = card.zone?.name.toLowerCase() ?? "left its zone";
+                const tapped = card instanceof Permanent && card.tapped && !card.retired ? ", tapped" : "";
+                const copy = choice.options.some(other => other !== card && other.name === card.name) ? ` #${card.id}` : "";
+                option.textContent = `${card.name}${copy} · Player ${player.id}, ${location}${tapped}`;
+                option.addEventListener("click", () => select(card));
+                item.append(option);
+                list.append(item);
+            }
+            this.panel.append(list);
+            return;
+        }
+
+        this.selection = new UICardSelection(() => this.update(), choice.count);
+        this.selection.setCards(choice.options);
+        this.status.setAttribute("role", "status");
+        this.panel.append(this.status);
+
+        if (choice.visibility === CardChoiceVisibility.Public && choice.earlierChoices.length) {
             const list = document.createElement("ul");
             list.className = "earlier-public-choices";
             for (const { player, cards } of choice.earlierChoices) {
@@ -48,7 +76,7 @@ export class UIResolutionChoice {
     }
 
     open() {
-        if (this.choice.visibility === "public") {
+        if (this.choice.visibility === CardChoiceVisibility.Public) {
             this.showPanel();
             return;
         }
@@ -80,7 +108,7 @@ export class UIResolutionChoice {
     close() {
         this.closeHandoff();
         this.panel.remove();
-        if (this.choice.visibility === "private")
+        if (this.choice.visibility === CardChoiceVisibility.Private)
             this.root.setVisibleHands();
     }
 
@@ -92,7 +120,10 @@ export class UIResolutionChoice {
 
     private showPanel() {
         document.body.append(this.panel);
-        this.root.focusCardSelection();
+        if (this.optionsList)
+            this.optionsList.querySelector("button")?.focus();
+        else
+            this.root.focusCardSelection();
     }
 
     private update() {

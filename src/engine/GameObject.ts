@@ -242,6 +242,7 @@ export class Permanent extends CardObject {
 
 export class Spell extends CardObject {
     readonly targets: readonly ActionTarget[];
+    resolvedPermanent?: Permanent;
 
     constructor(card: Card, override readonly controller: Player, targets: readonly ActionTarget[]) {
         super(card);

@@ -1,6 +1,6 @@
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import {
-    GameEvent_ActivateAbility,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,
+    CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,
     GameEvent_DiscardCard,GameEvent_GoToStep,GameEvent_PlayLand,GameEvent_SacrificePermanent,
 } from "@engine/events";
 import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
@@ -66,7 +66,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
         gameEventManager.addEvent(new GameEvent_CastSpell(caster, source));
         passPriorityRound();
         const first = game.pendingResolutionChoice;
-        expect(first).toMatchObject({ player: active, options: activeLands, count: 2, visibility: "public", earlierChoices: [] });
+        expect(first).toMatchObject({ player: active, options: activeLands, count: 2, visibility: CardChoiceVisibility.Public, earlierChoices: [] });
 
         first.submit(next, activeLands.slice(0, 2));
         first.submit(active, []);
@@ -96,10 +96,10 @@ test("collects multiplayer choices in turn order and commits each batch simultan
         expect(onSacrifice).toHaveBeenCalledTimes(3);
 
         const privateFirst = game.pendingResolutionChoice;
-        expect(privateFirst).toMatchObject({ player: active, visibility: "private", options: [activeDiscard, activeKeep] });
+        expect(privateFirst).toMatchObject({ player: active, visibility: CardChoiceVisibility.Private, options: [activeDiscard, activeKeep] });
         privateFirst.submit(active, [activeDiscard]);
         const privateSecond = game.pendingResolutionChoice;
-        expect(privateSecond).toMatchObject({ player: next, visibility: "private", options: [nextDiscard, nextKeep] });
+        expect(privateSecond).toMatchObject({ player: next, visibility: CardChoiceVisibility.Private, options: [nextDiscard, nextKeep] });
         expect(privateSecond).not.toHaveProperty("earlierChoices");
         expect(active.hand.objects).toEqual([activeDiscard, activeKeep]);
         expect(onDiscard).not.toHaveBeenCalled();

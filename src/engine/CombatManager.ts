@@ -295,7 +295,7 @@ export class CombatManager {
         const sources = [...blockersByAttacker, ...CombatManager.effectiveBlocks];
         const damage: GameEvent_DealDamage[] = [];
         let index = 0;
-        const addDamage = (source: Permanent, recipient: Permanent, amount: number) => {
+        const addDamage = (source: Permanent, recipient: Permanent | Player, amount: number) => {
             if (amount > 0)
                 damage.push(new GameEvent_DealDamage(source, recipient, amount));
         };
@@ -305,8 +305,15 @@ export class CombatManager {
                 const [source, opponents] = sources[index++];
                 const recipients = [...opponents];
                 const total = source.power;
-                if (total <= 0 || !recipients.length)
+                if (total <= 0)
                     continue;
+                if (!recipients.length) {
+                    // 509.1h and 510.1b–c: Only unblocked attackers deal damage to the defender.
+                    const defender = CombatManager.attackingCreatures.get(source);
+                    if (defender && !CombatManager.isBlocked(source))
+                        addDamage(source, defender, total);
+                    continue;
+                }
                 if (recipients.length === 1) {
                     addDamage(source, recipients[0], total);
                     continue;

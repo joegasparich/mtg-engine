@@ -111,6 +111,33 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 .card-selection-panel button:last-child:hover { background: #34665e; }
 .card-selection-panel button:disabled { opacity: .55; cursor: default; transform: none; }
 
+.resolution-card-options {
+    display: grid;
+    gap: 4px;
+    max-height: calc(100dvh - 135px);
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+}
+.resolution-card-options li button { width: 100%; margin: 0; text-align: left; }
+
+.life-totals {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    display: grid;
+    gap: 4px;
+    padding: 8px 12px;
+    border: 1px solid #54726d;
+    border-radius: 8px;
+    background: #081b24f0;
+    color: #e6eee9;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
 .combat-panel {
     max-height: calc(100dvh - 64px);
     overflow-y: auto;

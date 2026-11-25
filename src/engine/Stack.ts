@@ -130,6 +130,8 @@ export class Stack extends Zone<Spell | StackAbility> {
                         const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
                         const event = resolver?.resolvePermanentSpell(spell)
                             ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
+                        if (event instanceof GameEvent_ChangeCardZone)
+                            event.resolvesPermanentSpell = true;
                         // 608.3b–c: Validate and commit permanent entry in the same resolution.
                         gameEventManager.performImmediate(event);
                     };

@@ -4,6 +4,7 @@ import { ActionTarget,Targeter,TargetType } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_Advance,GameEvent_ChangeCardZone,type GameEvent_TurnStart } from "@engine/events";
+import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -181,6 +182,8 @@ export default class UIRoot extends PIXI.Container {
     readonly combat: UICombat;
     private resolutionChoice?: UIResolutionChoice;
     private readonly selectionStatus = document.createElement('p');
+    private readonly lifeTotalsPanel = document.createElement('aside');
+    private readonly lifeTotals = new Map<Player, HTMLElement>();
 
     get cardSelection() {
         return this.resolutionChoice ? this.resolutionChoice.cardSelection : this.combat.cardSelection;
@@ -204,6 +207,15 @@ export default class UIRoot extends PIXI.Container {
         this.zones.set(game.stack, this.stack);
         pixi.stage.addChild(this.stack);
         this.setupCardSelectionKeyboard();
+
+        this.lifeTotalsPanel.className = 'life-totals';
+        this.lifeTotalsPanel.setAttribute('aria-label', 'Life totals');
+        this.lifeTotalsPanel.setAttribute('aria-live', 'polite');
+        document.body.append(this.lifeTotalsPanel);
+        gameEventManager.onPerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
+            if (event.recipient instanceof Player)
+                this.updateLifeTotal(event.recipient);
+        });
 
         const devControls = document.createElement('div');
         devControls.className = 'testing-controls';
@@ -330,6 +342,7 @@ export default class UIRoot extends PIXI.Container {
 
     private setupCardSelectionKeyboard() {
         const canvas = pixi.canvas;
+        let handledSpace = false;
         canvas.tabIndex = 0;
         canvas.setAttribute('aria-label', 'Game board. Use arrow keys and Space when choosing cards.');
         this.selectionStatus.className = 'visually-hidden';
@@ -337,6 +350,7 @@ export default class UIRoot extends PIXI.Container {
         document.body.append(this.selectionStatus);
 
         canvas.addEventListener('focus', () => this.announceCardSelection());
+        canvas.addEventListener('blur', () => { handledSpace = false; });
         canvas.addEventListener('keydown', event => {
             const selection = this.cardSelection;
             if (!selection)
@@ -347,8 +361,10 @@ export default class UIRoot extends PIXI.Container {
             else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp')
                 selection.moveFocus(-1);
             else if (event.key === ' ' || event.key === 'Enter') {
-                if (!event.repeat)
+                if (!event.repeat) {
+                    handledSpace = event.key === ' ';
                     selection.toggle(selection.focusedCard);
+                }
             } else {
                 return;
             }
@@ -356,8 +372,10 @@ export default class UIRoot extends PIXI.Container {
             this.announceCardSelection();
         });
         canvas.addEventListener('keyup', event => {
-            if (event.key === ' ' && this.cardSelection)
+            if (event.key === ' ' && (handledSpace || this.cardSelection)) {
+                handledSpace = false;
                 event.stopPropagation();
+            }
         });
     }
 
@@ -435,7 +453,17 @@ export default class UIRoot extends PIXI.Container {
         this.players.push(uiPlayer);
         this.playerToUIPlayer.set(player, uiPlayer);
         this.uiPlayerToPlayer.set(uiPlayer, player);
+        const lifeTotal = document.createElement('span');
+        this.lifeTotals.set(player, lifeTotal);
+        this.updateLifeTotal(player);
+        this.lifeTotalsPanel.append(lifeTotal);
         this.layoutBoard();
+    }
+
+    private updateLifeTotal(player: Player) {
+        const label = this.lifeTotals.get(player);
+        if (label)
+            label.textContent = `Player ${player.id} · ${player.life} life`;
     }
 
     @autobind

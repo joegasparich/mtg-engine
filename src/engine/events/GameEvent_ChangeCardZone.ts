@@ -17,6 +17,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     type = GameEventType.ChangeCardZone;
     readonly oldZone?: Zone;
     newObject?: CardObject;
+    resolvesPermanentSpell = false;
 
     constructor(readonly oldObject: CardObject, public newZone: Zone,
         private readonly options?: ZoneChangeOptions) {
@@ -60,6 +61,10 @@ export class GameEvent_ChangeCardZone extends GameEvent {
             oldZone.onLeave(oldObject);
         else
             oldObject.retire();
+
+        // 609.7a: Damage-source effects can follow a spell into the permanent it resolves as.
+        if (this.resolvesPermanentSpell && oldObject instanceof Spell && this.newObject instanceof Permanent)
+            oldObject.resolvedPermanent = this.newObject;
 
         this.newZone.onEnter(this.newObject);
         this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${this.newZone.name}`;

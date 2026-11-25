@@ -386,5 +386,69 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Circle of Protection: Blue",
+        "image_url": "https://cards.scryfall.io/large/front/4/d/4dd460dc-8d50-4a8e-bb34-aa421a72fcdc.jpg?1783919589",
+        "oracle_text": "{1}: The next time a blue source of your choice would deal damage to you this turn, prevent that damage.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "activateString": "{1}: Prevent damage from a blue source",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{1}" },
+                    "AbilityPart_Effect_CircleOfProtection": { "colour": "U" }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Circle of Protection: Green",
+        "image_url": "https://cards.scryfall.io/large/front/7/6/76d13076-dce5-4c13-84f1-0421cea5dcda.jpg?1783919586",
+        "oracle_text": "{1}: The next time a green source of your choice would deal damage to you this turn, prevent that damage.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "activateString": "{1}: Prevent damage from a green source",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{1}" },
+                    "AbilityPart_Effect_CircleOfProtection": { "colour": "G" }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Circle of Protection: Red",
+        "image_url": "https://cards.scryfall.io/large/front/0/a/0a13c4d2-1791-4d4a-bd90-aa2b969cc717.jpg?1783919586",
+        "oracle_text": "{1}: The next time a red source of your choice would deal damage to you this turn, prevent that damage.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "activateString": "{1}: Prevent damage from a red source",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{1}" },
+                    "AbilityPart_Effect_CircleOfProtection": { "colour": "R" }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Circle of Protection: White",
+        "image_url": "https://cards.scryfall.io/large/front/e/1/e166bee4-8623-4c38-b687-3040b016e57f.jpg?1783919585",
+        "oracle_text": "{1}: The next time a white source of your choice would deal damage to you this turn, prevent that damage.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "activateString": "{1}: Prevent damage from a white source",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{1}" },
+                    "AbilityPart_Effect_CircleOfProtection": { "colour": "W" }
+                }
+            }
+        ]
     }
 ]

@@ -1,0 +1,18 @@
+[
+    {
+        "name": "Circle of Protection: Black",
+        "image_url": "https://cards.scryfall.io/large/front/7/7/770f2185-663a-4a3a-b83b-6b215d36113e.jpg?1783919589",
+        "oracle_text": "{1}: The next time a black source of your choice would deal damage to you this turn, prevent that damage.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "activateString": "{1}: Prevent damage from a black source",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{1}" },
+                    "AbilityPart_Effect_CircleOfProtection": { "colour": "B" }
+                }
+            }
+        ]
+    }
+]

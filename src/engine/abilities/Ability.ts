@@ -2,6 +2,7 @@ import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
+import type Player from "@engine/Player";
 import { AbilityDef } from "~/defs";
 import { SlateVar } from ".";
 import { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
@@ -55,6 +56,8 @@ export class Ability {
     }
 
     //-- Getters --//
+
+    get controller(): Player | undefined { return this.slate.CONTROLLER?.[0]; }
 
     private _activatable?: boolean;
     get activatable() { return this._activatable ??= this.parts.some(p => p instanceof AbilityPart_Activate); }

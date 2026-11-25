@@ -31,13 +31,21 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 
 | Kind | What it does |
 | --- | --- |
-| `EventCheck` | Registers a `check` callback for proposed events. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
+| `EventCheck` | Registers a `check` callback. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
 | `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
 | `AbilityGrant` | Creates an ability instance from `grant` on the `recipient` permanent. The instance belongs to the recipient and records its granting object. `onGrantChanged` lets an ability part track that instance when it is granted or revoked. [Ability grants](src/engine/GameObject.ts) |
 
-### How cards intercept and override events
+### Event check phases
 
-The event manager passes proposed events to `EffectSystem`. `checkEvent` reports whether a particular proposal survived the checks. [Event manager](src/engine/events/GameEventManager.ts)
+| Phase | When it runs | What it is used for |
+| --- | --- | --- |
+| `Proposal` | When events are submitted for execution or checked through `checkEvent()`. | Applies ordinary checks, such as defender restrictions and target legality. |
+| `PreviewCommit` | In `checkEvent()` after the proposal survives. Runs checks registered with `beforeCommit: true` and sets `check.committing` to `false`. | Predicts whether an event would go through with the current game state. A damage preview can report prevention while leaving a shield available. |
+| `Commit` | Immediately before each event is performed. Runs the same `beforeCommit` checks and sets `check.committing` to `true`. | Applies checks that depend on execution order or spend an effect. A Circle of Protection shield is spent only when its check successfully removes a damage event, per rule 615.8. If cleanup runs first, the shield expires under rule 514.2. |
+
+The UI gets available actions and validates targets through engine methods. Attack, block, and target legality checks call `checkEvent()` and are handled by `Proposal` today. The Circle's damage previews are exercised by engine tests. [Player actions](src/engine/actions/PlayerActionManager.ts) · [Target checks](src/engine/abilities/parts/AbilityPart_Target.ts) · [Event manager](src/engine/events/GameEventManager.ts) · [Damage prevention tests](src/engine/tests/general/damagePrevention.test.ts)
+
+### How cards intercept and override events
 
 1. When a Wall is proposed as an attacker, `CombatManager.canAttack` checks its controller, zone, type, and tapped status, then checks a `GameEvent_DeclareAttacker`. [Combat manager](src/engine/CombatManager.ts)
 2. The Wall's defender ability tries to remove that event. A removed declaration fails the legality check. See rule 702.3b. [Defender](src/engine/abilities/parts/AbilityPart_Defender.ts)
@@ -47,7 +55,7 @@ Black Ward uses the same override mechanism for attachment checks. Its override 
 
 ## How the event queue works
 
-`addEvent` and `addEvents` append to the pending queue and run effect checks on it. If the event loop is idle, it starts draining immediately. The loop takes the pending events as a batch and runs them in order. Events queued during that batch wait for the next pass. When an event succeeds, the manager calls its `onPerformed` listeners and then its `then` callback. [Event manager](src/engine/events/GameEventManager.ts)
+`addEvent` and `addEvents` append to the pending queue and run `Proposal` checks on it. If the event loop is idle, it starts draining immediately. The loop takes the pending events as a batch and runs them in order. Events queued during that batch wait for the next pass. When an event succeeds, the manager calls its `onPerformed` listeners and then its `then` callback. [Event manager](src/engine/events/GameEventManager.ts)
 
 Use `onGamePerformed(type, callback, options)` for subscriptions owned by the current game. It returns a function that cancels the subscription. Use `matches` to filter events, and set `once` to detach the callback on its first match. Starting a new game drops these subscriptions. A subscription created during notification starts observing with the next event or simultaneous batch. [Event manager](src/engine/events/GameEventManager.ts)
 

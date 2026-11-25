@@ -9,14 +9,26 @@ type EventDispatcher = Pick<typeof gameEventManager, "addEvent" | "performImmedi
 
 export interface EventCheck {
     readonly events: readonly GameEvent[];
+    readonly committing: boolean;
     add(event: GameEvent): void;
     replace(event: GameEvent, replacement: GameEvent): void;
-    removeWhere(predicate: (event: GameEvent) => boolean): void;
+    removeWhere(predicate: (event: GameEvent) => boolean): boolean;
 }
 
 export type CheckListener = (check: EventCheck) => void;
 export type CheckSource = { readonly object: CardObject; readonly keyword?: Keyword; readonly ability?: Ability };
 export type CheckRemovalOverride = (event: GameEvent, source: CheckSource) => boolean;
+
+export enum EventCheckPhase {
+    Proposal,
+    PreviewCommit,
+    Commit,
+}
+
+type EventCheckOptions = {
+    readonly beforeCommit?: boolean;
+    readonly references?: () => readonly CardObject[];
+};
 
 export enum ContinuousEffectKind {
     EventCheck,
@@ -30,9 +42,8 @@ type PowerToughnessEffect = PowerToughnessModifier & {
     kind: ContinuousEffectKind.ModifyPowerToughness;
     appliesTo: (recipient: CardObject) => boolean;
 };
-
 export type ContinuousEffect =
-    | { kind: ContinuousEffectKind.EventCheck; check: CheckListener }
+    | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
     | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void }
     | PowerToughnessEffect;
@@ -63,7 +74,7 @@ export class OneShotEffect {
 }
 
 export class EffectSystem {
-    private readonly eventChecks = new Map<CheckListener, CheckSource | undefined>();
+    private readonly eventChecks = new Map<CheckListener, EventCheckOptions & { source?: CheckSource }>();
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
     private readonly powerToughnessEffects = new Set<PowerToughnessEffect>();
@@ -99,10 +110,14 @@ export class EffectSystem {
         return value;
     }
 
+    getEventCheckReferences(): CardObject[] {
+        return [...this.eventChecks.values()].flatMap(check => check.references?.() ?? []);
+    }
+
     private applyContinuous(ability: Ability, effect: ContinuousEffect): () => void {
         switch (effect.kind) {
             case ContinuousEffectKind.EventCheck:
-                this.onCheck(effect.check, { object: ability.source, keyword: ability.def.keyword, ability });
+                this.onCheck(effect.check, { object: ability.source, keyword: ability.def.keyword, ability }, effect);
                 return () => this.offCheck(effect.check);
             case ContinuousEffectKind.CheckOverride:
                 this.onCheckRemovalOverride(effect.allow);
@@ -123,9 +138,9 @@ export class EffectSystem {
         }
     }
 
-    onCheck(check: CheckListener, source?: CheckSource) {
+    onCheck(check: CheckListener, source?: CheckSource, { beforeCommit, references }: EventCheckOptions = {}) {
         if (!this.eventChecks.has(check))
-            this.eventChecks.set(check, source);
+            this.eventChecks.set(check, { source, beforeCommit, references });
     }
 
     offCheck(check: CheckListener) {
@@ -140,10 +155,16 @@ export class EffectSystem {
         this.checkOverrides.delete(allow);
     }
 
-    checkEvents(events: GameEvent[], checkedEvent?: GameEvent): GameEvent | undefined {
-        for (const [check, source] of this.eventChecks) {
+    checkEvents(events: GameEvent[], checkedEvent?: GameEvent, phase = EventCheckPhase.Proposal): GameEvent | undefined {
+        const beforeCommit = phase !== EventCheckPhase.Proposal;
+        for (const [check, registration] of this.eventChecks) {
+            if (!!registration.beforeCommit !== beforeCommit)
+                continue;
+
+            const { source } = registration;
             check({
                 events,
+                committing: phase === EventCheckPhase.Commit,
                 add: event => { events.push(event); },
                 replace: (event, replacement) => {
                     const index = events.indexOf(event);
@@ -155,7 +176,11 @@ export class EffectSystem {
                     if (checkedEvent === event)
                         checkedEvent = replacement;
                 },
-                removeWhere: predicate => removeIf(events, event => predicate(event) && this.canRemove(event, source)),
+                removeWhere: predicate => {
+                    const count = events.length;
+                    removeIf(events, event => predicate(event) && this.canRemove(event, source));
+                    return events.length < count;
+                },
             });
         }
         return events.includes(checkedEvent) ? checkedEvent : undefined;

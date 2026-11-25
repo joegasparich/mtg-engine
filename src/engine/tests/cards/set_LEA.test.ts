@@ -1,9 +1,9 @@
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { PlayerActions } from "@engine/actions";
-import type { CardObject,Permanent } from "@engine/GameObject";
+import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import { CardChoiceVisibility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
@@ -11,9 +11,62 @@ import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { Keyword } from "~/defs";
+import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+test("Circle of Protection: Red prevents one hit from the chosen source to its controller", () => {
+    Game.init();
+    const caster = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+
+    const def = cardData.find(card => card.name === "Circle of Protection: Red");
+    expect(def).toMatchObject({ type: CardType.Enchantment, cost: "{1}{W}" });
+    const plains = cardData.find(card => card.name === "Plains");
+    const castingLands = [addTestCard(plains, caster, caster.battlefield), addTestCard(plains, caster, caster.battlefield)];
+    const card = addTestCard(def, caster, caster.hand);
+    const [cast] = playerActionManager.getCardActions(card, caster);
+    cast.perform(caster);
+    passPriorityRound();
+    expect(castingLands.every(land => land.tapped)).toBe(true);
+    const circle = caster.battlefield.objects.find(object => object.card === card.card);
+    expect(playerActionManager.getCardActions(circle, caster)).toEqual([]);
+
+    const land = addTestCard(plains, caster, caster.battlefield);
+    const chosen = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+    const other = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+    const wrongColour = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    const [activate] = playerActionManager.getCardActions(circle, caster);
+    activate.perform(caster);
+    expect(land.tapped).toBe(true);
+    expect(game.stack.objects.at(-1)).toBeInstanceOf(StackAbility);
+    expect(game.pendingResolutionChoice).toBeNull();
+    expect(game.pendingTargeter).toBeNull();
+    gameEventManager.addEvent(new GameEvent_DealDamage(chosen, caster, 1));
+    expect(caster.life).toBe(19);
+
+    passPriorityRound();
+    const choice = game.pendingResolutionChoice;
+    expect(choice.player).toBe(caster);
+    expect(choice.options).toEqual([chosen, other]);
+    choice.submit(opponent, [chosen]);
+    choice.submit(caster, [wrongColour]);
+    expect(game.pendingResolutionChoice).toBe(choice);
+    choice.submit(caster, [chosen]);
+    expect(game.pendingResolutionChoice).toBeNull();
+    expect(game.stack.objects).toHaveLength(0);
+
+    gameEventManager.addEvents([
+        new GameEvent_DealDamage(chosen, opponent, 3),
+        new GameEvent_DealDamage(other, caster, 1),
+        new GameEvent_DealDamage(chosen, caster, 4),
+    ]);
+    expect(opponent.life).toBe(17);
+    expect(caster.life).toBe(18);
+    gameEventManager.addEvent(new GameEvent_DealDamage(chosen, caster, 4));
+    expect(caster.life).toBe(14);
+});
 
 describe("Ancestral Recall", () => {
     let caster: Player;
@@ -512,7 +565,7 @@ describe("Balance", () => {
 
         expect(game.stack.objects).toEqual([spell]);
         expect(caster.battlefield.objects).toEqual([plains, bears]);
-        expect(game.pendingResolutionChoice).toMatchObject({ player: caster, count: 2, visibility: "private" });
+        expect(game.pendingResolutionChoice).toMatchObject({ player: caster, count: 2, visibility: CardChoiceVisibility.Private });
         game.pendingResolutionChoice.submit(caster, discard);
 
         expect(game.stack.objects).toEqual([spell]);

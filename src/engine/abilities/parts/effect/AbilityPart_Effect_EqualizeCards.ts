@@ -2,7 +2,7 @@ import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_DiscardCard,GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
-import type { PublicCardSelection } from "@engine/events/GameEvent_ResolutionChoice";
+import { CardChoiceVisibility,type PublicCardSelection } from "@engine/events/GameEvent_ResolutionChoice";
 import type { GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { type CardObject,Permanent } from "@engine/GameObject";
@@ -74,12 +74,12 @@ export class AbilityPart_Effect_EqualizeCards extends AbilityPart_Effect {
                 const type = phase.cardType.toLowerCase();
                 game.requestResolutionChoice({
                     ...details, prompt: `Keep ${count} ${type}${count === 1 ? "" : "s"}`,
-                    visibility: "public", earlierChoices: [...earlierChoices],
+                    visibility: CardChoiceVisibility.Public, earlierChoices: [...earlierChoices],
                 }, accept);
             } else {
                 // 101.4a: Earlier discard choices stay hidden until the batch moves.
                 game.requestResolutionChoice({
-                    ...details, prompt: `Discard ${count} card${count === 1 ? "" : "s"}`, visibility: "private",
+                    ...details, prompt: `Discard ${count} card${count === 1 ? "" : "s"}`, visibility: CardChoiceVisibility.Private,
                 }, accept);
             }
         };

@@ -1,4 +1,4 @@
-import { type CheckListener,type CheckRemovalOverride,type CheckSource,EffectSystem,type OneShotEffect } from "@engine/effects/EffectSystem";
+import { type CheckListener,type CheckRemovalOverride,type CheckSource,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
 
 export type { CheckSource,EventCheck } from "@engine/effects/EffectSystem";
 
@@ -174,7 +174,8 @@ class GameEventManager {
     }
 
     checkEvent(event: GameEvent) {
-        return this.checkForEffects([event], event) !== undefined;
+        const checked = this.checkForEffects([event], event);
+        return !!checked && !!this.effects.checkEvents([checked], checked, EventCheckPhase.PreviewCommit);
     }
 
     performImmediate(event: GameEvent): boolean {
@@ -192,7 +193,7 @@ class GameEventManager {
     performSimultaneous(events: GameEvent[]): boolean {
         this.checkForEffects(events);
         // 704.3: Commit the whole batch before any listener observes its results.
-        const performed = events.filter(event => event.perform());
+        const performed = events.flatMap(event => this.commitEvent(event).performed);
         const notifications = performed.map(event => ({ event, listeners: this.getGameListeners(event) }));
         for (const { event, listeners } of notifications)
             this.notifyPerformed(event, listeners);
@@ -256,11 +257,16 @@ class GameEventManager {
     }
 
     private performEvent(event: GameEvent): boolean {
-        if (!event.perform())
-            return false;
+        const { performed, checked } = this.commitEvent(event);
+        for (const pending of performed)
+            this.notifyPerformed(pending);
+        return performed.includes(checked);
+    }
 
-        this.notifyPerformed(event);
-        return true;
+    private commitEvent(event: GameEvent) {
+        const events = [event];
+        const checked = this.effects.checkEvents(events, event, EventCheckPhase.Commit);
+        return { performed: events.filter(pending => pending.perform()), checked };
     }
 
     private getGameListeners(event: GameEvent): Listener[] {

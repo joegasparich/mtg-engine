@@ -1,8 +1,8 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_ChangeCardZone,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
-import gameEventManager from "@engine/events/GameEventManager";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
@@ -35,6 +35,44 @@ test("should trade", () => {
 
     expect(playerA.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsA.card }));
     expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsB.card }));
+});
+
+test("unblocked attackers deal player damage simultaneously with blocked combat damage", () => {
+    const blocked = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const unblocked = addTestCard(cardData[MONS_GOBLIN_RAIDERS], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [blocked, unblocked])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    new PlayerActions.DeclareBlocker(blocker).perform(playerB, [blocked]);
+
+    const observeDamage = vi.fn((event: GameEvent_DealDamage) => {
+        expect(blocked.damageTaken).toBe(2);
+        expect(blocker.damageTaken).toBe(2);
+        expect(playerB.life).toBe(19);
+        expect(event.source).toBe(unblocked);
+    });
+    gameEventManager.onGamePerformed(GameEventType.DealDamage, observeDamage, { matches: event => event.recipient === playerB });
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(observeDamage).toHaveBeenCalledOnce();
+});
+
+test("a blocked attacker deals no player damage after its blocker leaves combat", () => {
+    const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    new PlayerActions.DeclareBlocker(blocker).perform(playerB, [attacker]);
+    gameEventManager.addEvent(new GameEvent_Advance(playerB));
+    expect(CombatManager.isBlocked(attacker)).toBe(true);
+    blocker.destroy();
+
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    expect(playerB.life).toBe(20);
 });
 
 test("attacker should win", () => {
