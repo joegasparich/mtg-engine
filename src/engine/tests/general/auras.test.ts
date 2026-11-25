@@ -1,10 +1,11 @@
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone } from "@engine/events";
+import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type EventCheck,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import type Player from "@engine/Player";
-import { addTestCard,moveTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
-import { CardType } from "~/defs";
+import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
+import { AttachmentSubtype,CardType } from "~/defs";
 import { cardData } from "~/index";
 
 let caster: Player;
@@ -21,13 +22,13 @@ beforeEach(() => {
         image_url: "",
         oracle_text: "Enchant creature",
         type: CardType.Enchantment,
-        subtypes: ["Aura"],
+        subtypes: [AttachmentSubtype.Aura],
         cost: "{W}",
         power: undefined,
         toughness: undefined,
         abilities: [{
             parts: {
-                AbilityPart_Target: { saveAs: "ENCHANTED", validTargets: ["Card"], onBattlefield: true, cardType: CardType.Creature },
+                AbilityPart_AuraTarget: { saveAs: "ENCHANTED", targetValidator: { cardType: CardType.Creature } },
                 AbilityPart_Aura: { attachmentFrom: "ATTACHMENT" },
                 AbilityPart_Attach: { inSignal: "SPELL_RESOLVE", target: "ENCHANTED", saveAs: "ATTACHMENT", cardType: CardType.Creature },
             },
@@ -67,6 +68,33 @@ test.each(["leaves", "leaves and returns", "stops being a creature"])("an Aura f
 
     expect(caster.graveyard.objects.map(object => object.card)).toContain(aura.card);
     expect(game.stack.objects).toHaveLength(0);
+});
+
+test("Aura spells check attachment restrictions during casting and again before resolving", () => {
+    let canAttach = false;
+    const restrictAttachment = (check: EventCheck) => {
+        if (!canAttach)
+            check.removeWhere(event => event instanceof GameEvent_CheckAttachment && event.recipient === target);
+    };
+    gameEventManager.onCheck(restrictAttachment);
+    try {
+        expect(aura.spellTargeter.hasLegalTargets()).toBe(false);
+        expect(game.stack.spellCast(caster, aura, [target])).toBe(false);
+
+        canAttach = true;
+        expect(game.stack.spellCast(caster, aura, [target])).toBe(true);
+        const [spell] = game.stack.objects;
+        expect(spell).toBeInstanceOf(CardObject);
+        const resolve = vi.spyOn((spell as CardObject).abilities[0], "fireSignal");
+
+        canAttach = false;
+        game.stack.resolveAll();
+
+        expect(resolve).not.toHaveBeenCalled();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([aura.card]);
+    } finally {
+        gameEventManager.offCheck(restrictAttachment);
+    }
 });
 
 test("state checks put an Aura with an illegal attachment into its owner's graveyard", () => {
@@ -172,27 +200,25 @@ test("a non-Aura enchantment resolves and remains on the battlefield without an 
     expect(permanent.attachedTo).toBeUndefined();
 });
 
-test("an attachment part can attach and detach an Equipment independently of Aura rules", () => {
-    const equipment = addTestCard({
+test("an attachment effect can move an Aura to another legal recipient", () => {
+    const movableAura = addTestCard({
         ...aura.def,
-        name: "Test Equipment",
-        type: CardType.Artifact,
-        subtypes: ["Equipment"],
-        abilities: [{ parts: { AbilityPart_Attach: { target: "CHOSEN", targetValidator: { cardType: CardType.Creature } } } }],
-    }, caster, caster.battlefield);
-    const land = addTestCard(cardData[0], caster, caster.battlefield);
+        abilities: [...aura.def.abilities, { parts: { AbilityPart_Attach: { target: "CHOSEN" } } }],
+    }, caster, caster.hand);
+    const land = addTestCard(cardData[FOREST], caster, caster.battlefield);
+    const otherCreature = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
 
-    const [ability] = equipment.abilities;
+    expect(game.stack.spellCast(caster, movableAura, [target])).toBe(true);
+    game.stack.resolveAll();
+    const attached = caster.battlefield.objects.find(object => object.card === movableAura.card);
+    expect(attached?.attachedTo).toBe(target);
+
+    const [, ability] = attached.abilities;
     ability.slate.CHOSEN = [land];
     ability.fireSignal("default");
-    expect(equipment.attachedTo).toBeUndefined();
+    expect(attached.attachedTo).toBe(target);
 
-    ability.slate.CHOSEN = [target];
+    ability.slate.CHOSEN = [otherCreature];
     ability.fireSignal("default");
-    expect(equipment.attachedTo).toBe(target);
-
-    target.type = CardType.Land;
-    game.checkState();
-    expect(equipment.attachedTo).toBeUndefined();
-    expect(equipment.zone).toBe(caster.battlefield);
+    expect(attached.attachedTo).toBe(otherCreature);
 });

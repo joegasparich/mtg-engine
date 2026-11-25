@@ -31,7 +31,7 @@ function expandParts(parts: AbilityDef["parts"]): [string, object][] {
         const target = "ENCHANTED";
         const attachment = "ATTACHMENT";
         return [
-            ["AbilityPart_Target", { saveAs: target, validTargets: ["Card"], onBattlefield: true, targetValidator }],
+            ["AbilityPart_AuraTarget", { saveAs: target, targetValidator }],
             ["AbilityPart_Attach", { inSignal: HardcodedSignals.SpellResolve, target, saveAs: attachment, targetValidator }],
             ["AbilityPart_Aura", { attachmentFrom: attachment }],
         ];

@@ -1,6 +1,6 @@
 import { AbilityPart_Attach } from "@engine/abilities/parts/AbilityPart_Attach";
 import { AbilityPart_Aura } from "@engine/abilities/parts/AbilityPart_Aura";
-import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
+import { AbilityPart_AuraTarget } from "@engine/abilities/parts/AbilityPart_AuraTarget";
 import Card from "@engine/Card";
 import { CardObject } from "@engine/GameObject";
 import Game,{ game } from "@engine/Game";
@@ -56,7 +56,7 @@ test("SimpleAura expands into three parts using one filter for targeting and att
         abilities: [{ parts: { SimpleAura: { targetValidator } } }],
     }, player, player.hand);
     const parts = shorthand.abilities[0].parts;
-    const targeting = parts.find(part => part instanceof AbilityPart_Target);
+    const targeting = parts.find(part => part instanceof AbilityPart_AuraTarget);
     const attachment = parts.find(part => part instanceof AbilityPart_Attach);
     const auraPart = parts.find(part => part instanceof AbilityPart_Aura);
 

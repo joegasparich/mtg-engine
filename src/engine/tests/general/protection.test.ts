@@ -8,7 +8,7 @@ import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
-import { type CardDef,CardType,Keyword } from "~/defs";
+import { AttachmentSubtype,type CardDef,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -75,34 +75,17 @@ test("a black spell that destroys creatures without targeting still affects a pr
     expect(opponent.graveyard.objects.map(object => object.card)).toEqual([target.card]);
 });
 
-test("protection removes matching attachments and prevents new ones", () => {
+test("protection removes matching Auras and prevents new ones", () => {
     const target = addCreature(player);
-    const aura: CardDef = { ...creature, type: CardType.Enchantment, subtypes: ["Aura"], cost: "{B}", abilities: [enchantCreature] };
+    const aura: CardDef = { ...creature, type: CardType.Enchantment, subtypes: [AttachmentSubtype.Aura], cost: "{B}", abilities: [enchantCreature] };
     const blackAura = addTestCard(aura, opponent, opponent.hand);
+    const whiteAura = addTestCard({ ...aura, cost: "{W}" }, opponent, opponent.hand);
     expect(game.stack.spellCast(opponent, blackAura, [target])).toBe(true);
+    expect(game.stack.spellCast(opponent, whiteAura, [target])).toBe(true);
     game.stack.resolveAll();
     expect(opponent.battlefield.objects.find(object => object.card === blackAura.card)?.attachedTo).toBe(target);
-
-    function addAttachment(subtype: string, cost: string) {
-        return addTestCard({
-            ...creature, type: CardType.Artifact, subtypes: [subtype], cost,
-            abilities: [{ parts: { AbilityPart_Attach: { target: "CHOSEN" } } }],
-        }, player, player.battlefield);
-    }
-
-    function attach(attachment: Permanent) {
-        const [ability] = attachment.abilities;
-        ability.slate.CHOSEN = [target];
-        ability.fireSignal("default");
-    }
-
-    const blackEquipment = addAttachment("Equipment", "{B}");
-    const blackFortification = addAttachment("Fortification", "{B}");
-    const colourlessEquipment = addAttachment("Equipment", "{2}");
-    for (const attachment of [blackEquipment, blackFortification, colourlessEquipment]) {
-        attach(attachment);
-        expect(attachment.attachedTo).toBe(target);
-    }
+    const attachedWhiteAura = opponent.battlefield.objects.find(object => object.card === whiteAura.card);
+    expect(attachedWhiteAura?.attachedTo).toBe(target);
 
     const protectionAura = addTestCard({
         ...aura, cost: "{W}", abilities: [enchantCreature, { parts: { AbilityPart_GrantAttachedAbility: { grant: protection } } }],
@@ -111,18 +94,13 @@ test("protection removes matching attachments and prevents new ones", () => {
     game.stack.resolveAll();
 
     expect(opponent.graveyard.objects.map(object => object.card)).toEqual([blackAura.card]);
-    expect(colourlessEquipment.attachedTo).toBe(target);
-    for (const attachment of [blackEquipment, blackFortification]) {
-        expect(attachment.zone).toBe(player.battlefield);
-        expect(attachment.attachedTo).toBeUndefined();
-        attach(attachment);
-        expect(attachment.attachedTo).toBeUndefined();
-    }
+    expect(attachedWhiteAura.attachedTo).toBe(target);
 
     const newAura = addTestCard(aura, opponent, opponent.hand);
+    expect(game.stack.spellCast(opponent, newAura, [target])).toBe(false);
     gameEventManager.addEvent(new GameEvent_ChangeCardZone(newAura, opponent.battlefield, { attachedTo: target }));
     expect(newAura.zone).toBe(opponent.hand);
-    expect(opponent.battlefield.objects).toHaveLength(0);
+    expect(opponent.battlefield.objects).toEqual([attachedWhiteAura]);
 });
 
 test("starting a new game ends a continuous grant and the effect it supplied", () => {

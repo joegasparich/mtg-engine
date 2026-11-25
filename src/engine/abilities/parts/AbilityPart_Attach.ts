@@ -5,8 +5,7 @@ import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { Permanent } from "@engine/GameObject";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import type { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
-import { GameEvent_DetachPermanent } from "@engine/events/GameEvent_DetachPermanent";
-import gameEventManager,{ type GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { Battlefield } from "@engine/Zone";
 import { autobind } from "@utility/typeUtility";
 import type { TargetValidator } from "~/defs";
@@ -39,13 +38,6 @@ export class AbilityPart_Attach extends AbilityPart_Effect {
         } else if (source instanceof Permanent && target instanceof Permanent) {
             effect.performImmediate(new GameEvent_AttachPermanent(source, target));
         }
-    }
-
-    checkState(actions: GameEvent[]) {
-        const { source } = this.ability;
-        // 704.5m–n: The Aura part handles graveyard moves. Illegal Equipment and Fortification attachments are removed.
-        if (source instanceof Permanent && source.attachedTo && !source.subtypes.includes("Aura") && !source.hasLegalAttachment())
-            actions.push(new GameEvent_DetachPermanent(source));
     }
 
     canAttachTo(target: Permanent) {

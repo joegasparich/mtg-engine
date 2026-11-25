@@ -21,6 +21,10 @@ export enum CardType {
     Enchantment = "Enchantment",
 }
 
+export enum AttachmentSubtype {
+    Aura = "Aura",
+}
+
 export const cardColours = ["W", "U", "B", "R", "G"] as const;
 export type CardColour = (typeof cardColours)[number];
 
@@ -43,5 +47,6 @@ export enum Keyword {
     Banding = "banding",
     Defender = "defender",
     Flying = "flying",
+    Indestructible = "indestructible",
     Reach = "reach",
 }

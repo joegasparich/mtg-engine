@@ -17,6 +17,12 @@
             "AbilityPart_Flying": {}
         }
     },
+    "indestructible": {
+        "keyword": "indestructible",
+        "parts": {
+            "AbilityPart_Indestructible": {}
+        }
+    },
     "reach": {
         "keyword": "reach",
         "parts": {

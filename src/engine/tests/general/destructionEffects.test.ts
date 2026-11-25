@@ -1,10 +1,28 @@
-import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
+import { GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DestroyPermanent } from "@engine/events";
 import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
-import { CardType } from "~/defs";
+import { CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+test("indestructible stops destruction and lethal damage with damage still marked", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const bears = cardData[GRIZZLY_BEARS];
+    const creature = addTestCard({ ...bears, abilities: [{ keyword: Keyword.Indestructible, parts: {} }] }, player, player.battlefield);
+    const source = addTestCard(bears, opponent, opponent.battlefield);
+
+    expect(gameEventManager.performImmediate(new GameEvent_DestroyPermanent(creature))).toBe(false);
+    gameEventManager.addEvent(new GameEvent_DealDamage(source, creature, 2));
+    expect(creature.zone).toBe(player.battlefield);
+    expect(creature.damageTaken).toBe(2);
+
+    creature.toughness = 0;
+    game.checkState();
+    expect(player.graveyard.objects.map(object => object.card)).toEqual([creature.card]);
+});
 
 test("a filtered destruction effect checks its whole batch and uses each permanent's owner", () => {
     Game.init();

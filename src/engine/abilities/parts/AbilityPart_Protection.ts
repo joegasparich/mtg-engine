@@ -27,13 +27,9 @@ export class AbilityPart_Protection extends AbilityPart_ContinuousEffect {
             if (event instanceof GameEvent_DealDamage)
                 return event.recipient === source && event.source.colours.has(this.colour);
 
-            if (!(event instanceof GameEvent_CheckAttachment) || event.recipient !== source || !event.attachment.colours.has(this.colour))
-                return false;
-
-            // 702.16c–d: Protection restricts Auras, Equipment, and Fortifications.
-            const { attachment } = event;
-            return attachment.subtypes.includes("Aura") || attachment.subtypes.includes("Equipment")
-                || attachment.subtypes.includes("Fortification");
+            // 702.16c: Protection blocks attachments of the specified colour.
+            return event instanceof GameEvent_CheckAttachment && event.recipient === source
+                && event.attachment.colours.has(this.colour);
         });
     }
 }

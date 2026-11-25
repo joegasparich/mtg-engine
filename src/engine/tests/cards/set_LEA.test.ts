@@ -5,6 +5,7 @@ import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
 import { CardChoiceVisibility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
+import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -66,6 +67,80 @@ test("Circle of Protection: Red prevents one hit from the chosen source to its c
     expect(caster.life).toBe(18);
     gameEventManager.addEvent(new GameEvent_DealDamage(chosen, caster, 4));
     expect(caster.life).toBe(14);
+});
+
+describe("Consecrate Land", () => {
+    const consecrateLand = cardData.find(card => card.name === "Consecrate Land");
+    const plains = cardData.find(card => card.name === "Plains");
+    let caster: Player;
+    let opponent: Player;
+    let land: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+    });
+
+    test("enchants an opponent's land for one white mana and protects it from Armageddon", () => {
+        startMainPhase();
+        const manaSource = addTestCard(plains, caster, caster.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const aura = addTestCard(consecrateLand, caster, caster.hand);
+        const [cast] = playerActionManager.getCardActions(aura, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([creature])).toBe(false);
+        game.pendingTargeter.onTargeted([land]);
+        passPriorityRound();
+
+        const attached = caster.battlefield.objects.find(object => object.card === aura.card);
+        expect(manaSource.tapped).toBe(true);
+        expect(attached?.attachedTo).toBe(land);
+        expect(land.hasKeyword(Keyword.Indestructible)).toBe(true);
+
+        const armageddon = addTestCard(cardData.find(card => card.name === "Armageddon"), caster, caster.hand);
+        expect(game.stack.spellCast(caster, armageddon)).toBe(true);
+        game.stack.resolveAll();
+
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(manaSource.card);
+        expect(land.zone).toBe(opponent.battlefield);
+        expect(attached.attachedTo).toBe(land);
+
+        gameEventManager.addEvent(new GameEvent_SacrificePermanent(opponent, land));
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([land.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(aura.card);
+    });
+
+    test("makes other Auras illegal until it leaves the battlefield", () => {
+        const otherAura = { ...consecrateLand, name: "Test land Aura", abilities: [{ parts: {
+            SimpleAura: { targetValidator: { cardType: CardType.Land } },
+        } }] };
+        const firstAura = addTestCard(otherAura, opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, firstAura, [land])).toBe(true);
+        game.stack.resolveAll();
+
+        const aura = addTestCard(consecrateLand, caster, caster.hand);
+        expect(game.stack.spellCast(caster, aura, [land])).toBe(true);
+        game.stack.resolveAll();
+
+        const attached = caster.battlefield.objects.find(object => object.card === aura.card);
+        expect(attached?.attachedTo).toBe(land);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([firstAura.card]);
+        const nextAura = addTestCard(otherAura, opponent, opponent.hand);
+        const secondConsecrate = addTestCard(consecrateLand, caster, caster.hand);
+        expect(game.stack.spellCast(caster, secondConsecrate, [land])).toBe(false);
+        expect(game.stack.spellCast(opponent, nextAura, [land])).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_ChangeCardZone(nextAura, opponent.battlefield, { attachedTo: land }));
+        expect(nextAura.zone).toBe(opponent.hand);
+
+        moveTestCard(attached, caster.graveyard);
+        expect(land.hasKeyword(Keyword.Indestructible)).toBe(false);
+        expect(game.stack.spellCast(opponent, nextAura, [land])).toBe(true);
+        game.stack.resolveAll();
+        expect(opponent.battlefield.objects.find(object => object.card === nextAura.card)?.attachedTo).toBe(land);
+    });
 });
 
 describe("Ancestral Recall", () => {

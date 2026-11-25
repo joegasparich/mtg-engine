@@ -450,5 +450,26 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Consecrate Land",
+        "image_url": "https://cards.scryfall.io/large/front/f/b/fb0deecb-776d-4707-a228-337646077e77.jpg?1783919585",
+        "oracle_text": "Enchant land\nEnchanted land has indestructible and can't be enchanted by other Auras.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Land" }
+                    },
+                    "AbilityPart_GrantAttachedAbility": {
+                        "grant": { "keyword": "indestructible" }
+                    },
+                    "AbilityPart_PreventOtherAurasOnAttachment": {}
+                }
+            }
+        ]
     }
 ]

@@ -29,7 +29,6 @@ export enum GameEventType {
     CheckRequiredBlock,
     StartTargeting,
     PlayLand,
-    DetachPermanent,
     SacrificePermanent,
     DiscardCard,
     RequestResolutionChoice,
