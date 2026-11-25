@@ -10,18 +10,20 @@ export class GameEvent_CastSpell extends GameEvent {
     caster: Player;
     handObject: CardObject;
 
-    constructor(caster: Player, handObject: CardObject, readonly targets: readonly ActionTarget[] = []) {
+    constructor(caster: Player, handObject: CardObject, readonly targets: readonly ActionTarget[] = [],
+        readonly chosenX = 0) {
         super();
 
         this.caster = caster;
         this.handObject = handObject;
 
-        this.label = `Player ${this.caster.id} cast ${this.handObject.logName}`;
+        const variableCost = handObject.variableManaSymbols ? ` with X = ${chosenX}` : "";
+        this.label = `Player ${this.caster.id} cast ${this.handObject.logName}${variableCost}`;
     }
 
     perform(): boolean {
         if (this.handObject.owner !== this.caster || !this.handObject.canPlay()
-            || !game.stack.spellCast(this.caster, this.handObject, this.targets))
+            || !game.stack.spellCast(this.caster, this.handObject, this.targets, this.chosenX))
             return false;
 
         game.notePriorityAction();

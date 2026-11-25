@@ -1,6 +1,8 @@
+import { makeAbility } from "@engine/abilities";
+import { AbilityPart_Activate_Mana } from "@engine/abilities/parts/activate/AbilityPart_Activate_Mana";
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
-import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_GoToNextStep } from "@engine/events";
+import { GameEvent_Advance,GameEvent_CastSpell,GameEvent_Cleanup,GameEvent_GoToNextStep } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { StepIndex } from "@engine/Step";
@@ -113,4 +115,62 @@ test("ending the turn gives the opponent a final chance to respond", () => {
     gameEventManager.addEvent(new GameEvent_Advance(player));
     expect(game.turnNumber).toBe(1);
     expect(game.currentTurnPlayer()).toBe(opponent);
+});
+
+test("auto-skip offers an affordable special action to its authorized player at priority", () => {
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const source = addTestCard(cardData[FOREST], player, player.battlefield);
+    const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+    game.startGame({ allowAutoSkip: true });
+    expect(game.currentStepIndex).toBe(StepIndex.Main);
+    const ability = makeAbility({ parts: {
+        AbilityPart_Activate_Mana: { cost: "{1}" },
+        AbilityPart_Effect_GainLife: { amount: 1, target: "CONTROLLER" },
+    } }, source);
+    const action = { player: opponent, label: "Pay mana to gain 1 life", ability };
+    game.registerSpecialActionUntilEndOfTurn(action);
+    game.takeSpecialAction(opponent, action);
+    expect(opponent.life).toBe(20);
+
+    gameEventManager.addEvent(new GameEvent_Advance(player));
+    expect(game.priorityPlayer).toBe(opponent);
+    expect(game.getSpecialActions(opponent)).toEqual([action]);
+    game.takeSpecialAction(player, action);
+    expect(opponent.life).toBe(20);
+
+    const activation = ability.parts.find(part => part instanceof AbilityPart_Activate_Mana);
+    activation.cost = "{2}";
+    expect(game.getSpecialActions(opponent)).toEqual([]);
+    game.takeSpecialAction(opponent, action);
+    expect(opponent.life).toBe(20);
+    expect(forest.tapped).toBe(false);
+
+    activation.cost = "{1}";
+    game.takeSpecialAction(opponent, action);
+    expect(opponent.life).toBe(21);
+    expect(player.life).toBe(20);
+    expect(forest.tapped).toBe(true);
+    expect(source.tapped).toBe(false);
+    expect(game.stack.objects).toEqual([]);
+});
+
+test.each(["cleanup", "new game"])("disposes registered special-action ability parts at %s", when => {
+    const player = game.addPlayer([]);
+    startMainPhase();
+    const origin = addTestCard(cardData[FOREST], player, player.battlefield);
+    const ability = makeAbility({ parts: { AbilityPart_Activate_Mana: { cost: "{0}" } } }, origin);
+    const [part] = ability.parts;
+    const setup = vi.spyOn(part, "setup");
+    const cleanup = vi.spyOn(part, "cleanup");
+    game.registerSpecialActionUntilEndOfTurn({ player, label: "Special action", ability });
+    expect(setup).toHaveBeenCalledExactlyOnceWith(ability);
+
+    if (when === "cleanup")
+        gameEventManager.addEvent(new GameEvent_Cleanup(player));
+    else
+        Game.init();
+
+    expect(cleanup).toHaveBeenCalledExactlyOnceWith(ability);
+    expect(game.getSpecialActions(player)).toEqual([]);
 });

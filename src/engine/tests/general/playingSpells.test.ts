@@ -23,6 +23,66 @@ function addForestToHand(owner: Player) {
     return forest;
 }
 
+test("announces a safe affordable X, with cancellation before mana is paid", () => {
+    const other = game.addPlayer([]);
+    startMainPhase();
+    const spell = addTestCard({
+        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{X}{1}{U}", abilities: [],
+    }, player, player.hand);
+    player.manaPool[ManaColour.R] = 5;
+    const action = new PlayerActions.PlayCard(spell);
+    action.perform(player);
+    expect(game.pendingSpellXChoice).toBeNull();
+    expect(playerActionManager.getCardActions(spell, player)).toEqual([]);
+
+    player.manaPool[ManaColour.U] = 1;
+    action.perform(player);
+    const first = game.pendingSpellXChoice;
+    expect(first.max).toBe(2);
+    first.submit(other, 2);
+    for (const invalid of [-1, 1.5, 3, Infinity, NaN])
+        first.submit(player, invalid);
+    expect(game.pendingSpellXChoice).toBe(first);
+
+    first.submit(player, null);
+    expect(spell.zone).toBe(player.hand);
+    expect(game.priorityPlayer).toBe(player);
+    expect(game.stack.objects).toEqual([]);
+    expect(player.manaPool[ManaColour.U]).toBe(1);
+    expect(player.manaPool[ManaColour.R]).toBe(5);
+
+    action.perform(player);
+    const second = game.pendingSpellXChoice;
+    first.submit(player, 2);
+    expect(game.pendingSpellXChoice).toBe(second);
+    player.manaPool[ManaColour.R] = 4;
+    second.submit(player, 2);
+    expect(game.pendingSpellXChoice).toBe(second);
+    second.submit(player, 1);
+    expect(game.stack.objects.at(-1)).toMatchObject({ card: spell.card, chosenX: 1, cost: [0, 1, 0, 0, 0, 0, 3] });
+    expect(player.manaPool[ManaColour.R]).toBe(1);
+    expect(player.manaPool[ManaColour.U]).toBe(0);
+});
+
+test("cancelling targets after announcing X leaves the spell and mana available", () => {
+    const other = game.addPlayer([]);
+    startMainPhase();
+    const spell = addTestCard({
+        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{G}",
+        abilities: [{ parts: { AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] } } }],
+    }, player, player.hand);
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    player.manaPool[ManaColour.R] = 1;
+    new PlayerActions.PlayCard(spell).perform(player);
+    game.pendingSpellXChoice.submit(player, 1);
+    expect(game.pendingTargeter.validateTargets([other])).toBe(true);
+    game.pendingTargeter.onCancelled();
+    expect(spell.zone).toBe(player.hand);
+    expect(player.manaPool[ManaColour.R]).toBe(1);
+    expect(forest.tapped).toBe(false);
+    expect(game.priorityPlayer).toBe(player);
+});
+
 test("target card types accept any listed type and still enforce other target filters", () => {
     const creature = cardData[GRIZZLY_BEARS];
     const target = addTestCard(creature, player, player.battlefield);

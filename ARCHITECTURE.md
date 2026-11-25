@@ -18,6 +18,7 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 - **Definitions and instances.** `CardDef` and `AbilityDef` describe cards and abilities. `makeAbility` instantiates registered parts from their JSON configuration. Keyword definitions supply shared parts, and `SimpleAura` expands into targeting, attachment, and Aura resolution parts. [Definitions](src/defs.ts) · [Ability factory](src/engine/abilities/index.ts) · [Keyword abilities](keyword_abilities.json)
 - **Parts, signals, and slate.** Each part handles a task such as validating a target, paying an activation cost, listening for a trigger, or producing an effect. Parts communicate through named signals and the ability's `slate`, which stores values such as `THIS`, selected objects, and granted ability instances. For example, Armageddon selects lands into the slate and signals the destruction part to use them. [Ability](src/engine/abilities/Ability.ts) · [Alpha card definitions](cards_lea.json)
 - **Timing.** Resolving spells fire `SPELL_RESOLVE`. Activated abilities pay their costs before going on the stack, and mana abilities resolve immediately. Triggered abilities listen to performed events, capture their inputs, and wait to go on the stack. Static parts register continuous effects while their source is in the applicable zone. [Stack](src/engine/Stack.ts) · [Activation event](src/engine/events/GameEvent_ActivateAbility.ts) · [Trigger parts](src/engine/abilities/parts/trigger) · [Continuous effect part](src/engine/abilities/parts/AbilityPart_ContinuousEffect.ts)
+- **Special actions.** Guardian Angel gives its controller a permission stored on `Game` until cleanup. The permission holds an ability instance with the original recipient in its slate. Taking the action at priority checks and pays its cost through the activation part, then fires the effect immediately under rule 116. [Game](src/engine/Game.ts) · [Guardian Angel](src/engine/abilities/parts/bespoke/AbilityPart_Effect_GuardianAngel.ts)
 
 ## How effects run
 
@@ -34,6 +35,7 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 | `EventCheck` | Registers a `check` callback. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
 | `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
 | `AbilityGrant` | Creates an ability instance from `grant` on the `recipient` permanent. The instance belongs to the recipient and records its granting object. `onGrantChanged` lets an ability part track that instance when it is granted or revoked. [Ability grants](src/engine/GameObject.ts) |
+| `DamagePrevention` | Registers a finite shield, a shield for the next hit from a source, or ongoing prevention such as protection. The affected player chooses how to apply competing effects or divide a finite shield among simultaneous sources. [Damage prevention](src/engine/effects/DamagePrevention.ts) |
 
 ### Event check phases
 
@@ -41,9 +43,9 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 | --- | --- | --- |
 | `Proposal` | When events are submitted for execution or checked through `checkEvent()`. | Applies ordinary checks, such as defender restrictions and target legality. |
 | `PreviewCommit` | In `checkEvent()` after the proposal survives. Runs checks registered with `beforeCommit: true` and sets `check.committing` to `false`. | Predicts whether an event would go through with the current game state. A damage preview can report prevention while leaving a shield available. |
-| `Commit` | Immediately before each event is performed. Runs the same `beforeCommit` checks and sets `check.committing` to `true`. | Applies checks that depend on execution order or spend an effect. A Circle of Protection shield is spent only when its check successfully removes a damage event, per rule 615.8. If cleanup runs first, the shield expires under rule 514.2. |
+| `Commit` | Immediately before each event is performed. Runs the same `beforeCommit` checks and sets `check.committing` to `true`. | Applies checks that depend on execution order or spend an effect, such as regeneration. |
 
-The UI gets available actions and validates targets through engine methods. Attack, block, and target legality checks call `checkEvent()` and are handled by `Proposal` today. The Circle's damage previews are exercised by engine tests. [Player actions](src/engine/actions/PlayerActionManager.ts) · [Target checks](src/engine/abilities/parts/AbilityPart_Target.ts) · [Event manager](src/engine/events/GameEventManager.ts) · [Damage prevention tests](src/engine/tests/general/damagePrevention.test.ts)
+The UI gets available actions and validates targets through engine methods. Attack, block, and target legality checks call `checkEvent()` and are handled by `Proposal` today. For damage, `checkEvent()` also previews prevention. When damage commits, the prevention system reduces the pending damage and spends shields under rules 615.7–8. [Player actions](src/engine/actions/PlayerActionManager.ts) · [Target checks](src/engine/abilities/parts/AbilityPart_Target.ts) · [Event manager](src/engine/events/GameEventManager.ts) · [Damage prevention tests](src/engine/tests/general/damagePrevention.test.ts)
 
 ### How cards intercept and override events
 
@@ -63,7 +65,7 @@ Blaze of Glory uses a one-shot `Cleanup` subscription to revoke its grant alongs
 
 The loop checks for work from top to bottom.
 
-1. **Queued events.** Drain any new batch first, including choice submissions. Once the queue is empty, a pending resolution or combat damage choice pauses the loop.
+1. **Queued events.** Drain any new batch first, including choice submissions. While damage prevention choices are pending, process those choice events until the damage batch can commit. A pending resolution or combat damage choice pauses the loop once its queue is empty.
 2. **`onResolved` follow-ups.** Run callbacks scheduled to follow queued events.
 3. **`continueResolution` callbacks.** Advance the current spell or ability to its next instruction.
 4. **Game state checks.** Finish any current stack resolution, perform applicable state-based actions until stable, and put waiting triggers on the stack. [Game state checks](src/engine/Game.ts)

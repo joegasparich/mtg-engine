@@ -10,8 +10,27 @@ export class GameEvent_DealDamage extends GameEvent {
 
     constructor(readonly source: CardObject, readonly recipient: Permanent | Player, readonly amount: number) {
         super();
-        const recipientName = recipient instanceof Player ? `Player ${recipient.id}` : recipient.logName;
-        this.label = `${source.logName} dealt ${amount} damage to ${recipientName}`;
+        const recipientLogName = recipient instanceof Player ? this.recipientName : recipient.logName;
+        this.label = `${source.logName} dealt ${amount} damage to ${recipientLogName}`;
+    }
+
+    get recipientName() {
+        return this.recipient instanceof Player ? `Player ${this.recipient.id}` : this.recipient.name;
+    }
+
+    get affectedPlayer() {
+        return this.recipient instanceof Player ? this.recipient : this.recipient.controller;
+    }
+
+    withAmount(amount: number): GameEvent_DealDamage {
+        if (amount === this.amount)
+            return this;
+
+        const event = new GameEvent_DealDamage(this.source, this.recipient, amount);
+        event.isAction = this.isAction;
+        event.effect = this.effect;
+        event.callback = this.callback;
+        return event;
     }
 
     perform(): boolean {
@@ -27,7 +46,7 @@ export class GameEvent_DealDamage extends GameEvent {
     }
 
     canDealDamage(): boolean {
-        return this.amount > 0 && Number.isFinite(this.amount) && (this.recipient instanceof Player
+        return this.amount > 0 && Number.isSafeInteger(this.amount) && (this.recipient instanceof Player
             ? game.players.includes(this.recipient)
             : this.recipient.zone instanceof Battlefield && this.recipient.type === CardType.Creature);
     }

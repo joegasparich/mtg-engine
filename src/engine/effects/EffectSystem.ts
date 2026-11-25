@@ -1,4 +1,5 @@
 import type { Ability } from "@engine/abilities/Ability";
+import { type DamagePrevention,DamagePreventionSystem } from "@engine/effects/DamagePrevention";
 import type gameEventManager from "@engine/events/GameEventManager";
 import type { GameEvent } from "@engine/events/GameEventManager";
 import type { CardObject,Permanent } from "@engine/GameObject";
@@ -35,6 +36,7 @@ export enum ContinuousEffectKind {
     CheckOverride,
     AbilityGrant,
     ModifyPowerToughness,
+    DamagePrevention,
 }
 
 type PowerToughnessModifier = { power: number; toughness: number };
@@ -46,6 +48,7 @@ export type ContinuousEffect =
     | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
     | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void }
+    | { kind: ContinuousEffectKind.DamagePrevention; prevention: DamagePrevention }
     | PowerToughnessEffect;
 
 // 609.1 and 610.1: A resolving instruction produces events and can continue after a player choice.
@@ -74,6 +77,7 @@ export class OneShotEffect {
 }
 
 export class EffectSystem {
+    readonly damagePrevention = new DamagePreventionSystem((hit, source) => this.canRemove(hit, source));
     private readonly eventChecks = new Map<CheckListener, EventCheckOptions & { source?: CheckSource }>();
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
@@ -111,7 +115,10 @@ export class EffectSystem {
     }
 
     getEventCheckReferences(): CardObject[] {
-        return [...this.eventChecks.values()].flatMap(check => check.references?.() ?? []);
+        return [
+            ...[...this.eventChecks.values()].flatMap(check => check.references?.() ?? []),
+            ...this.damagePrevention.getSourceReferences(),
+        ];
     }
 
     private applyContinuous(ability: Ability, effect: ContinuousEffect): () => void {
@@ -122,6 +129,9 @@ export class EffectSystem {
             case ContinuousEffectKind.CheckOverride:
                 this.onCheckRemovalOverride(effect.allow);
                 return () => this.offCheckRemovalOverride(effect.allow);
+            case ContinuousEffectKind.DamagePrevention:
+                return this.damagePrevention.register(effect.prevention,
+                    { object: ability.source, keyword: ability.def.keyword, ability });
             case ContinuousEffectKind.AbilityGrant: {
                 const { ability: granted, revoke } = effect.recipient.grantAbility(effect.grant, ability.source);
                 effect.onGrantChanged?.(granted);

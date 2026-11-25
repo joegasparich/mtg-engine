@@ -43,6 +43,7 @@ export namespace ManaUtility {
                 case "R": mana[3]++; break;
                 case "G": mana[4]++; break;
                 case "C": mana[5]++; break;
+                case "X": break; // 107.3g: The fixed portion of a cost treats X as zero.
                 default:  mana[6] += parseInt(pip); break;
             }
         }
@@ -50,6 +51,16 @@ export namespace ManaUtility {
         manaStringCache.set(manaString, [...mana]);
 
         return mana as T;
+    }
+
+    export function countVariableSymbols(manaString?: string): number {
+        return manaString?.match(/\{X\}/g)?.length ?? 0;
+    }
+
+    export function withX(cost: Readonly<ManaCost>, symbols: number, x: number): ManaCost {
+        const total: ManaCost = [...cost];
+        total[ManaColour.Generic] += symbols * x;
+        return total;
     }
 
 

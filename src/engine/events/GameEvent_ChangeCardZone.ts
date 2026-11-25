@@ -11,6 +11,7 @@ type ZoneChangeOptions = {
     attachedTo?: Permanent;
     illegalAttachmentDestination?: Graveyard;
     targets?: readonly ActionTarget[];
+    chosenX?: number;
 };
 
 export class GameEvent_ChangeCardZone extends GameEvent {
@@ -36,7 +37,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         if (newZone instanceof Stack) {
             if (!options?.targets)
                 return false;
-            this.newObject = new Spell(oldObject.card, controller, options.targets);
+            this.newObject = new Spell(oldObject.card, controller, options.targets, options.chosenX);
         } else if (newZone instanceof Battlefield) {
             const permanent = new Permanent(oldObject.card, controller);
             const attachment = options?.attachedTo;

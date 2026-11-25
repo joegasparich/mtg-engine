@@ -1,5 +1,6 @@
 import type { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
+import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 import { GameEvent,GameEventType } from "./GameEventManager";
 
 export type PublicCardSelection = {
@@ -35,6 +36,9 @@ export type CardChoice = CardChoiceDetails & (
 export enum ResolutionChoiceKind {
     Card,
     ManaPayment,
+    SpellX,
+    DamagePreventionOrder,
+    DamagePreventionAllocation,
 }
 
 export type CardResolutionChoice = CardChoice & {
@@ -55,22 +59,57 @@ export type ManaPaymentChoice = {
     submit(player: Player, decision: ManaPaymentDecision): void;
 };
 
-export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice;
+export type SpellXChoice = {
+    readonly kind: ResolutionChoiceKind.SpellX;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly max: number;
+    submit(player: Player, x: number | null): void;
+};
+
+export type DamagePreventionOrderChoice = {
+    readonly kind: ResolutionChoiceKind.DamagePreventionOrder;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly options: readonly string[];
+    submit(player: Player, index: number): void;
+};
+
+export type DamagePreventionAllocationChoice = {
+    readonly kind: ResolutionChoiceKind.DamagePreventionAllocation;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly hits: readonly GameEvent_DealDamage[];
+    readonly total: number;
+    submit(player: Player, amounts: readonly number[]): void;
+};
+
+export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
+export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice | SpellXChoice | DamagePreventionChoice;
+
+function isDamagePreventionChoice(choice: ResolutionChoice): choice is DamagePreventionChoice {
+    return choice.kind === ResolutionChoiceKind.DamagePreventionOrder
+        || choice.kind === ResolutionChoiceKind.DamagePreventionAllocation;
+}
 
 export class GameEvent_RequestResolutionChoice extends GameEvent {
     type = GameEventType.RequestResolutionChoice;
+    override readonly duringDamagePrevention: boolean;
 
     constructor(readonly choice: ResolutionChoice) {
         super();
+        this.duringDamagePrevention = isDamagePreventionChoice(choice);
         this.label = `Player ${choice.player.id} must make a choice for ${choice.sourceName}`;
     }
 }
 
 export class GameEvent_SubmitResolutionChoice extends GameEvent {
     type = GameEventType.SubmitResolutionChoice;
+    override readonly duringDamagePrevention: boolean;
 
     constructor(readonly choice: ResolutionChoice, private readonly accept: () => boolean) {
         super();
+        this.duringDamagePrevention = isDamagePreventionChoice(choice);
         this.label = `Player ${choice.player.id} made a choice for ${choice.sourceName}`;
     }
 

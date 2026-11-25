@@ -38,11 +38,13 @@ export class CardObject extends GameObject {
     get owner() { return this.card.owner; }
     get def() { return this.card.def; }
     get logName() { return `${this.name} (${this.id})`; }
+    get resolvedDamageSource(): Permanent | undefined { return undefined; }
 
     name: string;
     private baseType: CardType;
     private baseSubtypes: readonly string[];
     cost?: ManaCost;
+    readonly variableManaSymbols: number;
     colours: ReadonlySet<CardColour>;
     private basePower: number;
     private baseToughness: number;
@@ -61,6 +63,7 @@ export class CardObject extends GameObject {
         this.toughness = def.toughness;
         if (def.cost)
             this.cost = [...ManaUtility.parseManaString<ManaCost>(def.cost)];
+        this.variableManaSymbols = ManaUtility.countVariableSymbols(def.cost);
         // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
         this.colours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
         this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
@@ -315,10 +318,15 @@ export class Permanent extends CardObject {
 export class Spell extends CardObject {
     readonly targets: readonly ActionTarget[];
     resolvedPermanent?: Permanent;
+    override get resolvedDamageSource() { return this.resolvedPermanent; }
 
-    constructor(card: Card, override readonly controller: Player, targets: readonly ActionTarget[]) {
+    constructor(card: Card, override readonly controller: Player, targets: readonly ActionTarget[],
+        readonly chosenX = 0) {
         super(card);
         this.targets = [...targets];
+        // 107.3a: X in the cost of a spell on the stack equals its announced value.
+        if (this.variableManaSymbols)
+            this.cost = ManaUtility.withX(this.cost, this.variableManaSymbols, chosenX);
     }
 }
 

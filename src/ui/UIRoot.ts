@@ -8,7 +8,7 @@ import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
-import { game } from "@engine/Game";
+import { game,type SpecialAction } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield, Zone } from "@engine/Zone";
 import { Step } from "@engine/Step";
@@ -184,6 +184,8 @@ export default class UIRoot extends PIXI.Container {
     private readonly selectionStatus = document.createElement('p');
     private readonly lifeTotalsPanel = document.createElement('aside');
     private readonly lifeTotals = new Map<Player, HTMLElement>();
+    private readonly specialActionControls = document.createElement('div');
+    private visibleSpecialActions: readonly SpecialAction[] = [];
 
     get cardSelection() {
         return this.resolutionChoice ? this.resolutionChoice.cardSelection : this.combat.cardSelection;
@@ -232,6 +234,7 @@ export default class UIRoot extends PIXI.Container {
         addDevCheckbox('Infinite mana (testing)', game.infiniteMana, enabled => {
             game.infiniteMana = enabled;
             playerActionManager.refreshCardActionsForUI();
+            this.syncSpecialActions();
         });
         addDevCheckbox('Auto-pass priority (testing)', game.autoPassPriority, enabled => {
             game.autoPassPriority = enabled;
@@ -255,8 +258,12 @@ export default class UIRoot extends PIXI.Container {
                 targets => {
                     targeter.remove();
                     request.onTargeted(targets);
+                    this.syncSpecialActions();
                 },
-                request.onCancelled
+                () => {
+                    request.onCancelled();
+                    this.syncSpecialActions();
+                }
             );
         });
 
@@ -282,6 +289,10 @@ export default class UIRoot extends PIXI.Container {
         const turnControls = [turnLabel, currentStepLabel, advanceButton];
         for (const control of turnControls)
             control.className = 'turn-control';
+        this.specialActionControls.className = 'turn-control special-action-controls';
+        this.specialActionControls.setAttribute('aria-label', 'Special actions');
+        document.body.append(this.specialActionControls);
+        gameEventManager.onPerformed(GameEventType.All, () => this.syncSpecialActions());
 
         const syncTurnControls = () => {
             const hidden = game.declarationPlayer || game.pendingCombatDamageChoice;
@@ -406,6 +417,7 @@ export default class UIRoot extends PIXI.Container {
         const cancel = () => {
             close();
             request.onCancelled();
+            this.syncSpecialActions();
         };
         const onSourceMoved = (event: GameEvent_ChangeCardZone) => {
             if (event.oldObject === request.source)
@@ -423,6 +435,7 @@ export default class UIRoot extends PIXI.Container {
             button.addEventListener('click', () => {
                 close();
                 request.onTargeted([player]);
+                this.syncSpecialActions();
             });
             choices.append(button);
         }
@@ -440,6 +453,22 @@ export default class UIRoot extends PIXI.Container {
         document.body.append(dialog);
         gameEventManager.onPerformed(GameEventType.ChangeCardZone, onSourceMoved);
         dialog.showModal();
+    }
+
+    private syncSpecialActions() {
+        const player = game.priorityPlayer;
+        const actions = player ? game.getSpecialActions(player) : [];
+        if (actions.length === this.visibleSpecialActions.length
+            && actions.every((action, index) => action === this.visibleSpecialActions[index]))
+            return;
+
+        this.visibleSpecialActions = actions;
+        this.specialActionControls.replaceChildren(...actions.map(action => {
+            const button = document.createElement('button');
+            button.textContent = action.label;
+            button.addEventListener('click', () => game.takeSpecialAction(player, action));
+            return button;
+        }));
     }
 
     onPlayerAdded(player: Player) {

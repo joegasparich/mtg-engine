@@ -79,7 +79,7 @@ class PlayerActionManager {
     }
 
     public playerHasActions(actor: Player, ignoreManaAbilities = false) {
-        return this.getAvailableActions(actor, ignoreManaAbilities).size > 0;
+        return game.getSpecialActions(actor).length > 0 || this.getAvailableActions(actor, ignoreManaAbilities).size > 0;
     }
 
     public getCardActions(object: CardObject, actor: Player, ignoreManaAbilities = false): PlayerAction[] {
@@ -127,6 +127,17 @@ class PlayerActionManager {
         const availableMana: ManaAmount = [...actor.manaPool];
         ManaUtility.addMana(availableMana, actor.getPotentialMana());
         return ManaUtility.canPay(cost, availableMana);
+    }
+
+    public maxAffordableX(object: CardObject, actor: Player): number {
+        const fixed = object.cost.reduce((total, amount) => total + amount, 0);
+        const available: ManaAmount = [...actor.manaPool];
+        ManaUtility.addMana(available, actor.getPotentialMana());
+        if (!game.infiniteMana && !ManaUtility.canPay(object.cost, available))
+            return -1;
+
+        const total = game.infiniteMana ? Number.MAX_SAFE_INTEGER : ManaUtility.asGeneric(available);
+        return Math.floor((total - fixed) / object.variableManaSymbols);
     }
 
     public payManaCost(cost: Readonly<ManaCost>, actor: Player): boolean {

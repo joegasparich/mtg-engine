@@ -1,11 +1,10 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
+import { DamagePreventionKind } from "@engine/effects/DamagePrevention";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
-import { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { CardChoicePresentation,CardChoiceVisibility } from "@engine/events/GameEvent_ResolutionChoice";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject,Spell } from "@engine/GameObject";
-import type Player from "@engine/Player";
 import type { CardColour } from "~/defs";
 import { AbilityPart_Effect } from "../effect/AbilityPart_Effect";
 
@@ -19,7 +18,10 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
         if (!player)
             return;
 
-        const options = this.getEligibleSources();
+        const { colour } = this;
+        const hasColour = (source: CardObject) => source.colours.has(colour);
+        const eligibleSources = () => this.getDamageSources().filter(hasColour);
+        const options = eligibleSources();
         if (options.length === 0)
             return;
 
@@ -32,10 +34,21 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
             visibility: CardChoiceVisibility.Public,
             earlierChoices: [],
             presentation: CardChoicePresentation.SingleCardList,
-        }, ([source]) => this.preventNextDamage(player, source), source => this.getEligibleSources().includes(source));
+        }, ([source]) => {
+            gameEventManager.startContinuousUntilEndOfTurn(this.ability, {
+                kind: ContinuousEffectKind.DamagePrevention,
+                prevention: {
+                    kind: DamagePreventionKind.NextHit,
+                    recipient: player,
+                    source,
+                    matches: ({ source }) => hasColour(source),
+                    equivalenceKey: colour,
+                },
+            });
+        }, source => eligibleSources().includes(source));
     }
 
-    private getEligibleSources(): CardObject[] {
+    private getDamageSources(): CardObject[] {
         // 609.7a: Permanents, spells, and objects referenced by the stack or waiting effects are eligible sources.
         const sources = new Set<CardObject>(game.players.flatMap(player => player.battlefield.objects));
         for (const entry of game.stack.objects) {
@@ -49,31 +62,6 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
         }
         for (const reference of gameEventManager.effects.getEventCheckReferences())
             sources.add(reference);
-        return [...sources].filter(source => source.colours.has(this.colour));
-    }
-
-    private preventNextDamage(player: Player, source: CardObject) {
-        // 609.7a: Follow a permanent spell into the permanent it becomes.
-        const references = () => source instanceof Spell && source.resolvedPermanent
-            ? [source, source.resolvedPermanent] : [source];
-        const end = gameEventManager.effects.startContinuous(this.ability, {
-            kind: ContinuousEffectKind.EventCheck,
-            beforeCommit: true,
-            references,
-            check: check => {
-                // 609.7b and 615.8–9: Recheck colour and use up the shield only when it prevents damage.
-                const removed = check.removeWhere(event => event instanceof GameEvent_DealDamage
-                    && event.recipient === player && event.canDealDamage() && references().includes(event.source)
-                    && event.source.colours.has(this.colour));
-                if (removed && check.committing)
-                    endShield();
-            },
-        });
-        // 514.2: An unused shield expires in cleanup.
-        const cancelCleanup = gameEventManager.onGamePerformed(GameEventType.Cleanup, endShield, { once: true });
-        function endShield() {
-            cancelCleanup();
-            end();
-        }
+        return [...sources];
     }
 }

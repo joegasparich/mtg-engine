@@ -1,8 +1,11 @@
+import type { Ability } from "@engine/abilities";
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
-import { type CardChoice,type CardResolutionChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
+import { type CardChoice,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
+import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
+import { GameEvent_TakeSpecialAction } from "@engine/events/GameEvent_TakeSpecialAction";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import { type CardObject,Spell } from "@engine/GameObject";
 import Player from "@engine/Player";
@@ -12,6 +15,12 @@ import { Step,StepIndex } from "@engine/Step";
 class GameOptions {
     allowAutoSkip = false;
 }
+
+export type SpecialAction = {
+    readonly player: Player;
+    readonly label: string;
+    readonly ability: Ability;
+};
 
 export default class Game {
     options: GameOptions;
@@ -34,12 +43,21 @@ export default class Game {
     declarationPlayer: Player | null = null;
     private resolutionChoice: ResolutionChoice | null = null;
     private combatDamageChoice: CombatDamageChoice | null = null;
+    private readonly specialActions = new Map<Ability, SpecialAction>();
 
     get pendingResolutionChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.Card ? this.resolutionChoice : null;
     }
     get pendingManaPaymentChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaPayment ? this.resolutionChoice : null;
+    }
+    get pendingSpellXChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.SpellX ? this.resolutionChoice : null;
+    }
+    get pendingDamagePreventionChoice() {
+        const choice = this.resolutionChoice;
+        return choice?.kind === ResolutionChoiceKind.DamagePreventionOrder
+            || choice?.kind === ResolutionChoiceKind.DamagePreventionAllocation ? choice : null;
     }
     get hasPendingResolutionChoice() { return this.resolutionChoice !== null; }
     get pendingCombatDamageChoice() { return this.combatDamageChoice; }
@@ -52,6 +70,8 @@ export default class Game {
 
     static init() {
         if (game) {
+            for (const ability of game.specialActions.keys())
+                game.removeSpecialAction(ability);
             for (const player of game.players) {
                 for (const zone of player.zones) {
                     for (const object of zone.objects)
@@ -67,7 +87,11 @@ export default class Game {
         game = new Game();
         gameEventManager.startGame(() => game.settleState(),
             () => game.hasPendingResolutionChoice || !!game.pendingCombatDamageChoice,
-            () => game.advanceWhileIdle());
+            () => game.advanceWhileIdle(), {
+                turnOrder: () => [...game.players.slice(game.currentTurnPlayerID), ...game.players.slice(0, game.currentTurnPlayerID)],
+                chooseEffect: (player, options, resume) => game.chooseDamagePreventionEffect(player, options, resume),
+                allocate: (player, hits, total, resume) => game.allocateDamagePrevention(player, hits, total, resume),
+            });
     }
 
     requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void,
@@ -138,6 +162,38 @@ export default class Game {
         gameEventManager.addEvent(new GameEvent_RequestCombatDamageChoice(choice));
     }
 
+    private chooseDamagePreventionEffect(player: Player, options: readonly string[], resume: (index: number) => void) {
+        const choice: DamagePreventionOrderChoice = {
+            kind: ResolutionChoiceKind.DamagePreventionOrder,
+            player,
+            sourceName: "Damage prevention",
+            options,
+            submit: (actor, index) => this.submitResolutionChoice(choice, actor,
+                () => Number.isInteger(index) && index >= 0 && index < options.length, () => resume(index)),
+        };
+        this.openResolutionChoice(choice);
+    }
+
+    private allocateDamagePrevention(player: Player, hits: readonly GameEvent_DealDamage[], total: number,
+        resume: (amounts: readonly number[]) => void) {
+        const choice: DamagePreventionAllocationChoice = {
+            kind: ResolutionChoiceKind.DamagePreventionAllocation,
+            player,
+            sourceName: "Damage prevention",
+            hits,
+            total,
+            submit: (actor, amounts) => {
+                const selection = [...amounts];
+                this.submitResolutionChoice(choice, actor,
+                    () => selection.length === hits.length
+                        && selection.every((amount, i) => Number.isSafeInteger(amount) && amount >= 0 && amount <= hits[i].amount)
+                        && selection.reduce((sum, amount) => sum + amount, 0) === total,
+                    () => resume(selection));
+            },
+        };
+        this.openResolutionChoice(choice);
+    }
+
     addPlayer(deck: number[]): Player {
         const id = this.players.length;
         const player = new Player(id, deck);
@@ -200,6 +256,50 @@ export default class Game {
     notePriorityAction() {
         // 117.3c, 117.4: A player retains priority after acting and starts a new round of passes.
         this.passes = 0;
+    }
+
+    registerSpecialActionUntilEndOfTurn(action: SpecialAction) {
+        const { ability } = action;
+        if (!ability.activatable || this.specialActions.has(ability))
+            return;
+
+        ability.slate.CONTROLLER = [action.player];
+        ability.setup();
+        this.specialActions.set(ability, action);
+        // 514.2: The permission and its ability parts expire during cleanup.
+        gameEventManager.onGamePerformed(GameEventType.Cleanup, () => this.removeSpecialAction(ability), { once: true });
+    }
+
+    private removeSpecialAction(ability: Ability) {
+        if (this.specialActions.delete(ability))
+            ability.cleanup();
+    }
+
+    getSpecialActions(player: Player) {
+        if (player !== this.priorityPlayer || this.declarationPlayer)
+            return [];
+
+        return [...this.specialActions.values()].filter(action => action.player === player && action.ability.canActivate());
+    }
+
+    takeSpecialAction(player: Player, action: SpecialAction) {
+        if (game !== this || !this.canTakeSpecialAction(player, action))
+            return;
+
+        gameEventManager.addEvent(new GameEvent_TakeSpecialAction(`Player ${player.id} · ${action.label}`, () => {
+            if (game !== this || !this.canTakeSpecialAction(player, action) || !action.ability.payActivationCost())
+                return false;
+
+            // 116.2c and 116.3: A resolving effect can authorize an immediate action at priority.
+            this.notePriorityAction();
+            action.ability.resolveActivation();
+            return true;
+        }));
+    }
+
+    private canTakeSpecialAction(player: Player, action: SpecialAction) {
+        return player === this.priorityPlayer && !this.declarationPlayer && action?.player === player
+            && this.specialActions.get(action.ability) === action && action.ability.canActivate();
     }
 
     private passPriority(player: Player): boolean {

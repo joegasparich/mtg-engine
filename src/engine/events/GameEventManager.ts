@@ -1,4 +1,7 @@
-import { type CheckListener,type CheckRemovalOverride,type CheckSource,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
+import type { Ability } from "@engine/abilities";
+import type { DamagePreventionChoices } from "@engine/effects/DamagePrevention";
+import { type CheckListener,type CheckRemovalOverride,type CheckSource,type ContinuousEffect,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
+import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 
 export type { CheckSource,EventCheck } from "@engine/effects/EffectSystem";
 
@@ -44,6 +47,7 @@ export enum GameEventType {
     DrawCards,
     CheckBasicLandType,
     RegeneratePermanent,
+    TakeSpecialAction,
 }
 
 export abstract class GameEvent {
@@ -52,6 +56,7 @@ export abstract class GameEvent {
     isAction = true;
     effect?: OneShotEffect;
     readonly additionalPerformedTypes?: readonly GameEventType[];
+    readonly duringDamagePrevention?: boolean;
     callback: () => void;
 
     perform(): boolean {
@@ -75,6 +80,10 @@ export class GameEvent_Log extends GameEvent {
 
 type Listener = (event: GameEvent) => void;
 
+function isDamage(event: GameEvent): event is GameEvent_DealDamage {
+    return event.type === GameEventType.DealDamage;
+}
+
 interface GameSubscriptionOptions<T extends GameEvent> {
     once?: boolean;
     matches?: (event: T) => boolean;
@@ -91,19 +100,26 @@ class GameEventManager {
     private settleState?: () => boolean;
     private waitingForChoice?: () => boolean;
     private advanceWhileIdle?: () => boolean;
+    private damageChoices: DamagePreventionChoices;
+    private damagePending = false;
+    private currentBatch: GameEvent[] = [];
 
-    startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean) {
+    startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean,
+        damageChoices: DamagePreventionChoices) {
         for (const listeners of this.gameListenersByType.values())
             listeners.clear();
         this.gameListenersByType.clear();
         this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
+        this.currentBatch.length = 0;
+        this.damagePending = false;
         this.eventsResolvedCallback.length = 0;
         this.resolutionSteps.length = 0;
         this.idleCallbacks.length = 0;
         this.settleState = settle;
         this.waitingForChoice = waitingForChoice;
         this.advanceWhileIdle = advanceWhileIdle;
+        this.damageChoices = damageChoices;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -161,6 +177,12 @@ class GameEventManager {
         this.effects.offCheckRemovalOverride(override);
     }
 
+    startContinuousUntilEndOfTurn(ability: Ability, effect: ContinuousEffect) {
+        // 514.2: End turn-limited effects during cleanup.
+        const end = this.effects.startContinuous(ability, effect);
+        this.onGamePerformed(GameEventType.Cleanup, end, { once: true });
+    }
+
     activeEvents: GameEvent[] = [];
     performingEvents: boolean;
 
@@ -176,25 +198,52 @@ class GameEventManager {
 
     checkEvent(event: GameEvent) {
         const checked = this.checkForEffects([event], event);
-        return !!checked && !!this.effects.checkEvents([checked], checked, EventCheckPhase.PreviewCommit);
+        const preview = checked && this.effects.checkEvents([checked], checked, EventCheckPhase.PreviewCommit);
+        return !!preview && (!isDamage(preview) || this.effects.damagePrevention.preview(preview));
     }
 
     performImmediate(event: GameEvent): boolean {
+        if (this.damagePending) {
+            this.addEvent(event);
+            return false;
+        }
+
         const events = [event];
         const checkedEvent = this.checkForEffects(events, event);
         let performed = false;
-        for (const pending of events) {
+        for (const [index, pending] of events.entries()) {
             const result = this.performEvent(pending);
             if (pending === checkedEvent)
                 performed = result;
+            if (this.damagePending) {
+                this.currentBatch.unshift(...events.slice(index + 1));
+                break;
+            }
         }
         return performed;
     }
 
     performSimultaneous(events: GameEvent[]): boolean {
+        if (this.damagePending) {
+            const batch = [...events];
+            this.onResolved(() => this.performSimultaneous(batch));
+            return false;
+        }
+
         this.checkForEffects(events);
+        if (events.some(isDamage)) {
+            let performed = false;
+            const prepared = events.flatMap(event => this.prepareEvent(event).events);
+            this.commitPrepared(prepared, results => { performed = this.notifySimultaneous(results); });
+            return performed;
+        }
+
+        const performed = events.flatMap(event => this.prepareEvent(event).events.filter(pending => pending.perform()));
+        return this.notifySimultaneous(performed);
+    }
+
+    private notifySimultaneous(performed: GameEvent[]): boolean {
         // 704.3: Commit the whole batch before any listener observes its results.
-        const performed = events.flatMap(event => this.commitEvent(event).performed);
         const notifications = performed.map(event => ({ event, listeners: this.getGameListeners(event) }));
         for (const { event, listeners } of notifications)
             this.notifyPerformed(event, listeners);
@@ -229,12 +278,18 @@ class GameEventManager {
 
         try {
             for (;;) {
-                if (this.activeEvents.length > 0) {
-                    const events = this.activeEvents;
+                if (this.damagePending) {
+                    // 510.2: Suspend the whole damage batch while processing its choice events.
+                    const index = this.activeEvents.findIndex(event => event.duringDamagePrevention);
+                    if (index < 0)
+                        break;
+                    const [event] = this.activeEvents.splice(index, 1);
+                    this.performEvent(event);
+                } else if (this.currentBatch.length > 0) {
+                    this.performEvent(this.currentBatch.shift());
+                } else if (this.activeEvents.length > 0) {
+                    this.currentBatch = this.activeEvents;
                     this.activeEvents = [];
-                    for (const event of events) {
-                        this.performEvent(event);
-                    }
                 } else if (this.waitingForChoice?.()) {
                     // 117.2e: Process input events before resuming the current game action.
                     break;
@@ -258,16 +313,49 @@ class GameEventManager {
     }
 
     private performEvent(event: GameEvent): boolean {
-        const { performed, checked } = this.commitEvent(event);
-        for (const pending of performed)
-            this.notifyPerformed(pending);
-        return performed.includes(checked);
+        const { events, checked } = this.prepareEvent(event);
+        let performed = false;
+        this.commitPrepared(events, (results, checkedPerformed) => {
+            for (const pending of results)
+                this.notifyPerformed(pending);
+            performed = checkedPerformed;
+        }, checked);
+        return performed;
     }
 
-    private commitEvent(event: GameEvent) {
+    private prepareEvent(event: GameEvent) {
         const events = [event];
         const checked = this.effects.checkEvents(events, event, EventCheckPhase.Commit);
-        return { performed: events.filter(pending => pending.perform()), checked };
+        return { events, checked };
+    }
+
+    private commitPrepared(events: GameEvent[], notify: (performed: GameEvent[], checkedPerformed: boolean) => void,
+        checked?: GameEvent) {
+        const commit = (amounts?: readonly number[]) => {
+            const performed: GameEvent[] = [];
+            let checkedPerformed = false;
+            let hitIndex = 0;
+            for (const event of events) {
+                const actual = amounts && isDamage(event) ? event.withAmount(amounts[hitIndex++]) : event;
+                if (actual.perform()) {
+                    performed.push(actual);
+                    checkedPerformed ||= event === checked;
+                }
+            }
+            notify(performed, checkedPerformed);
+        };
+
+        const hits = events.filter(isDamage);
+        if (!hits.length) {
+            commit();
+            return;
+        }
+
+        this.damagePending = true;
+        this.effects.damagePrevention.resolve(hits, this.damageChoices, amounts => {
+            this.damagePending = false;
+            commit(amounts);
+        });
     }
 
     private getGameListeners(event: GameEvent): Listener[] {

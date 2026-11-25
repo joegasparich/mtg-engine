@@ -1,4 +1,4 @@
-import { CardChoicePresentation,CardChoiceVisibility,ManaPaymentDecision,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
+import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,ManaPaymentDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
@@ -9,6 +9,7 @@ export class UIResolutionChoice {
     private readonly confirm = document.createElement("button");
     private readonly selection?: UICardSelection;
     private readonly optionsList?: HTMLUListElement;
+    private firstInput?: HTMLInputElement;
     private handoff?: HTMLDialogElement;
 
     constructor(private readonly root: UIRoot, private readonly choice: ResolutionChoice) {
@@ -26,6 +27,30 @@ export class UIResolutionChoice {
             this.confirm.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Pay));
             decline.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Decline));
             this.panel.append(this.confirm, decline);
+            return;
+        }
+        if (choice.kind === ResolutionChoiceKind.SpellX) {
+            this.addSpellXForm(choice);
+            return;
+        }
+        if (choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
+            const prompt = document.createElement("p");
+            prompt.textContent = "Choose a prevention effect to apply next.";
+            const list = this.optionsList = document.createElement("ul");
+            list.className = "resolution-card-options";
+            choice.options.forEach((description, index) => {
+                const item = document.createElement("li");
+                const option = document.createElement("button");
+                option.textContent = description;
+                option.addEventListener("click", () => choice.submit(choice.player, index));
+                item.append(option);
+                list.append(item);
+            });
+            this.panel.append(prompt, list);
+            return;
+        }
+        if (choice.kind === ResolutionChoiceKind.DamagePreventionAllocation) {
+            this.addDamageAllocationForm(choice);
             return;
         }
 
@@ -49,8 +74,7 @@ export class UIResolutionChoice {
                 const player = card.controller ?? card.owner;
                 const location = card.zone?.name.toLowerCase() ?? "left its zone";
                 const tapped = card instanceof Permanent && card.tapped && !card.retired ? ", tapped" : "";
-                const copy = choice.options.some(other => other !== card && other.name === card.name) ? ` #${card.id}` : "";
-                option.textContent = `${card.name}${copy} · Player ${player.id}, ${location}${tapped}`;
+                option.textContent = `${card.name} · Player ${player.id}, ${location}${tapped}`;
                 option.addEventListener("click", () => select(card));
                 item.append(option);
                 list.append(item);
@@ -87,8 +111,67 @@ export class UIResolutionChoice {
             return this.selection;
     }
 
+    private addSpellXForm(choice: SpellXChoice) {
+        const form = document.createElement("form");
+        form.className = "numeric-choice-form";
+        const input = this.addNumberInput(form, "Value of X", choice.max);
+        this.confirm.textContent = "Continue";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => choice.submit(choice.player, null));
+        form.addEventListener("keydown", event => {
+            if (event.key === "Escape")
+                choice.submit(choice.player, null);
+        });
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            choice.submit(choice.player, input.valueAsNumber);
+        });
+        form.append(cancel, this.confirm);
+        this.panel.append(form);
+    }
+
+    private addDamageAllocationForm(choice: DamagePreventionAllocationChoice) {
+        const form = document.createElement("form");
+        form.className = "numeric-choice-form";
+        const prompt = document.createElement("p");
+        prompt.textContent = `Prevent ${choice.total} damage to ${choice.hits[0].recipientName}.`;
+        form.append(prompt);
+        const inputs = choice.hits.map(hit => this.addNumberInput(form, `${hit.source.name} · ${hit.amount} damage`, hit.amount));
+        this.status.setAttribute("role", "status");
+        this.confirm.textContent = "Confirm prevention";
+        const update = () => {
+            const assigned = inputs.reduce((sum, input) => sum + (input.valueAsNumber || 0), 0);
+            this.status.textContent = `${assigned} of ${choice.total} damage prevented`;
+            this.confirm.disabled = assigned !== choice.total || inputs.some(input => !input.validity.valid);
+        };
+        form.addEventListener("input", update);
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            choice.submit(choice.player, inputs.map(input => input.valueAsNumber));
+        });
+        form.append(this.status, this.confirm);
+        this.panel.append(form);
+        update();
+    }
+
+    private addNumberInput(form: HTMLFormElement, description: string, max: number) {
+        const label = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = "0";
+        input.min = "0";
+        input.max = String(max);
+        input.required = true;
+        this.firstInput ??= input;
+        label.append(description, input);
+        form.append(label);
+        return input;
+    }
+
     open() {
-        if (this.choice.kind === ResolutionChoiceKind.ManaPayment || this.choice.visibility === CardChoiceVisibility.Public) {
+        if (this.choice.kind !== ResolutionChoiceKind.Card || this.choice.visibility === CardChoiceVisibility.Public) {
             this.showPanel();
             return;
         }
@@ -134,7 +217,10 @@ export class UIResolutionChoice {
         document.body.append(this.panel);
         if (this.choice.kind === ResolutionChoiceKind.ManaPayment)
             this.confirm.focus();
-        else if (this.optionsList)
+        else if (this.firstInput) {
+            this.firstInput.focus();
+            this.firstInput.select();
+        } else if (this.optionsList)
             this.optionsList.querySelector("button")?.focus();
         else
             this.root.focusCardSelection();

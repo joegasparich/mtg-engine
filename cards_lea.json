@@ -543,6 +543,28 @@
         ]
     },
     {
+        "name": "Guardian Angel",
+        "image_url": "https://cards.scryfall.io/large/front/e/7/e74b0d4c-2a22-46ff-a852-d44306c5a731.jpg?1783919582",
+        "oracle_text": "Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this turn.",
+        "type": "Instant",
+        "cost": "{X}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "saveAs": "RECIPIENT",
+                        "validTargets": ["Player", "Card"],
+                        "targetValidator": { "cardType": "Creature", "onBattlefield": true }
+                    },
+                    "AbilityPart_Effect_GuardianAngel": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "target": "RECIPIENT"
+                    }
+                }
+            }
+        ]
+    },
+    {
         "name": "Farmstead",
         "image_url": "https://cards.scryfall.io/large/front/0/b/0b4a1194-ce5d-4491-9700-1a1abc6ee8e4.jpg?1783919584",
         "oracle_text": "Enchant land\nEnchanted land has \"At the beginning of your upkeep, you may pay {W}{W}. If you do, you gain 1 life.\"",

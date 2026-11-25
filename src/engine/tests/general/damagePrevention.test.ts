@@ -1,12 +1,14 @@
 import { PlayerActions } from "@engine/actions";
-import { GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToStep } from "@engine/events";
+import { DamagePreventionKind } from "@engine/effects/DamagePrevention";
+import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import { GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToStep,ResolutionChoiceKind } from "@engine/events";
 import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { type CardObject,type Permanent,Spell } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { addTestCard,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -42,6 +44,185 @@ function hit(source: CardObject, amount = 2) {
     return new GameEvent_DealDamage(source, protectedPlayer, amount);
 }
 
+function shield(recipient: Player | Permanent, amount: number) {
+    const permanent = addTestCard({ ...redCircle, name: "Finite shield" }, protectedPlayer, protectedPlayer.battlefield);
+    gameEventManager.startContinuousUntilEndOfTurn(permanent.abilities[0], {
+        kind: ContinuousEffectKind.DamagePrevention,
+        prevention: { kind: DamagePreventionKind.Points, recipient, amount },
+    });
+}
+
+test("a finite shield carries over and observers see only damage that was actually dealt", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    shield(protectedPlayer, 3);
+    expect(gameEventManager.checkEvent(hit(source, 3))).toBe(false);
+    expect(gameEventManager.checkEvent(hit(source, 4))).toBe(true);
+    expect(gameEventManager.checkEvent(hit(source, 3))).toBe(false);
+    const notify = vi.fn();
+    gameEventManager.onGamePerformed(GameEventType.DealDamage, notify);
+
+    gameEventManager.addEvent(hit(source, 1));
+    expect(protectedPlayer.life).toBe(20);
+    expect(notify).not.toHaveBeenCalled();
+
+    const incoming = hit(source, 3);
+    const callback = vi.fn();
+    incoming.then(callback);
+    gameEventManager.effects.resolveOneShot(circle.abilities[0], effect => { incoming.effect = effect; });
+    expect(gameEventManager.performImmediate(incoming)).toBe(true);
+    expect(protectedPlayer.life).toBe(19);
+    expect(notify).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ amount: 1, source, effect: incoming.effect }));
+    expect(callback).toHaveBeenCalledTimes(1);
+    gameEventManager.addEvent(hit(source));
+    expect(protectedPlayer.life).toBe(17);
+});
+
+test("a next-hit shield evaluates its source predicate when damage would be dealt", () => {
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
+        kind: ContinuousEffectKind.DamagePrevention,
+        prevention: {
+            kind: DamagePreventionKind.NextHit,
+            recipient: protectedPlayer,
+            source: attacker,
+            matches: ({ source }) => source.power >= 2,
+        },
+    });
+
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
+    attacker.power = 2;
+    expect(gameEventManager.checkEvent(hit(attacker))).toBe(false);
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(16);
+});
+
+test("different next-hit shield keys preserve the choice of which shield to spend", () => {
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    attacker.power = 2;
+    for (const minimumPower of [1, 2]) {
+        gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
+            kind: ContinuousEffectKind.DamagePrevention,
+            prevention: {
+                kind: DamagePreventionKind.NextHit,
+                recipient: protectedPlayer,
+                source: attacker,
+                matches: ({ source }) => source.power >= minimumPower,
+                equivalenceKey: minimumPower,
+            },
+        });
+    }
+
+    gameEventManager.addEvent(hit(attacker));
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a prevention order choice");
+    expect(choice.options).toHaveLength(2);
+    choice.submit(protectedPlayer, 1);
+
+    attacker.power = 1;
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(20);
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
+});
+
+test("the affected creature's controller allocates prevention before any hit commits", () => {
+    const red = addTestCard(redCreature, protectedPlayer, protectedPlayer.battlefield);
+    const green = addTestCard(cardData[GRIZZLY_BEARS], protectedPlayer, protectedPlayer.battlefield);
+    const creature = addTestCard({ ...redCreature, toughness: 4 }, opponent, opponent.battlefield);
+    shield(creature, 2);
+    const observed: [CardObject, number, number][] = [];
+    gameEventManager.onGamePerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
+        observed.push([event.source, creature.damageTaken, protectedPlayer.life]);
+    });
+
+    gameEventManager.performSimultaneous([
+        new GameEvent_DealDamage(red, creature, 2),
+        new GameEvent_DealDamage(green, creature, 2),
+        hit(red, 1),
+    ]);
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionAllocation)
+        throw new Error("Expected a prevention allocation");
+    expect(choice.player).toBe(opponent);
+    expect(choice.hits.map(hit => hit.source)).toEqual([red, green]);
+    expect(game.priorityPlayer).toBeNull();
+    expect(creature.damageTaken).toBe(0);
+    expect(protectedPlayer.life).toBe(20);
+    choice.submit(protectedPlayer, [2, 0]);
+    choice.submit(opponent, [3, -1]);
+    choice.submit(opponent, [1, 0]);
+    expect(game.pendingDamagePreventionChoice).toBe(choice);
+
+    gameEventManager.addEvent(new GameEvent_DealDamage(green, opponent, 1));
+    expect(observed).toEqual([]);
+    choice.submit(opponent, [2, 0]);
+    expect(game.pendingDamagePreventionChoice).toBeNull();
+    expect(observed).toEqual([[green, 2, 19], [red, 2, 19], [green, 2, 19]]);
+    expect(opponent.life).toBe(19);
+});
+
+test("simultaneous prevention choices are made with the turn player first", () => {
+    const red = addTestCard(redCreature, opponent, opponent.battlefield);
+    const green = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    shield(protectedPlayer, 1);
+    shield(opponent, 1);
+    gameEventManager.performSimultaneous([red, green].map(source => new GameEvent_DealDamage(source, opponent, 1))
+        .concat([red, green].map(source => hit(source, 1))));
+    const first = game.pendingDamagePreventionChoice;
+    if (first?.kind !== ResolutionChoiceKind.DamagePreventionAllocation)
+        throw new Error("Expected the turn player's allocation");
+    expect(first.player).toBe(protectedPlayer);
+    first.submit(protectedPlayer, [1, 0]);
+    const second = game.pendingDamagePreventionChoice;
+    if (second?.kind !== ResolutionChoiceKind.DamagePreventionAllocation)
+        throw new Error("Expected the opponent's allocation");
+    expect(second.player).toBe(opponent);
+    expect([protectedPlayer.life, opponent.life]).toEqual([20, 20]);
+    second.submit(opponent, [0, 1]);
+    expect([protectedPlayer.life, opponent.life]).toEqual([19, 19]);
+});
+
+test.each([true, false])("the affected player can apply the Circle first: %s", circleFirst => {
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    const other = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    activate();
+    choose(attacker);
+    shield(protectedPlayer, 1);
+
+    gameEventManager.addEvents([hit(attacker), hit(other, 1)]);
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a prevention order choice");
+    expect(choice.player).toBe(protectedPlayer);
+    expect(choice.options[0]).toContain("Circle of Protection");
+    expect(choice.options[1]).toContain("Finite shield");
+    expect(protectedPlayer.life).toBe(20);
+    choice.submit(protectedPlayer, circleFirst ? 0 : 1);
+    expect(game.pendingDamagePreventionChoice).toBeNull();
+    expect(protectedPlayer.life).toBe(circleFirst ? 20 : 19);
+});
+
+test("applying protection first saves a finite shield for damage of a different colour", () => {
+    const red = addTestCard(redCreature, opponent, opponent.battlefield);
+    const green = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    const creature = addTestCard({
+        ...cardData[GRIZZLY_BEARS], abilities: [{ parts: { AbilityPart_Protection: { colour: "R" } } }],
+    }, protectedPlayer, protectedPlayer.battlefield);
+    shield(creature, 1);
+    gameEventManager.addEvent(new GameEvent_DealDamage(red, creature, 1));
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a prevention order choice");
+    expect(choice.options[0]).toBe(`${creature.name} · prevent 1 damage from ${red.name} to ${creature.name}`);
+    choice.submit(protectedPlayer, 0);
+    gameEventManager.addEvent(new GameEvent_DealDamage(green, creature, 1));
+    expect(creature.damageTaken).toBe(0);
+});
+
 test("copies of a shield are consumed one at a time by committed positive damage", () => {
     const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
     activate();
@@ -55,6 +236,7 @@ test("copies of a shield are consumed one at a time by committed positive damage
     const notify = vi.fn();
     const stopListening = gameEventManager.onGamePerformed(GameEventType.DealDamage, notify);
     gameEventManager.performSimultaneous([hit(attacker), hit(attacker)]);
+    expect(game.pendingDamagePreventionChoice).toBeNull();
     expect(protectedPlayer.life).toBe(20);
     expect(notify).not.toHaveBeenCalled();
     expect(gameEventManager.performImmediate(hit(attacker))).toBe(true);
@@ -219,4 +401,28 @@ test("a Circle protects its controller from the chosen unblocked attacker in com
     expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
     expect(opponent.life).toBe(19);
     expect(protectedPlayer.life).toBe(20);
+});
+
+test("combat waits for prevention allocation before dealing damage and granting priority", () => {
+    const first = addTestCard(redCreature, protectedPlayer, protectedPlayer.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], protectedPlayer, protectedPlayer.battlefield);
+    shield(opponent, 1);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [first, second])
+        new PlayerActions.DeclareAttacker(attacker).perform(protectedPlayer, [opponent]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+    gameEventManager.addEvent(new GameEvent_Advance(opponent));
+    passPriorityRound();
+
+    expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+    expect(game.priorityPlayer).toBeNull();
+    expect(opponent.life).toBe(20);
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionAllocation)
+        throw new Error("Expected a prevention allocation");
+    expect(choice.player).toBe(opponent);
+    expect(choice.hits.map(hit => hit.source)).toEqual([first, second]);
+    choice.submit(opponent, [0, 1]);
+    expect(opponent.life).toBe(18);
+    expect(game.priorityPlayer).toBe(protectedPlayer);
 });

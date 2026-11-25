@@ -66,6 +66,173 @@ describe("Disenchant", () => {
     });
 });
 
+describe("Guardian Angel", () => {
+    const def = cardData.find(card => card.name === "Guardian Angel");
+    const plains = cardData.find(card => card.name === "Plains");
+    const damageSpellDef: CardDef = {
+        ...cardData[ANCESTRAL_RECALL],
+        name: "Test damage spell",
+        type: CardType.Instant,
+        cost: "{R}",
+        abilities: [{ parts: {
+            AbilityPart_Target: {
+                saveAs: "VICTIM", validTargets: ["Card"],
+                targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+            },
+            AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "VICTIM", amount: 3 },
+        } }],
+    };
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    function cast(x: number, target: Player | Permanent) {
+        const [action] = playerActionManager.getCardActions(card, caster);
+        action.perform(caster);
+        game.pendingSpellXChoice.submit(caster, x);
+        game.pendingTargeter.onTargeted([target]);
+        expect(game.stack.objects.at(-1)).toMatchObject({ card: card.card, chosenX: x, targets: [target] });
+    }
+
+    test("pays {X}{W} and prevents damage to the chosen player across hits", () => {
+        const whiteSource = addTestCard(plains, caster, caster.battlefield);
+        const genericSource = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], caster, caster.battlefield);
+        caster.manaPool[ManaColour.R] = 1;
+        const [action] = playerActionManager.getCardActions(card, caster);
+        action.perform(caster);
+
+        expect(game.pendingTargeter).toBeNull();
+        expect(game.pendingSpellXChoice.max).toBe(2);
+        game.pendingSpellXChoice.submit(caster, 2);
+        expect(game.pendingTargeter.validateTargets([whiteSource])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([source])).toBe(true);
+        expect(whiteSource.tapped || genericSource.tapped).toBe(false);
+        game.pendingTargeter.onTargeted([opponent]);
+        expect([whiteSource.tapped, genericSource.tapped]).toEqual([true, true]);
+        expect(caster.manaPool[ManaColour.R]).toBe(0);
+        expect(game.stack.objects.at(-1)).toMatchObject({ chosenX: 2 });
+        passPriorityRound();
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, opponent, 1));
+        expect(opponent.life).toBe(20);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, caster, 1));
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, opponent, 3));
+        expect([caster.life, opponent.life]).toEqual([19, 18]);
+    });
+
+    test("X = 0 still allows repeat payments with a damaging spell on the stack", () => {
+        const victim = addTestCard(cardData.find(def => def.name === "Air Elemental"), opponent, opponent.battlefield);
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        const untappedLand = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const damageSpell = addTestCard(damageSpellDef, opponent, opponent.hand);
+        caster.manaPool[ManaColour.W] = 1;
+        caster.manaPool[ManaColour.G] = 1;
+        cast(0, victim);
+        const spell = game.stack.objects.at(-1);
+        passPriorityRound();
+        expect(caster.graveyard.objects[0].card).toBe(card.card);
+        moveTestCard(caster.graveyard.objects[0], caster.hand);
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, victim, 1));
+        expect(victim.damageTaken).toBe(1);
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        expect(game.getSpecialActions(opponent)).toEqual([]);
+        opponent.manaPool[ManaColour.R] = 1;
+        new PlayerActions.PlayCard(damageSpell).perform(opponent);
+        game.pendingTargeter.onTargeted([victim]);
+        gameEventManager.addEvent(new GameEvent_Advance(opponent));
+
+        const [payment] = game.getSpecialActions(caster);
+        expect(payment.label).toBe("Pay {1} to prevent 1 damage to Air Elemental");
+        expect(payment.ability.source).toBe(spell);
+        expect(spell.retired).toBe(true);
+        game.takeSpecialAction(caster, payment);
+        expect(untappedLand.tapped).toBe(false);
+        game.takeSpecialAction(caster, payment);
+        expect(untappedLand.tapped).toBe(true);
+        expect(game.getSpecialActions(caster)).toEqual([]);
+        expect(game.priorityPlayer).toBe(caster);
+        expect(game.stack.objects).toHaveLength(1);
+
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        expect(game.priorityPlayer).toBe(opponent);
+        expect(game.stack.objects).toHaveLength(1);
+        gameEventManager.addEvent(new GameEvent_Advance(opponent));
+        expect(victim.damageTaken).toBe(2);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("X = 1 and a paid shield both prevent damage without a redundant order choice", () => {
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 3;
+        cast(1, caster);
+        passPriorityRound();
+        const [payment] = game.getSpecialActions(caster);
+        game.takeSpecialAction(caster, payment);
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, caster, 2));
+        expect(game.pendingDamagePreventionChoice).toBeNull();
+        expect(caster.life).toBe(20);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, caster, 1));
+        expect(caster.life).toBe(19);
+    });
+
+    test("a target that leaves before resolution prevents the spell from creating either effect", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 3;
+        cast(1, creature);
+        const returned = moveTestCard(moveTestCard(creature, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+
+        expect(caster.graveyard.objects[0].card).toBe(card.card);
+        expect(game.getSpecialActions(caster)).toEqual([]);
+        gameEventManager.addEvent(new GameEvent_DealDamage(returned, returned, 1));
+        expect(returned.damageTaken).toBe(1);
+    });
+
+    test("shields and later payments refer to the original creature and expire at cleanup", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 4;
+        cast(1, creature);
+        passPriorityRound();
+        const [payment] = game.getSpecialActions(caster);
+        const returned = moveTestCard(moveTestCard(creature, opponent.hand), opponent.battlefield);
+        game.takeSpecialAction(caster, payment);
+        gameEventManager.addEvent(new GameEvent_DealDamage(returned, returned, 1));
+        expect(returned.damageTaken).toBe(1);
+
+        const next = addTestCard(def, caster, caster.hand);
+        caster.manaPool[ManaColour.W] = 2;
+        new PlayerActions.PlayCard(next).perform(caster);
+        game.pendingSpellXChoice.submit(caster, 1);
+        game.pendingTargeter.onTargeted([caster]);
+        passPriorityRound();
+        const source = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, caster, 1));
+        expect(caster.life).toBe(19);
+        expect(returned.damageTaken).toBe(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+        // The next main phase belongs to the opponent. Give the original caster priority again.
+        gameEventManager.addEvent(new GameEvent_Advance(opponent));
+        expect(game.priorityPlayer).toBe(caster);
+        caster.manaPool[ManaColour.W] = 1;
+        expect(game.getSpecialActions(caster)).toEqual([]);
+        game.takeSpecialAction(caster, payment);
+        expect(caster.manaPool[ManaColour.W]).toBe(1);
+    });
+});
+
 describe("Farmstead", () => {
     const def = cardData.find(card => card.name === "Farmstead");
     const plains = cardData.find(card => card.name === "Plains");

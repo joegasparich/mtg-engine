@@ -5,6 +5,7 @@ import { GameEvent_StackAbilityChanged } from "@engine/events/GameEvent_StackAbi
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject,Spell,StackAbility } from "@engine/GameObject";
+import { ManaColour } from "@engine/mana";
 import type Player from "@engine/Player";
 import { Zone } from "@engine/Zone";
 import { CardType } from "~/defs";
@@ -32,16 +33,21 @@ export class Stack extends Zone<Spell | StackAbility> {
             gameEventManager.addEvent(new GameEvent_StackAbilityChanged(object, false));
     }
 
-    spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = []): boolean {
+    spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = [], chosenX = 0): boolean {
         if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
             return false;
 
-        // 601.2c
+        // 107.3a and 601.2b–c: Announce X and targets for this particular spell.
+        const variable = handObject.variableManaSymbols;
+        const generic = (handObject.cost?.[ManaColour.Generic] ?? 0) + variable * chosenX;
+        if (!Number.isSafeInteger(chosenX) || chosenX < 0 || !Number.isSafeInteger(generic) || (!variable && chosenX !== 0))
+            return false;
+
         const targeter = handObject.spellTargeter;
         if (targeter ? !targeter.validateTargets(targets) : targets.length > 0)
             return false;
 
-        const move = new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets });
+        const move = new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets, chosenX });
         if (gameEventManager.performingEvents)
             return gameEventManager.performImmediate(move);
 
