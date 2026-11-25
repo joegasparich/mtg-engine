@@ -146,5 +146,37 @@
         "power": 1,
         "toughness": 1,
         "abilities": [{ "keyword": "banding" }]
+    },
+    {
+        "name": "Black Ward",
+        "image_url": "https://cards.scryfall.io/large/front/7/b/7b298f64-b912-47ae-87f2-ef2a944b8ce2.jpg",
+        "oracle_text": "Enchant creature\nEnchanted creature has protection from black. This effect doesn't remove this Aura.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_GrantAttachedAbility": {
+                        "saveAs": "GRANTED_PROTECTION",
+                        "grant": {
+                            "parts": {
+                                "AbilityPart_Protection": { "colour": "B" }
+                            }
+                        }
+                    },
+                    "AbilityPart_KeepGrantingAuraAttached": {
+                        "grantFrom": "GRANTED_PROTECTION"
+                    }
+                }
+            }
+        ]
     }
 ]

@@ -38,8 +38,8 @@ function expandParts(parts: AbilityDef["parts"]): [string, object][] {
     });
 }
 
-export function makeAbility(def: AbilityDef, source: CardObject): Ability {
-    const ability = new Ability(source);
+export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: CardObject): Ability {
+    const ability = new Ability(source, grantedBy);
 
     ability.def = def;
 

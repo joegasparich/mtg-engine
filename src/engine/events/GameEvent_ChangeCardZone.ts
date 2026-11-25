@@ -4,7 +4,14 @@ import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { CardObject,Permanent,Spell } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
-import { Battlefield,type Zone } from "@engine/Zone";
+import { Battlefield,type Graveyard,type Zone } from "@engine/Zone";
+
+type ZoneChangeOptions = {
+    controller?: Player;
+    attachedTo?: Permanent;
+    illegalAttachmentDestination?: Graveyard;
+    targets?: readonly ActionTarget[];
+};
 
 export class GameEvent_ChangeCardZone extends GameEvent {
     type = GameEventType.ChangeCardZone;
@@ -12,7 +19,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     newObject?: CardObject;
 
     constructor(readonly oldObject: CardObject, public newZone: Zone,
-        private readonly options?: { controller?: Player; attachedTo?: Permanent; targets?: readonly ActionTarget[] }) {
+        private readonly options?: ZoneChangeOptions) {
         super();
         this.oldZone = oldObject.zone;
         this.label = `Card ${oldObject.logName} changed zones from ${this.oldZone?.name} to ${newZone.name}`;
@@ -29,11 +36,23 @@ export class GameEvent_ChangeCardZone extends GameEvent {
             if (!options?.targets)
                 return false;
             this.newObject = new Spell(oldObject.card, controller, options.targets);
-        }
-        else if (newZone instanceof Battlefield)
-            this.newObject = new Permanent(oldObject.card, controller, options?.attachedTo);
-        else
+        } else if (newZone instanceof Battlefield) {
+            const permanent = new Permanent(oldObject.card, controller);
+            const attachment = options?.attachedTo;
+            if (attachment && !permanent.canAttachTo(attachment)) {
+                const destination = options.illegalAttachmentDestination;
+                if (!destination || destination === oldZone)
+                    return false;
+
+                this.newZone = destination;
+                this.newObject = new CardObject(oldObject.card);
+            } else {
+                permanent.attachedTo = attachment;
+                this.newObject = permanent;
+            }
+        } else {
             this.newObject = new CardObject(oldObject.card);
+        }
 
         if (oldObject instanceof Permanent)
             CombatManager.removeFromCombat(oldObject);
@@ -42,8 +61,8 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         else
             oldObject.retire();
 
-        newZone.onEnter(this.newObject);
-        this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${newZone.name}`;
+        this.newZone.onEnter(this.newObject);
+        this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${this.newZone.name}`;
         return true;
     }
 }

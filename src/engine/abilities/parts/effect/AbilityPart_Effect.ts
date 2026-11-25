@@ -1,3 +1,5 @@
+import type { OneShotEffect } from "@engine/effects/EffectSystem";
+import gameEventManager from "@engine/events/GameEventManager";
 import { AbilityPart } from "../AbilityPart";
 
 export abstract class AbilityPart_Effect extends AbilityPart {
@@ -5,9 +7,8 @@ export abstract class AbilityPart_Effect extends AbilityPart {
 
     onSignalFired(signal: string) {
         if (signal === this.inSignal)
-            this.perform();
+            gameEventManager.effects.resolveOneShot(this.ability, effect => this.perform(effect));
     }
 
-    perform() {
-    }
+    abstract perform(effect: OneShotEffect): void;
 }

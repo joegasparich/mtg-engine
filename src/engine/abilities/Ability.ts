@@ -12,7 +12,7 @@ import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_Ad
 // Abilities are made up of several parts, which communicate with signals
 // For simple abilities, the signals can be ignored, as triggers and effects have a "default" signal
 // Parts can store arbitrary data in the slate for use by other parts
-// Effect parts are responsible for firing some game event when they receive their signal
+// Effect parts send resolving instructions or continuous effects to the effect system
 // Trigger parts are only used by triggered abilities, and are responsible for setting up listeners and firing their signal via onTrigger
 // Activate parts are only used by activated abilities, and are activated via the UI, which is accessed through public methods in this class
 // Target parts fire a game event to tell the UI to create a targeter, and fire a signal when they receive their target
@@ -25,7 +25,7 @@ export class Ability {
     slate: Record<SlateVar | string, any> = {};
     source: CardObject;
 
-    constructor(source: CardObject) {
+    constructor(source: CardObject, readonly grantedBy?: CardObject) {
         this.slate["THIS"] = [ source ];
         this.source = source;
     }
@@ -39,7 +39,7 @@ export class Ability {
 
     setup() {
         this.listening = true;
-        gameEventManager.withCheckSource({ object: this.source, keyword: this.def?.keyword }, () => {
+        gameEventManager.withCheckSource({ object: this.source, keyword: this.def?.keyword, ability: this }, () => {
             this.parts.forEach(part => part.setup(this));
         });
     }

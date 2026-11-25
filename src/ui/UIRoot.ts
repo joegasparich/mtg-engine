@@ -3,7 +3,7 @@ import * as PIXI from "pixi.js";
 import { ActionTarget,Targeter,TargetType } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
-import { GameEvent_ChangeCardZone, GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn } from "@engine/events";
+import { GameEvent_ChangeCardZone,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,type GameEvent_TurnStart } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
@@ -259,7 +259,7 @@ export default class UIRoot extends PIXI.Container {
         for (const control of turnControls)
             control.className = 'turn-control';
 
-        gameEventManager.onPerformed(GameEventType.TurnStart, () => turnLabel.text = `Player ${game.currentTurnPlayerID}'s turn`);
+        gameEventManager.onPerformed(GameEventType.TurnStart, (event: GameEvent_TurnStart) => turnLabel.text = `Player ${event.player.id}'s turn`);
         const syncTurnControls = () => {
             const inCombatInput = UICombat.declaresAt(game.currentStepIndex) || game.pendingCombatDamageChoice;
             for (const control of turnControls) {

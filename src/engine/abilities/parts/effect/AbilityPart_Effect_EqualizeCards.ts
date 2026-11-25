@@ -1,8 +1,9 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
+import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_DiscardCard,GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import type { PublicCardSelection } from "@engine/events/GameEvent_ResolutionChoice";
-import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
+import type { GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import type { CardType } from "~/defs";
@@ -14,12 +15,12 @@ type EqualizePhase = { action: "sacrifice"; cardType: CardType } | { action: "di
 export class AbilityPart_Effect_EqualizeCards extends AbilityPart_Effect {
     phases: readonly EqualizePhase[] = [];
 
-    perform() {
+    perform(effect: OneShotEffect) {
         if (this.phases.length)
-            this.equalizePhase(0);
+            this.equalizePhase(effect, 0);
     }
 
-    private equalizePhase(phaseIndex: number) {
+    private equalizePhase(effect: OneShotEffect, phaseIndex: number) {
         const phase = this.phases[phaseIndex];
         const active = game.currentTurnPlayerID;
         // 101.4: Turn order starts with the player whose turn it is.
@@ -39,9 +40,9 @@ export class AbilityPart_Effect_EqualizeCards extends AbilityPart_Effect {
             if (index === players.length) {
                 // 101.4 and 608.2f: Make all choices before moving any of the cards.
                 if (events.length)
-                    gameEventManager.performSimultaneous(events);
+                    effect.performSimultaneous(events);
                 if (phaseIndex + 1 < this.phases.length)
-                    gameEventManager.continueResolution(() => this.equalizePhase(phaseIndex + 1));
+                    effect.continueResolution(() => this.equalizePhase(effect, phaseIndex + 1));
                 return;
             }
 

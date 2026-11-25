@@ -1,8 +1,8 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_ChangeCardZone,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
-import gameEventManager,{ GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { GameEvent_ChangeCardZone,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
@@ -96,7 +96,7 @@ test("defender only intercepts attacker checks on the battlefield", () => {
         ...cardData[GRIZZLY_BEARS],
         abilities: [{ keyword: Keyword.Defender, parts: {} }],
     }, playerA, playerA.battlefield);
-    const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "", defender);
+    const declaration = new GameEvent_DeclareAttacker(defender);
 
     expect(gameEventManager.checkEvent(declaration)).toBe(false);
 

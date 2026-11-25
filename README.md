@@ -2,6 +2,8 @@
 
 A Magic: The Gathering engine with a PixiJS browser frontend.
 
+For an overview of the engine and frontend systems, see [Architecture](ARCHITECTURE.md).
+
 ## Development
 
 Use Node 24 (`nvm use`); the minimum supported version is Node 22.17.

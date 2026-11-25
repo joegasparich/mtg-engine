@@ -1,29 +1,16 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import gameEventManager,{ type EventCheck,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
-import { Battlefield } from "@engine/Zone";
-import { autobind } from "@utility/typeUtility";
-import { Ability } from "../Ability";
-import { AbilityPart } from "./AbilityPart";
+import { type ContinuousEffect,ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import { GameEvent_DeclareAttacker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { AbilityPart_ContinuousEffect } from "./AbilityPart_ContinuousEffect";
 
 @RegisterAbilityPart
-export class AbilityPart_Defender extends AbilityPart {
-    setup(ability: Ability) {
-        super.setup(ability);
-
-        if (ability.source.zone instanceof Battlefield)
-            gameEventManager.onCheck(this.checkForEffects);
-    }
-
-    cleanup(ability: Ability) {
-        if (ability.source.zone instanceof Battlefield)
-            gameEventManager.offCheck(this.checkForEffects);
-    }
-
-    @autobind
-    private checkForEffects(check: EventCheck) {
+export class AbilityPart_Defender extends AbilityPart_ContinuousEffect {
+    protected getContinuousEffect(): ContinuousEffect {
         // 702.3b: A creature with defender cannot attack.
-        check.removeWhere(event => event instanceof GameEvent_Simple
-            && event.type === GameEventType.DeclareAttacker
-            && event.objectA === this.ability.source);
+        return {
+            kind: ContinuousEffectKind.EventCheck,
+            check: check => check.removeWhere(event => event instanceof GameEvent_DeclareAttacker
+                && event.attacker === this.ability.source),
+        };
     }
 }

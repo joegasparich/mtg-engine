@@ -1,10 +1,12 @@
 import { AbilityPart_Banding } from "@engine/abilities/parts/AbilityPart_Banding";
+import { GameEvent_DeclareAttacker,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
 import { GameEvent_CheckCombatDamageChooser } from "@engine/events/GameEvent_CombatDamageChoice";
+import { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
-import gameEventManager,{ GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager from "@engine/events/GameEventManager";
 import { StepIndex } from "@engine/Step";
 import { CardType } from "~/defs";
 
@@ -161,7 +163,7 @@ export class CombatManager {
             return false;
 
         // 508.1c: Check restrictions on declaring this creature as an attacker.
-        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareAttacker, "", attacker));
+        return gameEventManager.checkEvent(new GameEvent_DeclareAttacker(attacker));
     }
 
     static canBlock(blocker: Permanent) {
@@ -197,7 +199,7 @@ export class CombatManager {
         if (CombatManager.attackingCreatures.get(attacker) !== blocker.controller || !CombatManager.canBlock(blocker))
             return false;
 
-        return gameEventManager.checkEvent(new GameEvent_Simple(GameEventType.DeclareBlocker, "", blocker, attacker));
+        return gameEventManager.checkEvent(new GameEvent_DeclareBlocker(blocker, attacker));
     }
 
     static hasAnyAttackers(player: Player): boolean {
@@ -238,10 +240,12 @@ export class CombatManager {
 
         // 510.1: Assign damage from attackers first, then from blockers.
         const sources = [...blockersByAttacker, ...CombatManager.effectiveBlocks];
-        const damage = new Map<Permanent, number>();
+        const damage: GameEvent_DealDamage[] = [];
         let index = 0;
-        const addDamage = (recipient: Permanent, amount: number) =>
-            damage.set(recipient, (damage.get(recipient) ?? 0) + amount);
+        const addDamage = (source: Permanent, recipient: Permanent, amount: number) => {
+            if (amount > 0)
+                damage.push(new GameEvent_DealDamage(source, recipient, amount));
+        };
 
         const assignNext = () => {
             while (index < sources.length) {
@@ -251,22 +255,22 @@ export class CombatManager {
                 if (total <= 0 || !recipients.length)
                     continue;
                 if (recipients.length === 1) {
-                    addDamage(recipients[0], total);
+                    addDamage(source, recipients[0], total);
                     continue;
                 }
 
                 const chooser = new GameEvent_CheckCombatDamageChooser(source, recipients);
                 gameEventManager.checkEvent(chooser);
                 game.requestCombatDamageChoice({ player: chooser.player, source, recipients, total }, amounts => {
-                    recipients.forEach((recipient, i) => addDamage(recipient, amounts[i]));
+                    recipients.forEach((recipient, i) => addDamage(source, recipient, amounts[i]));
                     assignNext();
                 });
                 return;
             }
 
             // 510.2: Deal all assigned damage before the next state-based action check.
-            for (const [recipient, amount] of damage)
-                recipient.damageTaken += amount;
+            if (damage.length)
+                gameEventManager.performSimultaneous(damage);
         };
         assignNext();
     }

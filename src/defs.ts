@@ -21,6 +21,9 @@ export enum CardType {
     Enchantment = "Enchantment",
 }
 
+export const cardColours = ["W", "U", "B", "R", "G"] as const;
+export type CardColour = (typeof cardColours)[number];
+
 export type TargetValidator = {
     cardType?: CardType;
     cardSubtype?: string;

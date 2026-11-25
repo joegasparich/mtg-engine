@@ -1,6 +1,8 @@
 import { TargetTypeKeys,type ActionTarget } from "@engine/actions/PlayerActionManager";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
+import { GameEvent_CheckTarget } from "@engine/events/GameEvent_CardInteractionChecks";
+import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
 import Player from "@engine/Player";
@@ -37,6 +39,7 @@ export class AbilityPart_Target extends AbilityPart {
 
         return this.validTargets.includes(TargetTypeKeys.Card) && target instanceof CardObject && Boolean(target.zone)
             && (!this.onBattlefield || target.zone instanceof Battlefield)
-            && matchesTargetValidator(target, this);
+            && matchesTargetValidator(target, this)
+            && gameEventManager.checkEvent(new GameEvent_CheckTarget(this.ability.source, target));
     }
 }

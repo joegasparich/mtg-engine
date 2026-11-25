@@ -37,6 +37,9 @@ test("a filtered destruction effect checks its whole batch and uses each permane
     const checkedDestruction = vi.fn((check: EventCheck) => {
         const destruction = check.events.filter(event => event instanceof GameEvent_DestroyPermanent);
         if (destruction.length) {
+            const { effect } = destruction[0];
+            expect(effect?.ability.source).toBe(game.stack.objects.at(-1));
+            expect(destruction.every(event => event.effect === effect)).toBe(true);
             expect(new Set(destruction.map(event => event.permanent)))
                 .toEqual(new Set([protectedWall, controlledByOpponent.newObject]));
             check.removeWhere(event => event instanceof GameEvent_DestroyPermanent && event.permanent === protectedWall);

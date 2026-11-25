@@ -1,33 +1,22 @@
-import type { Ability } from "@engine/abilities/Ability";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
+import { type ContinuousEffect,ContinuousEffectKind,type EventCheck } from "@engine/effects/EffectSystem";
 import { GameEvent_CheckCombatDamageChooser } from "@engine/events/GameEvent_CombatDamageChoice";
-import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import type { Permanent } from "@engine/GameObject";
-import { Battlefield } from "@engine/Zone";
-import { autobind } from "@utility/typeUtility";
 import { Keyword } from "~/defs";
-import { AbilityPart } from "./AbilityPart";
+import { AbilityPart_ContinuousEffect } from "./AbilityPart_ContinuousEffect";
 
 @RegisterAbilityPart
-export class AbilityPart_Banding extends AbilityPart {
+export class AbilityPart_Banding extends AbilityPart_ContinuousEffect {
     // 702.22c: Every band has a creature with banding and at most one without it.
     static allowsBand(members: ReadonlySet<Permanent>): boolean {
         const withBanding = [...members].filter(member => member.hasKeyword(Keyword.Banding)).length;
         return withBanding > 0 && members.size - withBanding <= 1;
     }
 
-    setup(ability: Ability) {
-        super.setup(ability);
-
-        if (ability.source.zone instanceof Battlefield)
-            gameEventManager.onCheck(this.chooseDamage);
+    protected getContinuousEffect(): ContinuousEffect {
+        return { kind: ContinuousEffectKind.EventCheck, check: check => this.chooseDamage(check) };
     }
 
-    cleanup() {
-        gameEventManager.offCheck(this.chooseDamage);
-    }
-
-    @autobind
     private chooseDamage(check: EventCheck) {
         const creature = this.ability.source;
         if (!creature.hasKeyword(Keyword.Banding))

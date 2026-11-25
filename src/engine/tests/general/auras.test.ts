@@ -1,6 +1,6 @@
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone } from "@engine/events";
-import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ type EventCheck,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import type Player from "@engine/Player";
 import { addTestCard,moveTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
@@ -77,6 +77,32 @@ test("state checks put an Aura with an illegal attachment into its owner's grave
     game.checkState();
 
     expect(caster.graveyard.objects.map(object => object.card)).toContain(aura.card);
+});
+
+test("an Aura goes straight to its owner's graveyard if its attachment becomes illegal during entry", () => {
+    expect(game.stack.spellCast(caster, aura, [target])).toBe(true);
+    const [spell] = game.stack.objects;
+    const beforeEntry = (check: EventCheck) => {
+        if (check.events.some(event => event instanceof GameEvent_ChangeCardZone
+            && event.oldObject === spell && event.newZone === caster.battlefield))
+            target.type = CardType.Land;
+    };
+    const moves = vi.fn();
+    const onMove = (event: GameEvent_ChangeCardZone) => {
+        if (event.oldObject === spell)
+            moves(event.newZone);
+    };
+    gameEventManager.onCheck(beforeEntry);
+    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    try {
+        game.stack.resolveAll();
+    } finally {
+        gameEventManager.offCheck(beforeEntry);
+        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+    }
+
+    expect(moves.mock.calls).toEqual([[caster.graveyard]]);
+    expect(game.stack.objects).toHaveLength(0);
 });
 
 test("an Aura waits for pending zone changes before it starts resolving", () => {

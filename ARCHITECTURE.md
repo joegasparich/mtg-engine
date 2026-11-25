@@ -1,0 +1,73 @@
+# MTG Engine architecture
+
+The TypeScript engine owns the game state and enforces the rules. The PixiJS frontend renders that state and collects player input. Card definitions configure reusable ability parts that supply card-specific behavior.
+
+## Actions, abilities, effects, and events
+
+| Concept | What it does | Example |
+| --- | --- | --- |
+| **Player action** | Handles a player's intent and validates whether they can act. | `PlayerAction_PlayCard` asks for any required targets, pays mana, and submits a cast event. |
+| **Ability** | Defines what a spell or permanent can do, when it does it, and which parts implement it. | A basic land has an activation part for the tap cost and an effect part for adding mana. |
+| **Effect** | Carries out a resolving instruction or applies an ongoing grant, restriction, or exception. | Armageddon produces a batch of destruction events. Black Ward grants an ability while attached. |
+| **Game event** | Represents a proposed operation, a legality check, or a notification. Successful operations publish what happened. | `GameEvent_ChangeCardZone` moves a card. `GameEvent_CheckTarget` checks a proposed target. `GameEvent_StepStart` announces a step. |
+
+When a player casts Ancestral Recall, the play action submits a cast event, the stack resolves the spell's ability, and the resulting effect submits a draw instruction. An untap, a turn-based draw, and paying a tap cost enter the event manager directly as rules operations. Combat declaration actions edit the pending attack and block assignments through the combat system. [Play action](src/engine/actions/PlayerAction_PlayCard.ts) · [Event manager](src/engine/events/GameEventManager.ts)
+
+## How abilities work
+
+- **Definitions and instances.** `CardDef` and `AbilityDef` describe cards and abilities. `makeAbility` instantiates registered parts from their JSON configuration. Keyword definitions supply shared parts, and `SimpleAura` expands into targeting, attachment, and Aura resolution parts. [Definitions](src/defs.ts) · [Ability factory](src/engine/abilities/index.ts) · [Keyword abilities](keyword_abilities.json)
+- **Parts, signals, and slate.** Each part handles a task such as validating a target, paying an activation cost, listening for a trigger, or producing an effect. Parts communicate through named signals and the ability's `slate`, which stores values such as `THIS`, selected objects, and granted ability instances. For example, Armageddon selects lands into the slate and signals the destruction part to use them. [Ability](src/engine/abilities/Ability.ts) · [Alpha card definitions](cards_lea.json)
+- **Timing.** Resolving spells fire `SPELL_RESOLVE`. Activated abilities pay their costs before going on the stack, and mana abilities resolve immediately. Triggered abilities listen to performed events, capture their inputs, and wait to go on the stack. Static parts register continuous effects while their source is in the applicable zone. [Stack](src/engine/Stack.ts) · [Activation event](src/engine/events/GameEvent_ActivateAbility.ts) · [Trigger parts](src/engine/abilities/parts/trigger) · [Continuous effect part](src/engine/abilities/parts/AbilityPart_ContinuousEffect.ts)
+
+## How effects run
+
+**One-shot effects** carry the originating ability into the events they produce. `emit` queues an event, `performImmediate` applies it inline, and `performSimultaneous` applies the whole batch before notifying listeners. Ancestral Recall queues a draw instruction and each individual draw reads the current top card. Armageddon destroys all affected lands in one batch. See rules 609.1, 610.1, 121.2, and 608.2f. [Effects system](src/engine/effects/EffectSystem.ts) · [Draw events](src/engine/events/GameEvent_DrawCard.ts)
+
+**Continuous effects** start when their source ability becomes active and are cleaned up when it stops applying. Black Ward's grant follows reattachment and ends when the Aura leaves or loses the granting ability. See rule 611.3. [Continuous effect part](src/engine/abilities/parts/AbilityPart_ContinuousEffect.ts) · [Attachment grant](src/engine/abilities/parts/AbilityPart_GrantAttachedAbility.ts)
+
+### Continuous effect kinds
+
+`ContinuousEffectKind` tells the engine how to apply a continuous effect. [Effect kinds](src/engine/effects/EffectSystem.ts)
+
+| Kind | What it does |
+| --- | --- |
+| `EventCheck` | Registers a `check` callback for proposed events. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
+| `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
+| `AbilityGrant` | Creates an ability instance from `grant` on the `recipient` permanent. The instance belongs to the recipient and records its granting object. `onGrantChanged` lets an ability part track that instance when it is granted or revoked. [Ability grants](src/engine/GameObject.ts) |
+
+### How cards intercept and override events
+
+The event manager passes proposed events to `EffectSystem`. `checkEvent` reports whether a particular proposal survived the checks. [Event manager](src/engine/events/GameEventManager.ts)
+
+1. When a Wall is proposed as an attacker, `CombatManager.canAttack` checks its controller, zone, type, and tapped status, then checks a `GameEvent_DeclareAttacker`. [Combat manager](src/engine/CombatManager.ts)
+2. The Wall's defender ability tries to remove that event. A removed declaration fails the legality check. See rule 702.3b. [Defender](src/engine/abilities/parts/AbilityPart_Defender.ts)
+3. Animate Wall allows the event to survive that veto when the source of the check is defender on the creature it currently enchants. The exception applies only to that attack declaration and that restriction under rule 609.4. [Animate Wall override](src/engine/abilities/parts/AbilityPart_AttachedCreatureAttacksWithDefender.ts) · [Comprehensive Rules](ref/MagicCompRules.txt)
+
+Black Ward uses the same override mechanism for attachment checks. Its override matches the exact protection ability it granted, so a separate instance of protection can still make the Aura fall off. See rule 702.16n. [Black Ward override](src/engine/abilities/parts/AbilityPart_KeepGrantingAuraAttached.ts)
+
+## How the event queue works
+
+`addEvent` and `addEvents` append to the pending queue and run effect checks on it. If the event loop is idle, it starts draining immediately. The loop takes the pending events as a batch and runs them in order. Events queued during that batch wait for the next pass. When an event succeeds, the manager calls its `onPerformed` listeners and then its `then` callback. [Event manager](src/engine/events/GameEventManager.ts)
+
+The loop checks for work from top to bottom.
+
+1. **Queued events.** Drain any new batch first, including choice submissions. Once the queue is empty, a pending resolution or combat damage choice pauses the loop.
+2. **`onResolved` follow-ups.** Run callbacks scheduled to follow queued events.
+3. **`continueResolution` callbacks.** Advance the current spell or ability to its next instruction.
+4. **Game state checks.** Finish any current stack resolution, perform applicable state-based actions until stable, and put waiting triggers on the stack. [Game state checks](src/engine/Game.ts)
+5. **`onIdle` callbacks.** Start work that needs a settled game state, such as resolving the next object on the stack or advancing a step. [Stack](src/engine/Stack.ts) · [Turn progression](src/engine/Game.ts)
+
+After each `onResolved`, `continueResolution`, or `onIdle` callback, the loop starts again at the top of the list. Balance schedules its next instruction with `continueResolution` so it counts cards after the previous instruction's moves and their queued follow-ups. [Balance effect](src/engine/abilities/parts/effect/AbilityPart_Effect_EqualizeCards.ts)
+
+## Engine and frontend systems
+
+| System | Responsibility |
+| --- | --- |
+| **Cards, objects, and zones** | `Card` holds a card's definition and owner across zone changes. `CardObject` is its current rules object, with `Spell` and `Permanent` as specialized forms. A zone change creates a new object under rule 400.7. Targets and attachments track the rules object. [Game objects](src/engine/GameObject.ts) · [Zones](src/engine/Zone.ts) |
+| **Turns and state-based actions** | `Game` owns the players, turn, current step, and pending choices. `Step` runs turn-based actions such as untapping and clearing marked damage during cleanup. [Game](src/engine/Game.ts) · [Steps](src/engine/Step.ts) |
+| **Stack and choices** | The stack holds spells and separate occurrences of activated or triggered abilities. The current engine schedules resolution automatically and rechecks spell targets at resolution. Targeting gathers casting input, while resolution and combat damage choices can pause processing and resume after a valid submission. [Stack](src/engine/Stack.ts) · [Choices](src/engine/Game.ts) |
+| **Mana** | `ManaUtility` parses mana costs and handles payment. `PlayerActionManager` checks available mana and can activate eligible mana abilities to pay for a spell. Mana pools empty at step boundaries. [Mana](src/engine/mana.ts) · [Actions and autopay](src/engine/actions/PlayerActionManager.ts) |
+| **Combat** | `CombatManager` validates and tracks attackers, blockers, and bands. It gathers damage assignments, retains their sources for checks such as protection, and deals damage among combatants in one batch. [Combat manager](src/engine/CombatManager.ts) |
+| **Browser UI** | `UIRoot` reacts to engine events and coordinates card views, targeting, and choice dialogs. `UICombat` renders declarations and gathers damage assignments. `UIEventManager` carries frontend interactions such as card clicks. [UI root](src/ui/UIRoot.ts) · [Combat UI](src/ui/UICombat.ts) · [UI events](src/ui/UIEventManager.ts) |
+| **Card data and artwork** | The local JSON catalogs supply card mechanics. `UICard` loads artwork from each definition's `image_url`. The Scryfall service provides card and set metadata lookups. [Card catalog](src/index.ts) · [Card view](src/ui/UICard.ts) · [Scryfall service](src/scryfallService.ts) |
+| **Build and tests** | Vite runs the browser app and production build. Vitest covers general engine behavior and individual cards. `npm run check` runs TypeScript, ESLint, and the test suite. [Engine tests](src/engine/tests) · [Package scripts](package.json) |

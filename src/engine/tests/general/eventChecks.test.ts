@@ -1,6 +1,7 @@
 import Card from "@engine/Card";
-import { CardObject } from "@engine/GameObject";
-import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { GameEvent_DeclareAttacker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { Permanent } from "@engine/GameObject";
+import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
@@ -57,10 +58,11 @@ test("adding a separate event does not make a removed event pass its check", () 
 
 test.each(["before", "after"])("overrides only the named check with a veto registered %s it", order => {
     Game.init();
-    const object = new CardObject(new Card(cardData[0], game.addPlayer([])));
-    const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "Declaration", object);
-    const otherEvent = new GameEvent_Simple(GameEventType.Log, "Other event");
-    const otherDeclaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "Other declaration", object);
+    const player = game.addPlayer([]);
+    const object = new Permanent(new Card(cardData[0], player), player);
+    const declaration = new GameEvent_DeclareAttacker(object);
+    const otherEvent = new GameEvent_Log(GameEventType.Log, "Other event");
+    const otherDeclaration = new GameEvent_DeclareAttacker(object);
     const veto = (check: EventCheck) => check.removeWhere(event => event === declaration);
     const defender = (check: EventCheck) => check.removeWhere(event => event === declaration || event === otherDeclaration);
     const override = (event: GameEvent, source: CheckSource) =>

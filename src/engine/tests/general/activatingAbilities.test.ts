@@ -1,6 +1,6 @@
 import { PlayerActions } from "@engine/actions";
 import { GameEvent_ActivateAbility,GameEvent_GoToStep } from "@engine/events";
-import gameEventManager from "@engine/events/GameEventManager";
+import gameEventManager,{ type GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
@@ -24,8 +24,19 @@ test("a mana ability taps its land and resolves without touching the stack", () 
     game.stack.spellCast(player, bears);
 
     const abilityEnteredStack = vi.spyOn(game.stack, "abilityActivated");
+    const performed: GameEvent[] = [];
+    const observe = (event: GameEvent) => performed.push(event);
 
-    new PlayerActions.ActivateAbility(forest, forest.abilities[0]).perform(player);
+    gameEventManager.onPerformed(GameEventType.All, observe);
+    try {
+        new PlayerActions.ActivateAbility(forest, forest.abilities[0]).perform(player);
+    } finally {
+        gameEventManager.offPerformed(GameEventType.All, observe);
+    }
+
+    expect(performed.map(event => event.type)).toEqual([GameEventType.TapCard, GameEventType.AddMana, GameEventType.ActivateAbility]);
+    expect(performed[0].effect).toBeUndefined();
+    expect(performed[1].effect?.ability).toBe(forest.abilities[0]);
 
     expect(abilityEnteredStack).not.toHaveBeenCalled();
     expect(game.stack.objects).toHaveLength(1);

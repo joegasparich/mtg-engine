@@ -1,9 +1,9 @@
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_DrawCard,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
+import { GameEvent_DrawCards,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import { type CardChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
-import gameEventManager,{ type GameEvent,GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import type { CardObject } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
@@ -128,7 +128,7 @@ export default class Game {
 
         // Draw 7
         for (const player of this.players) {
-            gameEventManager.addEvent(new GameEvent_DrawCard(player, 7));
+            gameEventManager.addEvent(new GameEvent_DrawCards(player, 7));
         }
 
         this.currentTurnPlayerID = 0;
@@ -137,7 +137,7 @@ export default class Game {
         this.currentStepIndex = 0;
         this.landPlayedThisTurn = false;
 
-        gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
+        gameEventManager.addEvent(new GameEvent_TurnStart(this.currentTurnPlayer()));
 
         this.startStep(this.currentStepIndex);
 
@@ -162,7 +162,7 @@ export default class Game {
             this.currentStepIndex = 0;
             this.landPlayedThisTurn = false;
 
-            gameEventManager.addEvent(new GameEvent_Simple(GameEventType.TurnStart, "Next turn"));
+            gameEventManager.addEvent(new GameEvent_TurnStart(this.currentTurnPlayer()));
         }
 
         this.startStep(this.currentStepIndex);

@@ -59,6 +59,15 @@ export class GameEvent_GoToNextTurn extends GameEvent {
     }
 }
 
+export class GameEvent_TurnStart extends GameEvent {
+    type = GameEventType.TurnStart;
+    label = "Next turn";
+
+    constructor(readonly player: Player) {
+        super();
+    }
+}
+
 export class GameEvent_StepStart extends GameEvent {
     type = GameEventType.StepStart;
 

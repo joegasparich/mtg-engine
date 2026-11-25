@@ -2,14 +2,14 @@ import playerActionManager from "@engine/actions/PlayerActionManager";
 import type { CardObject,Permanent } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
-import { GameEvent_Log,GameEvent_Simple,GameEventType } from "@engine/events/GameEventManager";
+import { GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -57,6 +57,33 @@ describe("Ancestral Recall", () => {
         expect(caster.graveyard.objects.map(object => object.card)).toContain(recall.card);
         expect(caster.hand.objects).toHaveLength(target === caster ? 10 : 7);
         expect(opponent.hand.objects).toHaveLength(target === opponent ? 10 : 7);
+    });
+
+    test("each draw uses the top of the library after the previous draw's follow-ups", () => {
+        const next = addTestCard(cardData[FOREST], opponent, opponent.library);
+        const first = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.library);
+        const inserted = addTestCard(cardData[FOREST], opponent, opponent.hand);
+        const drawn: CardObject["card"][] = [];
+        const afterDraw = (event: GameEvent_ChangeCardZone) => {
+            if (event.oldZone !== opponent.library || event.newZone !== opponent.hand)
+                return;
+
+            drawn.push(event.oldObject.card);
+            if (event.oldObject === first) {
+                gameEventManager.onResolved(() => {
+                    gameEventManager.addEvent(new GameEvent_ChangeCardZone(inserted, opponent.library));
+                });
+            }
+        };
+        gameEventManager.onPerformed(GameEventType.ChangeCardZone, afterDraw);
+        try {
+            beginCasting().onTargeted([opponent]);
+        } finally {
+            gameEventManager.offPerformed(GameEventType.ChangeCardZone, afterDraw);
+        }
+
+        expect(drawn).toEqual([first.card, inserted.card, next.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(recall.card);
     });
 
     test("rejects a missing target, a card, and a player outside the game", () => {
@@ -127,7 +154,7 @@ describe("Animate Wall", () => {
         const controller = recipient === "caster" ? caster : opponent;
         const wall = cardByName("Wall of Swords", controller, controller.battlefield);
         const otherWall = cardByName("Wall of Swords", controller, controller.battlefield);
-        const declaration = new GameEvent_Simple(GameEventType.DeclareAttacker, "Declaration", wall);
+        const declaration = new GameEvent_DeclareAttacker(wall);
         expect(gameEventManager.checkEvent(declaration)).toBe(false);
 
         const request = beginCasting();
@@ -170,6 +197,115 @@ describe("Animate Wall", () => {
         expect(aura.zone).toBe(caster.hand);
         request.onTargeted([legalWall]);
         expect(caster.battlefield.objects.find(object => object.card === aura.card)?.attachedTo).toBe(legalWall);
+    });
+});
+
+describe("Black Ward", () => {
+    const wardDef = cardData.find(card => card.name === "Black Ward");
+    let caster: Player;
+    let opponent: Player;
+    let ward: CardObject;
+    let plains: Permanent;
+    let creature: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        game.startGame();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+
+        ward = addTestCard(wardDef, caster, caster.hand);
+        plains = addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield);
+        creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    });
+
+    function castWard(): Permanent {
+        expect(game.stack.spellCast(caster, ward, [creature])).toBe(true);
+        game.stack.resolveAll();
+        return caster.battlefield.objects.find(object => object.card === ward.card);
+    }
+
+    test("pays white mana to enchant a creature and grants protection while attached", () => {
+        const [action] = playerActionManager.getCardActions(ward, caster);
+        action.perform(caster);
+        const request = game.pendingTargeter;
+        expect(request?.source).toBe(ward);
+        request.onTargeted([plains]);
+        expect(game.pendingTargeter).toBe(request);
+        expect(plains.tapped).toBe(false);
+
+        request.onTargeted([creature]);
+        expect(game.pendingTargeter).toBeNull();
+        expect(plains.tapped).toBe(true);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        const attachedWard = caster.battlefield.objects.find(object => object.card === ward.card);
+        expect(attachedWard?.attachedTo).toBe(creature);
+        expect(creature.abilities).toEqual([expect.objectContaining({ source: creature, grantedBy: attachedWard })]);
+
+        const source = addTestCard({ ...cardData[GRIZZLY_BEARS], cost: "{B}" }, opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, creature, 1));
+        expect(creature.damageTaken).toBe(0);
+
+        moveTestCard(attachedWard, caster.graveyard);
+        expect(creature.abilities).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, creature, 1));
+        expect(creature.damageTaken).toBe(1);
+    });
+
+    test("the grant follows reattachment and ends on detach or loss of the granting ability", () => {
+        const attachedWard = castWard();
+        const otherCreature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const [initialGrant] = creature.abilities;
+
+        attachedWard.attachedTo = otherCreature;
+        expect(creature.abilities).toHaveLength(0);
+        expect(otherCreature.abilities).toEqual([expect.objectContaining({ source: otherCreature, grantedBy: attachedWard })]);
+        expect(otherCreature.abilities).not.toContain(initialGrant);
+        attachedWard.colours = new Set(["W", "B"]);
+        game.checkState();
+        expect(attachedWard.zone).toBe(caster.battlefield);
+
+        attachedWard.attachedTo = undefined;
+        expect(otherCreature.abilities).toHaveLength(0);
+        attachedWard.attachedTo = otherCreature;
+        expect(otherCreature.abilities).toHaveLength(1);
+
+        attachedWard.abilities = attachedWard.abilities.slice(0, 1);
+        expect(attachedWard.attachedTo).toBe(otherCreature);
+        expect(otherCreature.abilities).toHaveLength(0);
+    });
+
+    test("its own protection keeps a black Black Ward attached until another grant applies", () => {
+        const firstWard = castWard();
+        firstWard.colours = new Set(["W", "B"]);
+        game.checkState();
+        expect(firstWard.attachedTo).toBe(creature);
+        expect(firstWard.zone).toBe(caster.battlefield);
+
+        ward = addTestCard(wardDef, caster, caster.hand);
+        const secondWard = castWard();
+        expect(secondWard.attachedTo).toBe(creature);
+        expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: firstWard.card }));
+    });
+
+    test("a separate protection grant from the same Aura can remove a black Black Ward", () => {
+        ward = addTestCard({
+            ...wardDef,
+            abilities: [...wardDef.abilities, { parts: {
+                AbilityPart_GrantAttachedAbility: {
+                    grant: { parts: { AbilityPart_Protection: { colour: "B" } } },
+                },
+            } }],
+        }, caster, caster.hand);
+        const attachedWard = castWard();
+        expect(creature.abilities).toHaveLength(2);
+
+        attachedWard.colours = new Set(["W", "B"]);
+        game.checkState();
+
+        expect(caster.graveyard.objects).toContainEqual(expect.objectContaining({ card: ward.card }));
+        expect(creature.abilities).toHaveLength(0);
     });
 });
 

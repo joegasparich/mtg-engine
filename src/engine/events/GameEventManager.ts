@@ -1,6 +1,6 @@
-import type { CardObject } from "@engine/GameObject";
-import { removeIf } from "@utility/arrayUtility";
-import type { Keyword } from "~/defs";
+import { type CheckListener,type CheckRemovalOverride,type CheckSource,EffectSystem,type OneShotEffect } from "@engine/effects/EffectSystem";
+
+export type { CheckSource,EventCheck } from "@engine/effects/EffectSystem";
 
 export enum GameEventType {
     All,
@@ -31,12 +31,19 @@ export enum GameEventType {
     CheckCombatDamageChooser,
     RequestCombatDamageChoice,
     SubmitCombatDamageChoice,
+    CheckTarget,
+    CheckAttachment,
+    DealDamage,
+    AddMana,
+    AttachPermanent,
+    DrawCards,
 }
 
 export abstract class GameEvent {
     type: GameEventType;
     label: string;
     isAction = true;
+    effect?: OneShotEffect;
     readonly additionalPerformedTypes?: readonly GameEventType[];
     callback: () => void;
 
@@ -45,20 +52,6 @@ export abstract class GameEvent {
     }
     then(callback: () => void) {
         this.callback = callback;
-    }
-}
-
-export class GameEvent_Simple extends GameEvent {
-    objectA?: CardObject;
-    objectB?: CardObject;
-
-    constructor(type: GameEventType, label: string, objectA?: CardObject, objectB?: CardObject) {
-        super();
-
-        this.type = type;
-        this.label = label;
-        this.objectA = objectA;
-        this.objectB = objectB;
     }
 }
 
@@ -74,21 +67,10 @@ export class GameEvent_Log extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
-export interface EventCheck {
-    readonly events: readonly GameEvent[];
-    add(event: GameEvent): void;
-    replace(event: GameEvent, replacement: GameEvent): void;
-    removeWhere(predicate: (event: GameEvent) => boolean): void;
-}
-
-type CheckListener = (check: EventCheck) => void;
-export type CheckSource = { readonly object: CardObject; readonly keyword?: Keyword };
-type CheckRemovalOverride = (event: GameEvent, source: CheckSource) => boolean;
 
 class GameEventManager {
+    readonly effects = new EffectSystem(this);
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
-    private readonly eventCheckListeners = new Map<CheckListener, CheckSource | undefined>();
-    private readonly checkRemovalOverrides = new Set<CheckRemovalOverride>();
     private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
     private readonly resolutionSteps: (() => void)[] = [];
@@ -97,6 +79,7 @@ class GameEventManager {
     private waitingForChoice?: () => boolean;
 
     startGame(settle: () => boolean, waitingForChoice: () => boolean) {
+        this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
         this.eventsResolvedCallback.length = 0;
         this.resolutionSteps.length = 0;
@@ -117,12 +100,11 @@ class GameEventManager {
     }
 
     onCheck(listener: CheckListener) {
-        if (!this.eventCheckListeners.has(listener))
-            this.eventCheckListeners.set(listener, this.checkSource);
+        this.effects.onCheck(listener, this.checkSource);
     }
 
     offCheck(listener: CheckListener) {
-        this.eventCheckListeners.delete(listener);
+        this.effects.offCheck(listener);
     }
 
     withCheckSource(source: CheckSource, register: () => void) {
@@ -136,11 +118,11 @@ class GameEventManager {
     }
 
     onCheckRemovalOverride(override: CheckRemovalOverride) {
-        this.checkRemovalOverrides.add(override);
+        this.effects.onCheckRemovalOverride(override);
     }
 
     offCheckRemovalOverride(override: CheckRemovalOverride) {
-        this.checkRemovalOverrides.delete(override);
+        this.effects.offCheckRemovalOverride(override);
     }
 
     activeEvents: GameEvent[] = [];
@@ -196,33 +178,7 @@ class GameEventManager {
     }
 
     checkForEffects(events: GameEvent[], checkedEvent?: GameEvent): GameEvent | undefined {
-        for (const [listener, source] of this.eventCheckListeners) {
-            listener({
-                events,
-                add: event => { events.push(event); },
-                replace: (event, replacement) => {
-                    const index = events.indexOf(event);
-                    if (index < 0 || !this.canRemove(event, source))
-                        return;
-
-                    events[index] = replacement;
-                    if (checkedEvent === event)
-                        checkedEvent = replacement;
-                },
-                removeWhere: predicate => removeIf(events, event => predicate(event) && this.canRemove(event, source)),
-            });
-        }
-        return events.includes(checkedEvent) ? checkedEvent : undefined;
-    }
-
-    private canRemove(event: GameEvent, source?: CheckSource): boolean {
-        if (source) {
-            for (const override of this.checkRemovalOverrides) {
-                if (override(event, source))
-                    return false;
-            }
-        }
-        return true;
+        return this.effects.checkEvents(events, checkedEvent);
     }
 
     performAllEvents() {

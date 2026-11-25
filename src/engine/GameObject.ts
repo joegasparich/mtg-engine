@@ -3,13 +3,14 @@ import type Card from "@engine/Card";
 import { Ability,makeAbility } from "@engine/abilities";
 import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
+import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
-import { ManaAmount,ManaCost,ManaUtility } from "@engine/mana";
+import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { Battlefield,Hand,Zone } from "@engine/Zone";
-import { CardType,Keyword } from "~/defs";
+import { type AbilityDef,type CardColour,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 
@@ -41,9 +42,11 @@ export class CardObject extends GameObject {
     type: CardType;
     subtypes: readonly string[];
     cost?: ManaCost;
+    colours: ReadonlySet<CardColour>;
     power: number;
     toughness: number;
-    abilities: Ability[];
+    private baseAbilities: readonly Ability[];
+    private readonly grantedAbilities = new Set<Ability>();
 
     constructor(readonly card: Card) {
         super();
@@ -55,7 +58,45 @@ export class CardObject extends GameObject {
         this.toughness = def.toughness;
         if (def.cost)
             this.cost = [...ManaUtility.parseManaString<ManaCost>(def.cost)];
-        this.abilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
+        // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
+        this.colours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
+        this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
+    }
+
+    get abilities(): readonly Ability[] {
+        return this.grantedAbilities.size > 0 ? [...this.baseAbilities, ...this.grantedAbilities] : this.baseAbilities;
+    }
+
+    set abilities(abilities: readonly Ability[]) {
+        const previous = this.baseAbilities;
+        this.baseAbilities = abilities.filter(ability => !this.grantedAbilities.has(ability));
+        if (!this.zone)
+            return;
+
+        for (const ability of previous) {
+            if (!this.baseAbilities.includes(ability))
+                ability.cleanup();
+        }
+        for (const ability of this.baseAbilities) {
+            if (!previous.includes(ability))
+                ability.setup();
+        }
+    }
+
+    grantAbility(def: AbilityDef, grantedBy: CardObject): { ability: Ability; revoke: () => void } {
+        // 613.1f: Each continuous effect contributes its own ability instance.
+        const ability = makeAbility(def, this, grantedBy);
+        this.grantedAbilities.add(ability);
+        if (this.zone)
+            ability.setup();
+
+        return {
+            ability,
+            revoke: () => {
+                if (this.grantedAbilities.delete(ability))
+                    ability.cleanup();
+            },
+        };
     }
 
     enterZone(zone: Zone) {
@@ -65,6 +106,7 @@ export class CardObject extends GameObject {
 
     retire() {
         this.abilities.forEach(ability => ability.cleanup());
+        this.grantedAbilities.clear();
         super.retire();
     }
 
@@ -96,6 +138,13 @@ export class CardObject extends GameObject {
         }
     }
 
+    canAttachTo(target: Permanent): boolean {
+        // 701.3a: Check the attachment's own restrictions and effects on the intended recipient.
+        return target.id !== this.id && target.zone instanceof Battlefield
+            && this.abilities.every(ability => ability.parts.every(part => part.canAttachTo?.(target) ?? true))
+            && gameEventManager.checkEvent(new GameEvent_CheckAttachment(this, target));
+    }
+
     checkState(actions: GameEvent[]) {
         for (const ability of this.abilities) {
             for (const part of ability.parts)
@@ -111,13 +160,29 @@ export class CardObject extends GameObject {
 
 
 export class Permanent extends CardObject {
-    attachedTo?: Permanent;
+    private attachment?: Permanent;
     tapped = false;
     damageTaken = 0;
 
     constructor(card: Card, override controller: Player, attachedTo?: Permanent) {
         super(card);
-        this.attachedTo = attachedTo;
+        this.attachment = attachedTo;
+    }
+
+    get attachedTo() { return this.attachment; }
+
+    set attachedTo(target: Permanent | undefined) {
+        if (this.attachment === target)
+            return;
+
+        this.attachment = target;
+        if (!(this.zone instanceof Battlefield))
+            return;
+
+        for (const ability of this.abilities) {
+            for (const part of ability.parts)
+                part.onAttachmentChanged?.();
+        }
     }
 
     public getPotentialMana(actor: Player): Readonly<ManaAmount> {
@@ -145,9 +210,7 @@ export class Permanent extends CardObject {
     }
 
     hasLegalAttachment(): boolean {
-        const target = this.attachedTo;
-        return target?.zone instanceof Battlefield && this.abilities.every(ability =>
-            ability.parts.every(part => part.canAttachTo?.(target) ?? true));
+        return !!this.attachedTo && this.canAttachTo(this.attachedTo);
     }
 
     checkState(actions: GameEvent[]) {
@@ -190,7 +253,7 @@ export class StackAbility extends GameObject {
         private readonly signal: string, inputs: Ability["slate"] = {}) {
         super();
         // 113.7a: Each occurrence resolves independently of its source and other occurrences.
-        this.ability = makeAbility(ability.def, source);
+        this.ability = makeAbility(ability.def, source, ability.grantedBy);
         for (const [key, value] of Object.entries({ ...ability.slate, ...inputs }))
             this.ability.slate[key] = Array.isArray(value) ? [...value] : value;
         this.ability.slate.CONTROLLER = [controller];
