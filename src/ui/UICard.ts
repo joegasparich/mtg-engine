@@ -259,7 +259,7 @@ export default class UICard extends PIXI.Container {
             if (Math.hypot(dx, dy) < DRAG_THRESHOLD)
                 return;
 
-            if (game.pendingResolutionChoice || game.pendingCombatDamageChoice) {
+            if (game.hasPendingResolutionChoice || game.pendingCombatDamageChoice) {
                 this.cancelPress();
                 return;
             }

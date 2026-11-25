@@ -1,4 +1,4 @@
-import { CardChoicePresentation,CardChoiceVisibility,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { CardChoicePresentation,CardChoiceVisibility,ManaPaymentDecision,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
@@ -7,7 +7,7 @@ export class UIResolutionChoice {
     private readonly panel = document.createElement("section");
     private readonly status = document.createElement("p");
     private readonly confirm = document.createElement("button");
-    private readonly selection: UICardSelection;
+    private readonly selection?: UICardSelection;
     private readonly optionsList?: HTMLUListElement;
     private handoff?: HTMLDialogElement;
 
@@ -15,11 +15,23 @@ export class UIResolutionChoice {
         const heading = document.createElement("h2");
         heading.id = "resolution-choice-heading";
         heading.textContent = `${choice.sourceName} · Player ${choice.player.id}`;
-        const prompt = document.createElement("p");
-        prompt.textContent = choice.prompt;
         this.panel.className = "card-selection-panel resolution-choice-panel";
         this.panel.setAttribute("aria-labelledby", heading.id);
-        this.panel.append(heading, prompt);
+        this.panel.append(heading);
+
+        if (choice.kind === ResolutionChoiceKind.ManaPayment) {
+            const decline = document.createElement("button");
+            this.confirm.textContent = `Pay ${choice.cost}`;
+            decline.textContent = "Decline";
+            this.confirm.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Pay));
+            decline.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Decline));
+            this.panel.append(this.confirm, decline);
+            return;
+        }
+
+        const prompt = document.createElement("p");
+        prompt.textContent = choice.prompt;
+        this.panel.append(prompt);
 
         if (choice.presentation === CardChoicePresentation.SingleCardList) {
             const select = (card: CardObject) => choice.submit(choice.player, [card]);
@@ -76,7 +88,7 @@ export class UIResolutionChoice {
     }
 
     open() {
-        if (this.choice.visibility === CardChoiceVisibility.Public) {
+        if (this.choice.kind === ResolutionChoiceKind.ManaPayment || this.choice.visibility === CardChoiceVisibility.Public) {
             this.showPanel();
             return;
         }
@@ -108,7 +120,7 @@ export class UIResolutionChoice {
     close() {
         this.closeHandoff();
         this.panel.remove();
-        if (this.choice.visibility === CardChoiceVisibility.Private)
+        if (this.choice.kind === ResolutionChoiceKind.Card && this.choice.visibility === CardChoiceVisibility.Private)
             this.root.setVisibleHands();
     }
 
@@ -120,14 +132,18 @@ export class UIResolutionChoice {
 
     private showPanel() {
         document.body.append(this.panel);
-        if (this.optionsList)
+        if (this.choice.kind === ResolutionChoiceKind.ManaPayment)
+            this.confirm.focus();
+        else if (this.optionsList)
             this.optionsList.querySelector("button")?.focus();
         else
             this.root.focusCardSelection();
     }
 
     private update() {
-        this.status.textContent = `${this.selection.count} of ${this.choice.count} selected`;
-        this.confirm.disabled = this.selection.count !== this.choice.count;
+        if (this.choice.kind === ResolutionChoiceKind.Card) {
+            this.status.textContent = `${this.selection.count} of ${this.choice.count} selected`;
+            this.confirm.disabled = this.selection.count !== this.choice.count;
+        }
     }
 }

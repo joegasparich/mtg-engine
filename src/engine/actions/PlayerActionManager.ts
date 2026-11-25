@@ -38,6 +38,9 @@ export type Targeter = {
 }
 
 class PlayerActionManager {
+    // 605.3a: While autopay taps mana sources, this player may activate mana abilities even during resolution.
+    private manaPaymentPlayer?: Player;
+
     // TODO: Maybe move to UI file
     public cardActionsForUI = new Map<CardObject, PlayerAction[]>();
 
@@ -134,12 +137,22 @@ class PlayerActionManager {
             if (!this.canAutoPayManaCost(cost, actor))
                 return false;
 
-            this.tapManaSources(cost, actor);
+            const previousPayer = this.manaPaymentPlayer;
+            this.manaPaymentPlayer = actor;
+            try {
+                this.tapManaSources(cost, actor);
+            } finally {
+                this.manaPaymentPlayer = previousPayer;
+            }
             if (!ManaUtility.canPay(cost, actor.manaPool))
                 return false;
         }
 
         return ManaUtility.pay(cost, actor.manaPool);
+    }
+
+    public isPayingManaCost(actor: Player): boolean {
+        return this.manaPaymentPlayer === actor;
     }
 
     public autoPay(object: CardObject, actor: Player) {

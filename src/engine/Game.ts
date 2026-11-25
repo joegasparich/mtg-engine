@@ -2,7 +2,7 @@ import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManage
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
-import { type CardChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { type CardChoice,type CardResolutionChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import { type CardObject,Spell } from "@engine/GameObject";
 import Player from "@engine/Player";
@@ -35,7 +35,13 @@ export default class Game {
     private resolutionChoice: ResolutionChoice | null = null;
     private combatDamageChoice: CombatDamageChoice | null = null;
 
-    get pendingResolutionChoice() { return this.resolutionChoice; }
+    get pendingResolutionChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.Card ? this.resolutionChoice : null;
+    }
+    get pendingManaPaymentChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaPayment ? this.resolutionChoice : null;
+    }
+    get hasPendingResolutionChoice() { return this.resolutionChoice !== null; }
     get pendingCombatDamageChoice() { return this.combatDamageChoice; }
     get hasPendingPlayerInput() { return !!(this.pendingTargeter || this.resolutionChoice || this.combatDamageChoice); }
     get priorityPlayer() { return this.hasPendingPlayerInput || this.stack.isResolving ? null : this.priority; }
@@ -60,39 +66,49 @@ export default class Game {
         CombatManager.reset();
         game = new Game();
         gameEventManager.startGame(() => game.settleState(),
-            () => !!(game.pendingResolutionChoice || game.pendingCombatDamageChoice), () => game.advanceWhileIdle());
+            () => game.hasPendingResolutionChoice || !!game.pendingCombatDamageChoice,
+            () => game.advanceWhileIdle());
     }
 
     requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void,
         isStillEligible?: (card: CardObject) => boolean) {
+        const optionZones = new Map(details.options.map(card => [card, card.zone]));
+        const choice: CardResolutionChoice = {
+            ...details,
+            kind: ResolutionChoiceKind.Card,
+            submit: (player, cards) => {
+                const selected = [...cards];
+                this.submitResolutionChoice(choice, player, () => selected.length === choice.count
+                    && new Set(selected).size === selected.length
+                    && selected.every(card => optionZones.has(card) && (isStillEligible
+                        ? isStillEligible(card)
+                        : !!card.zone && optionZones.get(card) === card.zone)), () => resume(selected));
+            },
+        };
+        this.openResolutionChoice(choice);
+    }
+
+    openResolutionChoice(choice: ResolutionChoice) {
         if (this.hasPendingPlayerInput)
             throw new Error("A player choice is already pending");
 
-        const optionZones = new Map(details.options.map(card => [card, card.zone]));
-        const choice: ResolutionChoice = {
-            ...details,
-            submit: (player, cards) => {
-                if (game !== this || this.resolutionChoice !== choice || player !== choice.player)
-                    return;
-
-                const selected = [...cards];
-                const event = new GameEvent_SubmitResolutionChoice(choice, () => {
-                    if (this.resolutionChoice !== choice || selected.length !== choice.count
-                        || new Set(selected).size !== selected.length
-                        || selected.some(card => !optionZones.has(card) || (isStillEligible
-                            ? !isStillEligible(card)
-                            : !card.zone || optionZones.get(card) !== card.zone)))
-                        return false;
-
-                    this.resolutionChoice = null;
-                    return true;
-                });
-                event.then(() => resume(selected));
-                gameEventManager.addEvent(event);
-            },
-        };
         this.resolutionChoice = choice;
         gameEventManager.addEvent(new GameEvent_RequestResolutionChoice(choice));
+    }
+
+    submitResolutionChoice(choice: ResolutionChoice, player: Player, accept: () => boolean, resume: () => void) {
+        if (game !== this || this.resolutionChoice !== choice || player !== choice.player)
+            return;
+
+        const event = new GameEvent_SubmitResolutionChoice(choice, () => {
+            if (this.resolutionChoice !== choice || !accept())
+                return false;
+
+            this.resolutionChoice = null;
+            return true;
+        });
+        event.then(resume);
+        gameEventManager.addEvent(event);
     }
 
     requestCombatDamageChoice(details: CombatDamageAssignment, resume: (amounts: readonly number[]) => void) {

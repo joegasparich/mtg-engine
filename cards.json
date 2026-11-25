@@ -5,19 +5,7 @@
         "oracle_text": "({T}: Add {W}.)",
         "type": "Land",
         "subtypes": ["Plains"],
-        "abilities": [
-            {
-                "activateString": "Tap for mana",
-                "isManaAbility": true,
-                "parts": {
-                    "AbilityPart_Activate_Tap": {},
-                    "AbilityPart_Effect_AddMana": {
-                        "target": "THIS.controller",
-                        "mana": "{W}"
-                    }
-                }
-            }
-        ]
+        "abilities": []
     },
     {
         "name": "Island",
@@ -25,19 +13,7 @@
         "oracle_text": "({T}: Add {U}.)",
         "type": "Land",
         "subtypes": ["Island"],
-        "abilities": [
-            {
-                "activateString": "Tap for mana",
-                "isManaAbility": true,
-                "parts": {
-                    "AbilityPart_Activate_Tap": {},
-                    "AbilityPart_Effect_AddMana": {
-                        "target": "THIS.controller",
-                        "mana": "{U}"
-                    }
-                }
-            }
-        ]
+        "abilities": []
     },
     {
         "name": "Swamp",
@@ -45,19 +21,7 @@
         "oracle_text": "({T}: Add {B}.)",
         "type": "Land",
         "subtypes": ["Swamp"],
-        "abilities": [
-            {
-                "activateString": "Tap for mana",
-                "isManaAbility": true,
-                "parts": {
-                    "AbilityPart_Activate_Tap": {},
-                    "AbilityPart_Effect_AddMana": {
-                        "target": "THIS.controller",
-                        "mana": "{B}"
-                    }
-                }
-            }
-        ]
+        "abilities": []
     },
     {
         "name": "Mountain",
@@ -65,19 +29,7 @@
         "oracle_text": "({T}: Add {R}.)",
         "type": "Land",
         "subtypes": ["Mountain"],
-        "abilities": [
-            {
-                "activateString": "Tap for mana",
-                "isManaAbility": true,
-                "parts": {
-                    "AbilityPart_Activate_Tap": {},
-                    "AbilityPart_Effect_AddMana": {
-                        "target": "THIS.controller",
-                        "mana": "{R}"
-                    }
-                }
-            }
-        ]
+        "abilities": []
     },
     {
         "name": "Forest",
@@ -85,18 +37,6 @@
         "oracle_text": "({T}: Add {G}.)",
         "type": "Land",
         "subtypes": ["Forest"],
-        "abilities": [
-            {
-                "activateString": "Tap for mana",
-                "isManaAbility": true,
-                "parts": {
-                    "AbilityPart_Activate_Tap": {},
-                    "AbilityPart_Effect_AddMana": {
-                        "target": "THIS.controller",
-                        "mana": "{G}"
-                    }
-                }
-            }
-        ]
+        "abilities": []
     }
 ]

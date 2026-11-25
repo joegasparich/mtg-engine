@@ -19,12 +19,10 @@ export class AbilityPart_Banding extends AbilityPart_ContinuousEffect {
 
     private chooseDamage(check: EventCheck) {
         const creature = this.ability.source;
-        if (!creature.hasKeyword(Keyword.Banding))
-            return;
-
         // 702.22j–k: Check the current ability of each opposing combatant at assignment time.
         for (const event of check.events) {
-            if (event instanceof GameEvent_CheckCombatDamageChooser && event.recipients.some(recipient => recipient === creature))
+            if (event instanceof GameEvent_CheckCombatDamageChooser
+                && event.recipients.some(recipient => recipient === creature) && creature.hasKeyword(Keyword.Banding))
                 event.player = creature.controller;
         }
     }

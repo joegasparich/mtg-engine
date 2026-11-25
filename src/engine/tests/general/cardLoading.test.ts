@@ -6,7 +6,7 @@ import { CardObject } from "@engine/GameObject";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
-import { CardType } from "~/defs";
+import { BasicLandType,CardType } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -24,9 +24,10 @@ test("should load land correctly", () => {
     expect(object.def).toBe(def);
     expect(object.name).toBe(def.name);
     expect(object.type).toBe(def.type);
-    expect(object.subtypes).toEqual(["Forest"]);
+    expect(object.subtypes).toEqual([BasicLandType.Forest]);
     expect(object.cost).toBe(undefined);
-    expect(object.abilities[0].def).toEqual(def.abilities[0]);
+    expect(object.abilities).toHaveLength(1);
+    expect(object.abilities[0].def.isManaAbility).toBe(true);
 
     expect(object.owner).toBe(player);
 });

@@ -3,7 +3,7 @@ import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { CardChoiceVisibility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
@@ -13,8 +13,122 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { CardType,Keyword } from "~/defs";
+import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+describe("Conversion", () => {
+    const def = cardData.find(card => card.name === "Conversion");
+    const mountain = cardData.find(card => card.name === "Mountain");
+    const plains = cardData.find(card => card.name === "Plains");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    function beginCasterUpkeep() {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.currentTurnPlayer()).toBe(opponent);
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.currentTurnPlayer()).toBe(caster);
+    }
+
+    test("casts for {2}{W}{W} and can use converted Mountains to pay for its upkeep", () => {
+        const mountains = [addTestCard(mountain, caster, caster.battlefield), addTestCard(mountain, caster, caster.battlefield)];
+        const firstPlains = addTestCard(plains, caster, caster.battlefield);
+        const card = addTestCard(def, caster, caster.hand);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        const secondPlains = addTestCard(plains, caster, caster.battlefield);
+        const opponentMountain = addTestCard(mountain, opponent, opponent.battlefield);
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect([firstPlains, secondPlains, ...mountains].every(land => land.tapped)).toBe(true);
+        expect(opponentMountain.subtypes).toEqual([BasicLandType.Mountain]);
+        passPriorityRound();
+        const conversion = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(opponentMountain.subtypes).toEqual([BasicLandType.Plains]);
+        expect(conversion?.zone).toBe(caster.battlefield);
+
+        beginCasterUpkeep();
+        expect(game.stack.objects).toHaveLength(1);
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        passPriorityRound();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice).toMatchObject({ player: caster, cost: "{W}{W}" });
+        expect(game.priorityPlayer).toBeNull();
+        choice.submit(opponent, ManaPaymentDecision.Pay);
+        expect(game.pendingManaPaymentChoice).toBe(choice);
+        choice.submit(caster, ManaPaymentDecision.Pay);
+
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(mountains.every(land => land.tapped)).toBe(true);
+        expect(firstPlains.tapped || secondPlains.tapped).toBe(false);
+        expect(conversion.zone).toBe(caster.battlefield);
+    });
+
+    test("declining sacrifices Conversion and restores the mana of newly played Mountains", () => {
+        const conversion = addTestCard(def, caster, caster.battlefield);
+        const otherLand = addTestCard(mountain, caster, caster.battlefield);
+        const inHand = addTestCard(mountain, caster, caster.hand);
+        expect(inHand.subtypes).toEqual([BasicLandType.Mountain]);
+        const [play] = playerActionManager.getCardActions(inHand, caster);
+        play.perform(caster);
+        const played = caster.battlefield.objects.find(object => object.card === inHand.card);
+        expect(played.name).toBe("Mountain");
+        expect(played.subtypes).toEqual([BasicLandType.Plains]);
+        const [tap] = playerActionManager.getCardActions(played, caster);
+        tap.perform(caster);
+        expect(caster.manaPool[ManaColour.W]).toBe(1);
+        expect(caster.manaPool[ManaColour.R]).toBe(0);
+
+        beginCasterUpkeep();
+        passPriorityRound();
+        const whiteManaAbility = played.abilities[0];
+        game.pendingManaPaymentChoice.submit(caster, ManaPaymentDecision.Decline);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(conversion.card);
+        expect([played.subtypes, otherLand.subtypes]).toEqual([[BasicLandType.Mountain], [BasicLandType.Mountain]]);
+        expect(gameEventManager.performImmediate(new GameEvent_ActivateAbility(caster, played, whiteManaAbility))).toBe(false);
+        const [tapAgain] = playerActionManager.getCardActions(played, caster);
+        tapAgain.perform(caster);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(caster.manaPool[ManaColour.R]).toBe(1);
+    });
+
+    test("sacrifices on resolution when the controller cannot pay", () => {
+        const conversion = addTestCard(def, caster, caster.battlefield);
+        const land = addTestCard(mountain, caster, caster.battlefield);
+        beginCasterUpkeep();
+        expect(conversion.zone).toBe(caster.battlefield);
+        passPriorityRound();
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(conversion.card);
+        expect(land.tapped).toBe(false);
+        expect(land.subtypes).toEqual([BasicLandType.Mountain]);
+    });
+
+    test("each Conversion applies until it leaves the battlefield", () => {
+        const first = addTestCard(def, caster, caster.battlefield);
+        const second = addTestCard(def, opponent, opponent.battlefield);
+        const land = addTestCard(mountain, caster, caster.battlefield);
+
+        expect(land.subtypes).toEqual([BasicLandType.Plains]);
+        moveTestCard(first, caster.graveyard);
+        expect(land.subtypes).toEqual([BasicLandType.Plains]);
+        moveTestCard(second, opponent.graveyard);
+        expect(land.subtypes).toEqual([BasicLandType.Mountain]);
+    });
+});
 
 test("Circle of Protection: Red prevents one hit from the chosen source to its controller", () => {
     Game.init();

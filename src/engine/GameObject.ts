@@ -1,16 +1,17 @@
 import type { ActionTarget } from "@engine/actions";
 import type Card from "@engine/Card";
 import { Ability,makeAbility } from "@engine/abilities";
+import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
 import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
-import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
+import { GameEvent_CheckAttachment,GameEvent_CheckBasicLandType } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { Battlefield,Zone } from "@engine/Zone";
-import { type AbilityDef,type CardColour,cardColours,CardType,Keyword } from "~/defs";
+import { type AbilityDef,type BasicLandType,type CardColour,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 
@@ -39,21 +40,23 @@ export class CardObject extends GameObject {
     get logName() { return `${this.name} (${this.id})`; }
 
     name: string;
-    type: CardType;
-    subtypes: readonly string[];
+    private baseType: CardType;
+    private baseSubtypes: readonly string[];
     cost?: ManaCost;
     colours: ReadonlySet<CardColour>;
     private basePower: number;
     private baseToughness: number;
     private baseAbilities: readonly Ability[];
+    private readonly activeBaseAbilities = new Set<Ability>();
+    private basicLandAbilities?: Map<AbilityDef, Ability>;
     private readonly grantedAbilities = new Set<Ability>();
 
     constructor(readonly card: Card) {
         super();
         const def = card.def;
         this.name = def.name;
-        this.type = def.type;
-        this.subtypes = [...(def.subtypes ?? [])];
+        this.baseType = def.type;
+        this.baseSubtypes = [...(def.subtypes ?? [])];
         this.power = def.power;
         this.toughness = def.toughness;
         if (def.cost)
@@ -61,6 +64,36 @@ export class CardObject extends GameObject {
         // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
         this.colours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
         this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
+    }
+
+    get type() { return this.baseType; }
+
+    set type(type: CardType) {
+        this.baseType = type;
+        this.refreshBaseAbilities();
+    }
+
+    get subtypes(): readonly string[] {
+        const replacement = this.basicLandTypeOverride;
+        return replacement ? [replacement] : this.baseSubtypes;
+    }
+
+    set subtypes(subtypes: readonly string[]) {
+        this.baseSubtypes = subtypes;
+        this.refreshBaseAbilities();
+    }
+
+    hasBaseSubtype(subtype: string): boolean {
+        return this.baseSubtypes.includes(subtype);
+    }
+
+    private get basicLandTypeOverride(): BasicLandType | undefined {
+        if (this.type !== CardType.Land || !(this.zone instanceof Battlefield))
+            return;
+
+        const check = new GameEvent_CheckBasicLandType(this);
+        gameEventManager.checkEvent(check);
+        return check.replacement;
     }
 
     get power(): number {
@@ -76,22 +109,53 @@ export class CardObject extends GameObject {
     set toughness(toughness: number) { this.baseToughness = toughness; }
 
     get abilities(): readonly Ability[] {
-        return this.grantedAbilities.size > 0 ? [...this.baseAbilities, ...this.grantedAbilities] : this.baseAbilities;
+        const abilities = this.effectiveBaseAbilities;
+        return this.grantedAbilities.size > 0 ? [...abilities, ...this.grantedAbilities] : abilities;
     }
 
     set abilities(abilities: readonly Ability[]) {
-        const previous = this.baseAbilities;
-        this.baseAbilities = abilities.filter(ability => !this.grantedAbilities.has(ability));
+        this.baseAbilities = abilities.filter(ability => !this.grantedAbilities.has(ability)
+            && this.basicLandAbilities?.get(ability.def) !== ability);
+        this.refreshBaseAbilities();
+    }
+
+    private get effectiveBaseAbilities(): readonly Ability[] {
+        if (this.type !== CardType.Land)
+            return this.baseAbilities;
+
+        // 305.6–7: Land subtypes give intrinsic mana abilities. Setting a basic land type replaces
+        // the old subtypes and rules-text abilities, while externally granted abilities still apply.
+        const replacement = this.basicLandTypeOverride;
+        const abilities = replacement ? [] : [...this.baseAbilities];
+        for (const subtype of new Set(replacement ? [replacement] : this.baseSubtypes)) {
+            const def = getBasicLandMana(subtype);
+            if (!def)
+                continue;
+
+            const intrinsic = this.basicLandAbilities ??= new Map();
+            if (!intrinsic.has(def))
+                intrinsic.set(def, makeAbility(def, this));
+            abilities.push(intrinsic.get(def));
+        }
+        return abilities;
+    }
+
+    refreshBaseAbilities() {
         if (!this.zone)
             return;
 
-        for (const ability of previous) {
-            if (!this.baseAbilities.includes(ability))
+        const abilities = this.effectiveBaseAbilities;
+        for (const ability of this.activeBaseAbilities) {
+            if (!abilities.includes(ability)) {
+                this.activeBaseAbilities.delete(ability);
                 ability.cleanup();
+            }
         }
-        for (const ability of this.baseAbilities) {
-            if (!previous.includes(ability))
+        for (const ability of abilities) {
+            if (!this.activeBaseAbilities.has(ability)) {
+                this.activeBaseAbilities.add(ability);
                 ability.setup();
+            }
         }
     }
 
@@ -113,11 +177,18 @@ export class CardObject extends GameObject {
 
     enterZone(zone: Zone) {
         super.enterZone(zone);
-        this.abilities.forEach(ability => ability.setup());
+        const grants = [...this.grantedAbilities];
+        this.refreshBaseAbilities();
+        grants.forEach(ability => {
+            if (this.grantedAbilities.has(ability))
+                ability.setup();
+        });
     }
 
     retire() {
-        this.abilities.forEach(ability => ability.cleanup());
+        this.activeBaseAbilities.forEach(ability => ability.cleanup());
+        this.activeBaseAbilities.clear();
+        this.grantedAbilities.forEach(ability => ability.cleanup());
         this.grantedAbilities.clear();
         super.retire();
     }
@@ -207,8 +278,9 @@ export class Permanent extends CardObject {
         return potentialMana;
     }
 
-    canActivate(ability: Ability) {
-        return this.zone === this.controller.battlefield && game.priorityPlayer === this.controller
+    canActivate(ability: Ability, payingManaCost = false) {
+        return this.zone === this.controller.battlefield
+            && (game.priorityPlayer === this.controller || (payingManaCost && ability.def.isManaAbility))
             && this.abilities.includes(ability) && ability.activatable && ability.canActivate();
     }
 

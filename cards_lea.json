@@ -471,5 +471,31 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Conversion",
+        "image_url": "https://cards.scryfall.io/large/front/5/6/5695021b-7ee6-4149-8591-0021d5662720.jpg?1783919584",
+        "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nAll Mountains are Plains.",
+        "type": "Enchantment",
+        "cost": "{2}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "controllerOnly": true },
+                    "AbilityPart_Effect_ChooseManaPayment": { "cost": "{W}{W}", "onDeclineSignal": "SACRIFICE" },
+                    "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                        "saveAs": "MOUNTAINS",
+                        "zone": "battlefield",
+                        "targetValidator": { "cardType": "Land", "baseSubtype": "Mountain" }
+                    },
+                    "AbilityPart_GiveBasicLandType": { "landsFrom": "MOUNTAINS", "landType": "Plains" }
+                }
+            }
+        ]
     }
 ]

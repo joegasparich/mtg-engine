@@ -25,12 +25,22 @@ export enum AttachmentSubtype {
     Aura = "Aura",
 }
 
+export enum BasicLandType {
+    Plains = "Plains",
+    Island = "Island",
+    Swamp = "Swamp",
+    Mountain = "Mountain",
+    Forest = "Forest",
+}
+
 export const cardColours = ["W", "U", "B", "R", "G"] as const;
 export type CardColour = (typeof cardColours)[number];
 
 export type TargetValidator = {
     cardType?: CardType;
     cardSubtype?: string;
+    // Match the subtype before continuous type changes are applied.
+    baseSubtype?: string;
     tapped?: boolean;
 };
 

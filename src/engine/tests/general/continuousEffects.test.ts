@@ -1,8 +1,9 @@
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import Game,{ game } from "@engine/Game";
-import { addTestCard,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
+import { ManaColour } from "@engine/mana";
+import { addTestCard,GRIZZLY_BEARS,moveTestCard,startMainPhase } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
-import { CardType } from "~/defs";
+import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 test("a static modifier reads a live selection from the slate until the ability is removed", () => {
@@ -67,4 +68,50 @@ test("the tapped filter matches only permanents in the requested state", () => {
     expect(matchesTargetValidator(permanent, { tapped: false })).toBe(false);
     expect(matchesTargetValidator(permanent, { tapped: true })).toBe(true);
     expect(matchesTargetValidator(permanent, {})).toBe(true);
+});
+
+test("setting a basic land type suppresses native abilities and leaves grants active", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    startMainPhase();
+    const mountain = cardData.find(card => card.name === "Mountain");
+    const grantSource = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const land = addTestCard({
+        ...mountain,
+        name: "Test land",
+        subtypes: [BasicLandType.Mountain, BasicLandType.Forest],
+        abilities: [{ parts: { AbilityPart_Trigger_Enters: { type: CardType.Creature } } }],
+    }, player, player.battlefield);
+    const [printed, mountainMana, forestMana] = land.abilities;
+    // Banding registers an event check that also reads the source's effective abilities.
+    const grant = land.grantAbility({ keyword: Keyword.Banding, parts: {} }, grantSource);
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        type: CardType.Enchantment,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectsFromZoneContinuously: {
+                saveAs: "MOUNTAINS",
+                zone: ZoneKind.Battlefield,
+                targetValidator: { cardType: CardType.Land, baseSubtype: BasicLandType.Mountain },
+            },
+            AbilityPart_GiveBasicLandType: { landsFrom: "MOUNTAINS", landType: BasicLandType.Island },
+        } }],
+    }, player, player.battlefield);
+
+    expect(source.abilities[0].slate.MOUNTAINS).toEqual([land]);
+    expect(matchesTargetValidator(land, { cardType: CardType.Land, baseSubtype: BasicLandType.Mountain })).toBe(true);
+    expect(matchesTargetValidator(land, { cardType: CardType.Land, cardSubtype: BasicLandType.Mountain })).toBe(false);
+    expect(land.subtypes).toEqual([BasicLandType.Island]);
+    expect(land.abilities).toHaveLength(2);
+    expect(land.abilities[0].getPotentialMana()[ManaColour.U]).toBe(1);
+    expect(land.abilities[1]).toBe(grant.ability);
+    addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    expect(game.stack.objects).toHaveLength(0);
+
+    moveTestCard(source, player.graveyard);
+    expect(land.subtypes).toEqual([BasicLandType.Mountain, BasicLandType.Forest]);
+    expect(land.abilities).toEqual([printed, mountainMana, forestMana, grant.ability]);
+    addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    expect(game.stack.objects).toHaveLength(1);
+    expect(game.stack.objects[0]).toMatchObject({ source: land });
 });

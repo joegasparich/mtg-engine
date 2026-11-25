@@ -32,9 +32,30 @@ export type CardChoice = CardChoiceDetails & (
     | { readonly visibility: CardChoiceVisibility.Private }
 );
 
-export type ResolutionChoice = CardChoice & {
+export enum ResolutionChoiceKind {
+    Card,
+    ManaPayment,
+}
+
+export type CardResolutionChoice = CardChoice & {
+    readonly kind: ResolutionChoiceKind.Card;
     submit(player: Player, cards: readonly CardObject[]): void;
 };
+
+export enum ManaPaymentDecision {
+    Pay,
+    Decline,
+}
+
+export type ManaPaymentChoice = {
+    readonly kind: ResolutionChoiceKind.ManaPayment;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly cost: string;
+    submit(player: Player, decision: ManaPaymentDecision): void;
+};
+
+export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice;
 
 export class GameEvent_RequestResolutionChoice extends GameEvent {
     type = GameEventType.RequestResolutionChoice;

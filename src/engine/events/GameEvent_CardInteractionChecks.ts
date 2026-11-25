@@ -1,4 +1,5 @@
 import type { CardObject,Permanent } from "@engine/GameObject";
+import type { BasicLandType } from "~/defs";
 import { GameEvent,GameEventType } from "./GameEventManager";
 
 export class GameEvent_CheckTarget extends GameEvent {
@@ -53,6 +54,16 @@ export class GameEvent_CheckRequiredBlock extends GameEvent {
     required = false;
 
     constructor(readonly blocker: Permanent, readonly attacker: Permanent) {
+        super();
+    }
+}
+
+export class GameEvent_CheckBasicLandType extends GameEvent {
+    type = GameEventType.CheckBasicLandType;
+    label = "";
+    replacement?: BasicLandType;
+
+    constructor(readonly land: CardObject) {
         super();
     }
 }

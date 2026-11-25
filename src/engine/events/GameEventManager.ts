@@ -42,6 +42,7 @@ export enum GameEventType {
     AddMana,
     AttachPermanent,
     DrawCards,
+    CheckBasicLandType,
 }
 
 export abstract class GameEvent {
