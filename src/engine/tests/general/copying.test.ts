@@ -1,3 +1,4 @@
+import { Ability } from "@engine/abilities";
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import { AbilityParts } from "@engine/abilities/registry";
 import { GameEvent_ChangeCardZone,OptionalDecision } from "@engine/events";
@@ -126,4 +127,93 @@ test("entry can copy a permanent supplied by a different slate producer", () => 
     expect(copy.isCopy).toBe(true);
     expect(copy.def).toBe(original.def);
     expect(game.hasPendingPlayerInput).toBe(false);
+});
+
+test("later copies inherit an added type without duplicating it or changing the printed face", () => {
+    const artifactCreature = { ...bears, types: [CardType.Artifact, CardType.Creature] };
+    let original = addTestCard(artifactCreature, player, player.battlefield);
+    for (const name of ["Copy Artifact", "Copy Artifact", "Clone"]) {
+        const card = addTestCard(cardData.find(def => def.name === name), player, player.hand);
+        const move = new GameEvent_ChangeCardZone(card, player.battlefield);
+        gameEventManager.addEvent(move);
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        game.pendingResolutionChoice.submit(player, [original]);
+        const copy = player.battlefield.objects.at(-1);
+        expect(copy.card).toBe(card.card);
+        expect(copy.printedFace).toBe(artifactCreature);
+        expect(copy.types).toEqual([CardType.Artifact, CardType.Creature, CardType.Enchantment]);
+        expect(copy.power).toBe(artifactCreature.power);
+        original = copy;
+    }
+    expect(artifactCreature.types).toEqual([CardType.Artifact, CardType.Creature]);
+});
+
+test("a copy exception sets characteristics once for the chosen copy and later copies inherit the result", () => {
+    const parts = copier.abilities[0].parts;
+    const modified = { ...bears, abilities: [{ parts: {
+        ...parts,
+        AbilityPart_EnterAsCopy: {
+            ...parts.AbilityPart_EnterAsCopy, modify: { signal: "ADJUST", saveAs: "RESULT" },
+        },
+        AbilityPart_SetCharacteristicsOn: {
+            inSignal: "ADJUST", on: "RESULT",
+            addTypes: [CardType.Enchantment], powerToughness: { power: 3, toughness: 4 },
+        },
+    } }] };
+    const original = addTestCard(bears, player, player.battlefield);
+    const signals = vi.spyOn(Ability.prototype, "fireSignal");
+    try {
+        addTestCard(modified, player, player.battlefield);
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Decline);
+        expect(signals).not.toHaveBeenCalledWith("ADJUST");
+        expect(player.battlefield.objects.at(-1)).toMatchObject({ power: 2, toughness: 2, types: [CardType.Creature] });
+
+        addTestCard(modified, player, player.battlefield);
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        game.pendingResolutionChoice.submit(player, [original]);
+        const copy = player.battlefield.objects.at(-1);
+        expect(copy).toMatchObject({ power: 3, toughness: 4, types: [CardType.Creature, CardType.Enchantment] });
+        expect(copy.printedFace).toBe(bears);
+        expect(original).toMatchObject({ power: 2, toughness: 2, types: [CardType.Creature] });
+        expect(original.def).toMatchObject({ power: 2, toughness: 2, types: [CardType.Creature] });
+
+        addTestCard(copier, player, player.battlefield);
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        game.pendingResolutionChoice.submit(player, [copy]);
+        expect(player.battlefield.objects.at(-1).def).toBe(copy.def);
+        expect(signals.mock.calls.filter(([signal]) => signal === "ADJUST")).toHaveLength(1);
+    } finally {
+        signals.mockRestore();
+    }
+});
+
+test("an ordinary entry ability can modify characteristics using its own signal and slate key", () => {
+    class SetEntryTypes extends AbilityPart {
+        replaceEntry(entering: Permanent, resume: () => void) {
+            const draft = { ...entering.def };
+            this.ability.slate.OTHER = [draft];
+            this.ability.fireSignal("SET_TYPES");
+            expect(draft.types).toBe(entering.def.types);
+            this.ability.slate.ENTRY = [draft];
+            this.ability.fireSignal("UNRELATED");
+            expect(draft.types).toBe(entering.def.types);
+            this.ability.fireSignal("SET_TYPES");
+            entering.types = draft.types;
+            resume();
+        }
+    }
+    AbilityParts.SetEntryTypes = SetEntryTypes;
+    try {
+        const printed = { ...bears, abilities: [{ parts: {
+            SetEntryTypes: {},
+            AbilityPart_SetCharacteristicsOn: { inSignal: "SET_TYPES", on: "ENTRY", addTypes: [CardType.Artifact] },
+        } }] };
+        const permanent = addTestCard(printed, player, player.battlefield);
+        expect(permanent.isCopy).toBe(false);
+        expect(permanent.types).toEqual([CardType.Creature, CardType.Artifact]);
+        expect(permanent.def).toBe(printed);
+        expect(printed.types).toEqual([CardType.Creature]);
+    } finally {
+        delete AbilityParts.SetEntryTypes;
+    }
 });

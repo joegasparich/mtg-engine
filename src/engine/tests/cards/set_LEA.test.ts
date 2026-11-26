@@ -3414,3 +3414,60 @@ describe("Clone", () => {
         expect(player.battlefield.objects[0]).toMatchObject({ card: grave.card, name: "Grizzly Bears" });
     });
 });
+
+describe("Copy Artifact", () => {
+    const def = cardData.find(card => card.name === "Copy Artifact");
+    const lotus = cardData.find(card => card.name === "Black Lotus");
+    let player: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        player = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    test.each([false, true])("can enter as a plain enchantment (artifact available: %s)", available => {
+        if (available)
+            addTestCard(lotus, opponent, opponent.battlefield);
+        const card = addTestCard(def, player, player.hand);
+        player.manaPool[ManaColour.Colourless] = 1;
+        expect(playerActionManager.getCardActions(card, player)).toHaveLength(0);
+        player.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, player)[0].perform(player);
+        expect(player.manaPool.every(amount => amount === 0)).toBe(true);
+        expect(game.pendingTargeter).toBeFalsy();
+        passPriorityRound();
+        if (available)
+            game.pendingOptionalChoice.submit(player, OptionalDecision.Decline);
+        expect(game.hasPendingPlayerInput).toBe(false);
+        expect(player.battlefield.objects[0]).toMatchObject({
+            card: card.card, def, isCopy: false, types: [CardType.Enchantment], colours: new Set(["U"]),
+        });
+    });
+
+    test("copies an opposing Black Lotus, adds enchantment, and sacrifices the copy for mana", () => {
+        const original = addTestCard(lotus, opponent, opponent.battlefield);
+        original.tapped = true;
+        addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+        const card = addTestCard(def, player, player.hand);
+        expect(game.stack.spellCast(player, card)).toBe(true);
+        passPriorityRound();
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        expect(game.pendingResolutionChoice.options).toEqual([original]);
+        game.pendingResolutionChoice.submit(player, [original]);
+
+        const copy = player.battlefield.objects.at(-1);
+        expect(copy).toMatchObject({
+            card: card.card, name: lotus.name, types: [CardType.Artifact, CardType.Enchantment],
+            colours: new Set(), cost: original.cost, tapped: false, isCopy: true,
+        });
+        playerActionManager.getCardActions(copy, player)[0].perform(player);
+        game.pendingColourChoice.submit(player, "U");
+        expect(player.manaPool[ManaColour.U]).toBe(3);
+        expect(player.graveyard.objects[0].def).toBe(def);
+        expect(opponent.battlefield.objects).toEqual([original]);
+        expect(original.types).toEqual([CardType.Artifact]);
+    });
+});

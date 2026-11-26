@@ -105,7 +105,7 @@ export default class UICard extends PIXI.Container {
 
     setObject(object: CardObject) {
         this.object = object;
-        const face = object.def;
+        const face = object instanceof Permanent ? object.printedFace : object.def;
         if (this.face !== face) {
             this.face = face;
             this.powerToughness?.destroy({ children: true });
@@ -178,7 +178,7 @@ export default class UICard extends PIXI.Container {
         // 120.6 and 302.7: Marked damage is tracked separately from the creature's actual toughness.
         const remainingToughness = toughness - object.damageTaken;
         const damaged = object.damageTaken > 0;
-        const printed = object.def;
+        const printed = this.face;
         const printedCapsule = printed.types.includes(CardType.Creature);
         const show = !printedCapsule || damaged || power !== printed.power || remainingToughness !== printed.toughness;
         if (this.powerToughness)
@@ -195,11 +195,11 @@ export default class UICard extends PIXI.Container {
     }
 
     private updateTypeLine({ types, subtypes }: Readonly<CardCharacteristics>) {
-        const { object, art } = this;
+        const { art } = this;
         if (art.texture === PIXI.Texture.EMPTY)
             return;
 
-        const def = object.def;
+        const def = this.face;
         const printedSubtypes = def.subtypes ?? [];
         const show = types.length !== def.types.length || types.some(type => !def.types.includes(type))
             || subtypes.length !== printedSubtypes.length

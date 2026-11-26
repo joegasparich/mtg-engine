@@ -312,16 +312,19 @@ export class CardObject extends GameObject {
 
 export class Permanent extends CardObject {
     private copiedDefinition?: Readonly<CardDef>;
+    private copiedFace?: Readonly<CardDef>;
     override get def() { return this.copiedDefinition ?? super.def; }
-    get isCopy() { return this.copiedDefinition !== undefined; }
+    get printedFace() { return this.copiedFace ?? this.card.def; }
+    get isCopy() { return this.copiedFace !== undefined; }
 
-    enterAsCopyOf(original: Permanent) {
+    enterAsCopyOf(original: Permanent, definition: Readonly<CardDef>) {
         if (this.zone || this.retired)
             throw new Error("Only a permanent preparing to enter can enter as a copy");
         // 613.2a, 707.2–3: Capture the layer-one definition, including earlier copies.
         // Fresh ability instances bind their source, slate and listeners to this permanent.
-        this.copiedDefinition = original.def;
-        this.applyDefinition(this.copiedDefinition);
+        this.copiedDefinition = definition;
+        this.copiedFace = original.printedFace;
+        this.applyDefinition(definition);
     }
 
     private attachment?: Permanent;

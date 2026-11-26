@@ -15,13 +15,12 @@ declare global {
 }
 
 const playtestDeck = Object.entries({
-    Clone: 10,
+    "Copy Artifact": 12,
     Island: 24,
-    "Black Lotus": 4,
+    "Black Lotus": 8,
     "Animate Artifact": 4,
-    "Celestial Prism": 6,
-    "Lord of Atlantis": 6,
-    "Air Elemental": 6,
+    "Celestial Prism": 8,
+    Clone: 4,
 }).flatMap(([name, copies]) => {
     const index = cardData.findIndex(card => card.name === name);
     if (index < 0)
@@ -49,29 +48,6 @@ export async function startGame() {
     uiRoot.onPlayerAdded(playerTwo);
 
     game.startGame({allowAutoSkip: true});
-
-    // const elemental = new Card(cardData[ELEMENTAL], playerOne);
-    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(elemental, playerOne.hand));
-    //
-    // gameEventManager.addEvent(new GameEvent_ActivateAbility(playerOne, island, island.abilities[0]));
-    //
-    // gameEventManager.addEvent(new GameEvent_CastSpell(playerOne, elemental));
-    //
-    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    //
-    // const mountain = new Card(cardData[MOUNTAIN], playerTwo);
-    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(mountain, playerTwo.hand));
-    // gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, mountain));
-    //
-    // const goblin = new Card(cardData[GOBLINS], playerTwo);
-    // gameEventManager.addEvent(new GameEvent_ChangeCardZone(goblin, playerTwo.hand));
-    //
-    // gameEventManager.addEvent(new GameEvent_ActivateAbility(playerTwo, mountain, mountain.abilities[0]));
-    //
-    // gameEventManager.addEvent(new GameEvent_CastSpell(playerTwo, goblin));
-    //
-    // gameEventManager.addEvent(new GameEvent_GoToNextTurn());
-    // gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
 }
 
 function tick(time: PIXI.Ticker) {

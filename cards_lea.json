@@ -1235,5 +1235,32 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Copy Artifact",
+        "image_url": "https://cards.scryfall.io/large/front/1/e/1e346604-ce68-4216-aa62-022f459f35ef.jpg?1783919561",
+        "oracle_text": "You may have this enchantment enter as a copy of any artifact on the battlefield, except it's an enchantment in addition to its other types.",
+        "types": ["Enchantment"],
+        "cost": "{1}{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_EnterAsCopy": {
+                    "outSignal": "CHOOSE_COPY", "inSignal": "CHOICE_COMPLETE", "copyFrom": "ORIGINAL",
+                    "modify": { "signal": "APPLY_COPY_CHANGES", "saveAs": "RESULT" }
+                },
+                "AbilityPart_ChooseObject": {
+                    "inSignal": "CHOOSE_COPY", "outSignal": "CHOICE_COMPLETE", "saveAs": "ORIGINAL",
+                    "selection": { "zone": "battlefield", "targetValidator": { "cardType": "Artifact" } },
+                    "prompt": "Choose which artifact to copy.",
+                    "optional": {
+                        "prompt": "Have Copy Artifact enter as a copy?",
+                        "acceptLabel": "Choose artifact", "declineLabel": "Enter without copying"
+                    }
+                },
+                "AbilityPart_SetCharacteristicsOn": {
+                    "inSignal": "APPLY_COPY_CHANGES", "on": "RESULT", "addTypes": ["Enchantment"]
+                }
+            }
+        }]
     }
 ]
