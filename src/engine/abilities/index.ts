@@ -60,24 +60,38 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
     return ability;
 }
 
-type GrammarValue = ActionTarget | undefined;
+type GrammarValue = ActionTarget | number | undefined;
+
+enum GrammarProperty {
+    Controller = "controller",
+    Owner = "owner",
+    AttachedTo = "attachedTo",
+    Power = "power",
+}
 
 export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
-    const parts = key.split(".");
-
-    let result: GrammarValue;
-
-    // TODO: Handle multiple targets in slate
-    for (const part of parts) {
-        if (ability.slate[part])
-            result = ability.slate[part][0];
-        else if (part === "controller")
-            result = result instanceof CardObject ? result.controller ?? result.owner : undefined;
-        else if (part === "owner")
-            result = result instanceof CardObject ? result.owner : undefined;
-        else if (part === "attachedTo")
-            // 303.4m and 608.2h: Read the current attachment, or its last known value on a retired source.
-            result = result instanceof Permanent ? result.attachedTo : undefined;
+    const [variable, ...properties] = key.split(".");
+    let result: GrammarValue = ability.slate[variable]?.[0];
+    for (const property of properties) {
+        if (!(result instanceof CardObject))
+            return undefined;
+        switch (property) {
+            case GrammarProperty.Controller:
+                result = result.controller ?? result.owner;
+                break;
+            case GrammarProperty.Owner:
+                result = result.owner;
+                break;
+            case GrammarProperty.AttachedTo:
+                // 303.4m and 608.2h: A retired source keeps its last known attachment.
+                result = result instanceof Permanent ? result.attachedTo : undefined;
+                break;
+            case GrammarProperty.Power:
+                result = result.power;
+                break;
+            default:
+                return undefined;
+        }
     }
 
     return result;

@@ -15,14 +15,12 @@ export default class Player {
     hand: Hand = new Hand();
     battlefield: Battlefield = new Battlefield();
     graveyard: Graveyard = new Graveyard();
-    // exile: Card[] = [];
 
     zones = [
         this.library,
         this.hand,
         this.battlefield,
         this.graveyard,
-        // this.exile
     ];
 
     constructor(id: number, deck: number[]) {

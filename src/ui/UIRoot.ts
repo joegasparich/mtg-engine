@@ -19,7 +19,7 @@ import { drawArrow } from "@ui/drawUtility";
 import UICard from "@ui/UICard";
 import uiEventManager,{ UIEvent_CardClicked,UIEventType } from "@ui/UIEventManager";
 import { UICombat } from "@ui/UICombat";
-import { UIGraveyards } from "@ui/UIGraveyards";
+import { UICardPiles } from "@ui/UICardPiles";
 import { UIPlayer } from "@ui/UIPlayer";
 import { UIResolutionChoice } from "@ui/UIResolutionChoice";
 import { UIStack } from "@ui/UIStack";
@@ -189,7 +189,7 @@ export default class UIRoot extends PIXI.Container {
     private readonly selectionStatus = document.createElement('p');
     private readonly lifeTotalsPanel = document.createElement('aside');
     private readonly lifeTotals = new Map<Player, HTMLElement>();
-    private readonly graveyards = new UIGraveyards(() => this.syncSpecialActions());
+    private readonly cardPiles = new UICardPiles(() => this.syncSpecialActions());
     private readonly specialActionControls = document.createElement('div');
     private visibleSpecialActions: readonly SpecialAction[] = [];
 
@@ -218,6 +218,7 @@ export default class UIRoot extends PIXI.Container {
 
         this.lifeTotalsPanel.className = 'life-totals';
         this.lifeTotalsPanel.setAttribute('aria-label', 'Player status');
+        this.lifeTotalsPanel.append(this.cardPiles.addPile(game.exile, 'Exile'));
         document.body.append(this.lifeTotalsPanel);
         gameEventManager.onPerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
             if (event.recipient instanceof Player)
@@ -251,7 +252,7 @@ export default class UIRoot extends PIXI.Container {
             removeCustomContextMenu();
             const request = event.targeter;
             if (request.zone === ZoneKind.Graveyard) {
-                if (!this.graveyards.openForTargeting(request)) {
+                if (!this.cardPiles.openForTargeting(request)) {
                     request.onCancelled();
                     this.syncSpecialActions();
                 }
@@ -503,7 +504,7 @@ export default class UIRoot extends PIXI.Container {
         this.updateLifeTotal(player);
         const status = document.createElement('div');
         status.className = 'player-status';
-        status.append(lifeTotal, this.graveyards.addPlayer(player));
+        status.append(lifeTotal, this.cardPiles.addPile(player.graveyard, `Player ${player.id}’s graveyard`));
         this.lifeTotalsPanel.append(status);
         this.layoutBoard();
     }
@@ -550,7 +551,7 @@ export default class UIRoot extends PIXI.Container {
         if (view && event.newZone !== game.stack)
             view.battlefieldDrop = undefined;
 
-        this.graveyards.onCardChangedZone(event);
+        this.cardPiles.onCardChangedZone(event);
     }
 
     getCardView(object?: CardObject): UICard | undefined {

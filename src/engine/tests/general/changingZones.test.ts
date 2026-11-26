@@ -1,8 +1,9 @@
+import { selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
 import { GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_DrawCards } from "@engine/events";
 import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
-import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
 import { cardData } from "~/index";
 
@@ -124,4 +125,31 @@ test("a battlefield zone change effect can put a land onto the battlefield from 
 
     expect(opponent.hand.objects).toEqual([instant]);
     expect(player.battlefield.objects).toEqual([source, expect.objectContaining({ card: forest.card, controller: player })]);
+});
+
+test("exile holds fresh card objects from every player and allows them to change zones again", () => {
+    const opponent = game.addPlayer([]);
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: { AbilityPart_Effect_ChangeZones: { target: "CHOSEN", destination: ZoneKind.Exile } } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    const own = addTestCard(cardData[FOREST], player, player.hand);
+    const opposing = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    for (const object of [own, opposing]) {
+        ability.slate.CHOSEN = [object];
+        ability.fireSignal("default");
+        expect(object.retired).toBe(true);
+    }
+
+    const [land, creature] = game.exile.objects;
+    expect(land.card).toBe(own.card);
+    expect(creature.card).toBe(opposing.card);
+    expect(creature.controller).toBeUndefined();
+    expect(selectObjectsFromZone(ability, { zone: ZoneKind.Exile })).toEqual([land, creature]);
+
+    const returned = moveTestCard(creature, opponent.hand);
+    expect(creature.retired).toBe(true);
+    expect(returned.card).toBe(opposing.card);
+    expect(game.exile.objects).toEqual([land]);
 });

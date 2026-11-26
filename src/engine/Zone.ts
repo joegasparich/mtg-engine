@@ -6,6 +6,7 @@ export enum ZoneKind {
     Hand = "hand",
     Battlefield = "battlefield",
     Graveyard = "graveyard",
+    Exile = "exile",
     Stack = "stack",
 }
 
@@ -55,4 +56,8 @@ export class Hand extends Zone<CardObject> {
 
 export class Graveyard extends Zone<CardObject> {
     name = "Graveyard";
+}
+
+export class Exile extends Zone<CardObject> {
+    name = "Exile";
 }

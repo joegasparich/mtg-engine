@@ -16,6 +16,7 @@ import { type CardObject,Spell } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Step,StepIndex } from "@engine/Step";
+import { Exile } from "@engine/Zone";
 
 class GameOptions {
     allowAutoSkip = false;
@@ -32,6 +33,8 @@ export default class Game {
 
     players: Player[] = [];
     stack = new Stack();
+    // 400.1: All players share one exile zone.
+    readonly exile = new Exile();
 
     currentTurnPlayerID = 0;
     turnNumber = 0;
@@ -83,11 +86,9 @@ export default class Game {
         if (game) {
             for (const ability of game.specialActions.keys())
                 game.removeSpecialAction(ability);
-            for (const player of game.players) {
-                for (const zone of player.zones) {
-                    for (const object of zone.objects)
-                        object.abilities.forEach(ability => ability.cleanup());
-                }
+            for (const zone of [...game.players.flatMap(player => player.zones), game.exile]) {
+                for (const object of zone.objects)
+                    object.abilities.forEach(ability => ability.cleanup());
             }
             for (const object of game.stack.objects) {
                 if (object instanceof Spell)

@@ -74,25 +74,25 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 .spell-target-dialog h2 { margin: 0 0 16px; font-size: 18px; }
 .spell-target-choices { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.graveyard-dialog {
+.card-pile-dialog {
     box-sizing: border-box;
     width: min(740px, calc(100vw - 32px));
     max-width: none;
     padding: clamp(12px, 3vw, 24px);
 }
-.graveyard-dialog header {
+.card-pile-dialog header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
 }
-.graveyard-dialog h2 { margin: 0; }
-.graveyard-dialog p { margin: 0; }
-.graveyard-dialog .graveyard-prompt { margin-bottom: 12px; }
-.graveyard-piles:not(:empty) { margin-bottom: 12px; }
-.graveyard-piles [aria-pressed="true"] { border-color: #e3c58a; }
-.graveyard-grid {
+.card-pile-dialog h2 { margin: 0; }
+.card-pile-dialog p { margin: 0; }
+.card-pile-dialog .card-pile-prompt { margin-bottom: 12px; }
+.card-pile-choices:not(:empty) { margin-bottom: 12px; }
+.card-pile-choices [aria-pressed="true"] { border-color: #e3c58a; }
+.card-pile-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
     gap: 12px;
@@ -102,17 +102,17 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
     overflow-y: auto;
     list-style: none;
 }
-.graveyard-grid:empty { display: none; }
-.graveyard-grid img {
+.card-pile-grid:empty { display: none; }
+.card-pile-grid img {
     display: block;
     width: 100%;
     aspect-ratio: 5 / 7;
     border-radius: 5%;
     background: #142d36;
 }
-.graveyard-grid button { width: 100%; padding: 0; border: 0; background: transparent; }
-.graveyard-grid button:disabled { opacity: .5; cursor: default; transform: none; }
-.graveyard-grid button:enabled:hover { outline: 2px solid #e3c58a; }
+.card-pile-grid button { width: 100%; padding: 0; border: 0; background: transparent; }
+.card-pile-grid button:disabled { opacity: .5; cursor: default; transform: none; }
+.card-pile-grid button:enabled:hover { outline: 2px solid #e3c58a; }
 
 .private-card-handoff::backdrop { background: #081b24; }
 .earlier-public-choices { margin: 0 0 8px; padding-inline-start: 18px; font-size: 12px; }
@@ -179,7 +179,7 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 }
 
 .player-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.graveyard-button { padding: 4px 8px; font-size: inherit; pointer-events: auto; }
+.card-pile-button { padding: 4px 8px; font-size: inherit; pointer-events: auto; }
 
 .combat-panel {
     max-height: calc(100dvh - 64px);

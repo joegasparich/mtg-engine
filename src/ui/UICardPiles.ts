@@ -1,9 +1,12 @@
 import type { Targeter } from "@engine/actions";
 import type { GameEvent_ChangeCardZone } from "@engine/events";
-import type Player from "@engine/Player";
+import type { CardObject } from "@engine/GameObject";
+import { Exile,type Zone } from "@engine/Zone";
 
-export class UIGraveyards {
-    private readonly buttons = new Map<Player, HTMLButtonElement>();
+type CardPile = { zone: Zone<CardObject>; label: string; button: HTMLButtonElement };
+
+export class UICardPiles {
+    private readonly piles: CardPile[] = [];
     private readonly dialog = document.createElement("dialog");
     private readonly heading = document.createElement("h2");
     private readonly prompt = document.createElement("p");
@@ -11,18 +14,17 @@ export class UIGraveyards {
     private readonly empty = document.createElement("p");
     private readonly grid = document.createElement("ul");
     private readonly closeButton = document.createElement("button");
-    private player?: Player;
+    private pile?: CardPile;
     private targeter?: Targeter;
-    private targetPlayers: readonly Player[] = [];
+    private targetPiles: readonly CardPile[] = [];
 
     constructor(private readonly onTargetingFinished: () => void) {
-        this.dialog.className = "spell-target-dialog graveyard-dialog";
-        this.heading.id = "graveyard-heading";
+        this.dialog.className = "spell-target-dialog card-pile-dialog";
+        this.heading.id = "card-pile-heading";
         this.dialog.setAttribute("aria-labelledby", this.heading.id);
-        this.prompt.className = "graveyard-prompt";
-        this.pileChoices.className = "spell-target-choices graveyard-piles";
-        this.grid.className = "graveyard-grid";
-        this.empty.textContent = "This graveyard is empty.";
+        this.prompt.className = "card-pile-prompt";
+        this.pileChoices.className = "spell-target-choices card-pile-choices";
+        this.grid.className = "card-pile-grid";
 
         this.closeButton.addEventListener("click", () => this.dismiss());
         this.dialog.addEventListener("cancel", event => {
@@ -36,26 +38,27 @@ export class UIGraveyards {
         document.body.append(this.dialog);
     }
 
-    addPlayer(player: Player) {
+    addPile(zone: Zone<CardObject>, label: string) {
         const button = document.createElement("button");
-        button.className = "graveyard-button";
+        button.className = "card-pile-button";
         button.setAttribute("aria-haspopup", "dialog");
-        // 404.2: Players may examine any graveyard.
-        button.addEventListener("click", () => this.open(player));
-        this.buttons.set(player, button);
-        this.updateButton(player);
+        // 404.2 and 406.3: Any player may examine a graveyard or face-up exiled cards.
+        const pile = { zone, label, button };
+        button.addEventListener("click", () => this.open(pile));
+        this.piles.push(pile);
+        this.updateButton(pile);
         return button;
     }
 
     onCardChangedZone(event: GameEvent_ChangeCardZone) {
-        for (const player of this.buttons.keys()) {
-            if (event.oldZone === player.graveyard || event.newZone === player.graveyard)
-                this.updateButton(player);
+        for (const pile of this.piles) {
+            if (event.oldZone === pile.zone || event.newZone === pile.zone)
+                this.updateButton(pile);
         }
 
         if (this.targeter?.source === event.oldObject)
             this.dismiss();
-        else if (this.player && (event.oldZone === this.player.graveyard || event.newZone === this.player.graveyard))
+        else if (this.pile && (event.oldZone === this.pile.zone || event.newZone === this.pile.zone))
             this.renderPile();
     }
 
@@ -63,46 +66,45 @@ export class UIGraveyards {
         if (targeter.count !== 1)
             return false;
 
-        const players = [...this.buttons.keys()].filter(player =>
-            player.graveyard.objects.some(card => targeter.validateTargets([card])));
-        if (!players.length)
+        const piles = this.piles.filter(pile => pile.zone.objects.some(card => targeter.validateTargets([card])));
+        if (!piles.length)
             return false;
 
         this.targeter = targeter;
-        this.targetPlayers = players;
-        this.open(players[0]);
+        this.targetPiles = piles;
+        this.open(piles[0]);
         return true;
     }
 
-    private updateButton(player: Player) {
-        const button = this.buttons.get(player);
-        const count = player.graveyard.objects.length;
-        button.textContent = `Graveyard (${count})`;
-        button.setAttribute("aria-label", `Player ${player.id} graveyard (${count})`);
+    private updateButton({ button, zone, label }: CardPile) {
+        const count = zone.objects.length;
+        button.textContent = `${zone.name} (${count})`;
+        button.setAttribute("aria-label", `${label} (${count})`);
     }
 
-    private open(player: Player) {
-        this.showPlayer(player);
+    private open(pile: CardPile) {
+        this.showPile(pile);
         this.closeButton.textContent = this.targeter ? "Cancel" : "Close";
         if (!this.dialog.open)
             this.dialog.showModal();
         (this.grid.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? this.closeButton).focus();
     }
 
-    private showPlayer(player: Player) {
-        this.player = player;
-        this.heading.textContent = `Player ${player.id}’s graveyard`;
+    private showPile(pile: CardPile) {
+        this.pile = pile;
+        this.heading.textContent = pile.label;
+        this.empty.textContent = pile.zone instanceof Exile ? "No cards in exile." : "This graveyard is empty.";
         this.prompt.hidden = !this.targeter;
         if (this.targeter)
             this.prompt.textContent = `Choose a target for ${this.targeter.source.name}.`;
         this.pileChoices.replaceChildren();
-        if (this.targetPlayers.length > 1) {
-            for (const choice of this.targetPlayers) {
+        if (this.targetPiles.length > 1) {
+            for (const choice of this.targetPiles) {
                 const button = document.createElement("button");
-                button.textContent = `Player ${choice.id}’s graveyard`;
-                button.setAttribute("aria-pressed", String(choice === player));
+                button.textContent = choice.label;
+                button.setAttribute("aria-pressed", String(choice === pile));
                 button.addEventListener("click", () => {
-                    this.showPlayer(choice);
+                    this.showPile(choice);
                     this.pileChoices.querySelector<HTMLButtonElement>("[aria-pressed=true]").focus();
                 });
                 this.pileChoices.append(button);
@@ -112,10 +114,10 @@ export class UIGraveyards {
     }
 
     private renderPile() {
-        const { player, targeter } = this;
-        const cards = player.graveyard.objects;
+        const { pile, targeter } = this;
+        const cards = pile.zone.objects;
         this.empty.hidden = cards.length > 0;
-        this.grid.setAttribute("aria-label", `Player ${player.id}’s graveyard, newest first`);
+        this.grid.setAttribute("aria-label", `${pile.label}, newest first`);
         // 404.1: The most recently added card is on top of the graveyard.
         this.grid.replaceChildren(...cards.slice().reverse().map(card => {
             const item = document.createElement("li");
@@ -125,6 +127,8 @@ export class UIGraveyards {
 
             if (!targeter) {
                 item.append(image);
+                if (pile.zone instanceof Exile)
+                    item.append(`Owner: Player ${card.owner.id}`);
                 return item;
             }
 
@@ -154,9 +158,9 @@ export class UIGraveyards {
     }
 
     private close() {
-        this.player = undefined;
+        this.pile = undefined;
         this.targeter = undefined;
-        this.targetPlayers = [];
+        this.targetPiles = [];
         this.dialog.close();
     }
 }

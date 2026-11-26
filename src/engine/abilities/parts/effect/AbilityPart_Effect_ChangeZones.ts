@@ -2,6 +2,7 @@ import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_ChangeCardZone } from "@engine/events";
+import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
 import { Battlefield,ZoneKind } from "@engine/Zone";
 import { AttachmentSubtype,CardType } from "~/defs";
@@ -11,8 +12,16 @@ import { AbilityPart_Effect } from "./AbilityPart_Effect";
 export class AbilityPart_Effect_ChangeZones extends AbilityPart_Effect {
     target: GrammarKey;
     destination: Exclude<ZoneKind, ZoneKind.Stack>;
+    outSignal?: string;
 
     perform(effect: OneShotEffect) {
+        this.moveCard(effect);
+        // 608.2c and 609.3: Continue with the next instruction even if the move was prevented.
+        if (this.outSignal)
+            effect.continueResolution(() => this.ability.fireSignal(this.outSignal));
+    }
+
+    private moveCard(effect: OneShotEffect) {
         const { ability } = this;
         const card = resolveAbilityGrammar(this.target, ability);
         if (!(card instanceof CardObject) || !card.zone)
@@ -20,7 +29,7 @@ export class AbilityPart_Effect_ChangeZones extends AbilityPart_Effect {
 
         if (this.destination !== ZoneKind.Battlefield) {
             // 400.3: Cards go to their owner's library, hand, or graveyard.
-            const zone = card.owner[this.destination];
+            const zone = this.destination === ZoneKind.Exile ? game.exile : card.owner[this.destination];
             if (zone && zone !== card.zone)
                 effect.emit(new GameEvent_ChangeCardZone(card, zone));
             return;

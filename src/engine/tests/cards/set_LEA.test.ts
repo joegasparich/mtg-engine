@@ -6,7 +6,7 @@ import { CombatManager } from "@engine/CombatManager";
 import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
-import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
+import { type EventCheck,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
@@ -2649,5 +2649,87 @@ describe("Resurrection", () => {
         expect(caster.battlefield.objects).toEqual([]);
         expect(caster.graveyard.objects[0]).toBe(returned);
         expect(caster.graveyard.objects[1].card).toBe(card.card);
+    });
+});
+
+describe("Swords to Plowshares", () => {
+    const def = cardData.find(card => card.name === "Swords to Plowshares");
+    let caster: Player;
+    let opponent: Player;
+    let swords: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        swords = addTestCard(def, caster, caster.hand);
+    });
+
+    test("costs {W}, exiles a creature, then gives its last controller life equal to its modified power", () => {
+        const target = addTestCard(cardData.find(card => card.name === "Personal Incarnation"), caster, caster.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(swords, caster)).toEqual([]);
+        caster.manaPool[ManaColour.W] = 1;
+        const [cast] = playerActionManager.getCardActions(swords, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([opponent])).toBe(false);
+        game.pendingTargeter.onTargeted([target]);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+
+        target.controller = opponent;
+        addTestCard(cardData.find(card => card.name === "Crusade"), opponent, opponent.battlefield);
+        expect(target.power).toBe(7);
+        gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, (event: GameEvent_ChangeCardZone) => {
+            if (event.oldObject === target)
+                expect(opponent.life).toBe(20);
+        });
+        passPriorityRound();
+
+        expect(game.exile.objects).toEqual([expect.objectContaining({ card: target.card, power: 6 })]);
+        expect(opponent.life).toBe(27);
+        expect(caster.life).toBe(20);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([swords.card]);
+        expect(game.stack.objects).toEqual([]); // Personal Incarnation's dies ability did not trigger.
+    });
+
+    test.each([0, -2])("exiles an indestructible creature with %i power and gives no life", power => {
+        const target = addTestCard({
+            ...cardData[GRIZZLY_BEARS], power, abilities: [{ keyword: Keyword.Indestructible, parts: {} }],
+        }, caster, caster.battlefield);
+        expect(game.stack.spellCast(caster, swords, [target])).toBe(true);
+        passPriorityRound();
+
+        expect(game.exile.objects.map(object => object.card)).toEqual([target.card]);
+        expect(caster.life).toBe(20);
+    });
+
+    test("a creature that leaves and returns in response is a new object and its controller gains no life", () => {
+        const target = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, swords, [target])).toBe(true);
+        const returned = moveTestCard(moveTestCard(target, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+
+        expect(returned.zone).toBe(opponent.battlefield);
+        expect(game.exile.objects).toEqual([]);
+        expect(opponent.life).toBe(20);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([swords.card]);
+    });
+
+    test("a legal target's controller still gains life if an effect prevents the exile", () => {
+        const target = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const preventExile = (check: EventCheck) => check.removeWhere(event =>
+            event instanceof GameEvent_ChangeCardZone && event.oldObject === target && event.newZone === game.exile);
+        gameEventManager.onCheck(preventExile);
+        try {
+            expect(game.stack.spellCast(caster, swords, [target])).toBe(true);
+            passPriorityRound();
+        } finally {
+            gameEventManager.offCheck(preventExile);
+        }
+        expect(target.zone).toBe(opponent.battlefield);
+        expect(game.exile.objects).toEqual([]);
+        expect(opponent.life).toBe(22);
     });
 });

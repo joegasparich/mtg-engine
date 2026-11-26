@@ -33,9 +33,9 @@ export function getBattlefieldPermanentsFromSlate(ability: Ability, key: Grammar
 }
 
 export function getSelectionZones(ability: Ability, { zone, zoneOf }: ZoneSelection): readonly Zone[] {
-    // 400.1: The stack is shared. The engine stores the shared battlefield in player partitions.
-    if (zone === ZoneKind.Stack)
-        return [game.stack];
+    // 400.1: Exile and the stack are shared. The battlefield is stored in player partitions.
+    if (zone === ZoneKind.Stack || zone === ZoneKind.Exile)
+        return [game[zone]];
 
     if (!zoneOf)
         return game.players.map(player => player[zone]);
