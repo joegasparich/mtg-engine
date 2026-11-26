@@ -33,6 +33,7 @@ test("previews leave shields available and simultaneous destruction attempts spe
     addShield(creature);
     const regenerated = vi.fn();
     const destroyed = vi.fn();
+    creature.grantAbility({ parts: { AbilityPart_Trigger_Dies: {} } }, creature);
     gameEventManager.onGamePerformed(GameEventType.RegeneratePermanent, regenerated);
     gameEventManager.onGamePerformed(GameEventType.DestroyPermanent, destroyed);
 
@@ -43,8 +44,10 @@ test("previews leave shields available and simultaneous destruction attempts spe
     expect(creature.zone).toBe(player.battlefield);
     expect(regenerated).toHaveBeenCalledTimes(2);
     expect(destroyed).not.toHaveBeenCalled();
+    expect(game.stack.objects).toHaveLength(0);
 
     gameEventManager.addEvent(new GameEvent_DestroyPermanent(creature));
+    expect(game.stack.objects).toHaveLength(1);
     expect(destroyed).toHaveBeenCalledOnce();
     expect(player.graveyard.objects.map(object => object.card)).toEqual([creature.card]);
 });

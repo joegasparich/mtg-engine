@@ -21,7 +21,7 @@ test("chosenX belongs to each individual spell on the stack", () => {
     expect(values).toEqual([0, 3]);
 });
 
-test.each(["TARGET.controller", "TARGET.power", "TARGET"])("ReadValue snapshots %s when signalled", value => {
+test.each(["TARGET.controller", "TARGET.power", "TARGET.toughness", "TARGET"] as const)("ReadValue snapshots %s when signalled", value => {
     Game.init();
     const player = game.addPlayer([]);
     const opponent = game.addPlayer([]);
@@ -32,14 +32,16 @@ test.each(["TARGET.controller", "TARGET.power", "TARGET"])("ReadValue snapshots 
     const [ability] = source.abilities;
     const target = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
     target.power = 0;
+    target.toughness = 4;
     ability.slate.TARGET = [target];
-    const expected = value === "TARGET" ? target : value === "TARGET.controller" ? opponent : 0;
+    const expectedValues = { TARGET: target, "TARGET.controller": opponent, "TARGET.power": 0, "TARGET.toughness": 4 };
 
     ability.fireSignal("READ");
     target.controller = player;
     target.power = 3;
+    target.toughness = 1;
     expect(ability.slate.SAVED).toHaveLength(1);
-    expect(ability.slate.SAVED[0]).toBe(expected);
+    expect(ability.slate.SAVED[0]).toBe(expectedValues[value]);
 
     ability.slate.TARGET = [];
     ability.fireSignal("READ");

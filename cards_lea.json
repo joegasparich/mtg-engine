@@ -1262,5 +1262,27 @@
                 }
             }
         }]
+    },
+    {
+        "name": "Creature Bond",
+        "image_url": "https://cards.scryfall.io/large/front/5/d/5d89669b-f08a-400c-8673-7ffd91c05f5d.jpg?1783919561",
+        "oracle_text": "Enchant creature\nWhen enchanted creature dies, this Aura deals damage equal to that creature's toughness to the creature's controller.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{1}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Creature" } } } },
+            { "parts": {
+                "AbilityPart_Trigger_Dies": {
+                    "subject": "THIS.attachedTo",
+                    "storeAs": "DYING", "beforeMoveSignal": "READ_DYING_CREATURE"
+                },
+                "AbilityPart_ReadValue": [
+                    { "inSignal": "READ_DYING_CREATURE", "value": "DYING.toughness", "saveAs": "TOUGHNESS" },
+                    { "inSignal": "READ_DYING_CREATURE", "value": "DYING.controller", "saveAs": "RECIPIENT" }
+                ],
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "RECIPIENT", "amount": "TOUGHNESS" }
+            } }
+        ]
     }
 ]

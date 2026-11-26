@@ -2,6 +2,7 @@ import type Player from "@engine/Player";
 import type { Ability } from "@engine/abilities";
 import type { DamagePreventionChoices } from "@engine/effects/DamagePrevention";
 import { type CheckListener,type CheckRemovalOverride,type CheckSource,type ContinuousEffect,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
+import type { GameEvent_ChangeCardZone } from "./GameEvent_ChangeCardZone";
 import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 
 export type { CheckSource,EventCheck } from "@engine/effects/EffectSystem";
@@ -82,7 +83,7 @@ export class GameEvent_Log extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
-type GameSubscription = { notify: Listener } | { capture: () => Listener };
+type GameSubscription = { notify: Listener } | { capture: (pending: readonly GameEvent[]) => Listener };
 type CapturedListeners = ReadonlyMap<GameEventType, readonly Listener[]>;
 
 function isDamage(event: GameEvent): event is GameEvent_DealDamage {
@@ -139,11 +140,11 @@ class GameEventManager {
     }
 
     onGamePerformed<T extends GameEvent, State>(eventType: GameEventType, listener: (event: T, state: State) => void,
-        options: GameSubscriptionOptions<T> & { captureBeforeBatch: () => State }): () => void;
+        options: GameSubscriptionOptions<T> & { captureBeforeBatch: (pending: readonly T[]) => State }): () => void;
     onGamePerformed<T extends GameEvent>(eventType: GameEventType, listener: (event: T) => void,
         options?: GameSubscriptionOptions<T>): () => void;
     onGamePerformed<T extends GameEvent, State>(eventType: GameEventType, listener: (event: T, state?: State) => void,
-        { once, matches, captureBeforeBatch }: GameSubscriptionOptions<T> & { captureBeforeBatch?: () => State } = {}): () => void {
+        { once, matches, captureBeforeBatch }: GameSubscriptionOptions<T> & { captureBeforeBatch?: (pending: readonly T[]) => State } = {}): () => void {
         const listeners = this.gameListenersByType.get(eventType) ?? new Set<GameSubscription>();
         this.gameListenersByType.set(eventType, listeners);
 
@@ -162,8 +163,8 @@ class GameEventManager {
                 listener(event as T);
         };
         const subscription: GameSubscription = captureBeforeBatch ? {
-            capture: () => {
-                const state = captureBeforeBatch();
+            capture: pending => {
+                const state = captureBeforeBatch(pending as readonly T[]);
                 return event => notify(event, state);
             },
         } : {
@@ -175,6 +176,21 @@ class GameEventManager {
         const cancel = () => { listeners.delete(subscription); };
         listeners.add(subscription);
         return cancel;
+    }
+
+    // Prepare against the battlefield before the first move. A successful move runs its callback after the batch.
+    beforeZoneChange(prepare: (move: GameEvent_ChangeCardZone) => (() => void) | undefined) {
+        const captureBeforeBatch = (moves: readonly GameEvent_ChangeCardZone[]) => {
+            const callbacks = new Map<GameEvent_ChangeCardZone, () => void>();
+            for (const move of moves) {
+                const callback = prepare(move);
+                if (callback)
+                    callbacks.set(move, callback);
+            }
+            return callbacks;
+        };
+        return this.onGamePerformed(GameEventType.ChangeCardZone,
+            (move: GameEvent_ChangeCardZone, callbacks) => callbacks.get(move)?.(), { captureBeforeBatch });
     }
 
     onCheck(listener: CheckListener) {
@@ -358,17 +374,23 @@ class GameEventManager {
     private commitPrepared(events: GameEvent[],
         notify: (performed: GameEvent[], checkedPerformed: boolean, captured: CapturedListeners) => void, checked?: GameEvent) {
         const commit = (damage?: readonly GameEvent_DealDamage[][], afterDamage: readonly (() => void)[] = []) => {
-            const captured = this.captureGameListeners();
+            let damageIndex = 0;
+            let checkedPortions: readonly GameEvent[] = [];
+            const pending = damage ? events.flatMap(event => {
+                if (!isDamage(event))
+                    return [event];
+                const portions = damage[damageIndex++];
+                if (event === checked)
+                    checkedPortions = portions;
+                return portions;
+            }) : events;
+            const captured = this.captureGameListeners(pending);
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
-            let hitIndex = 0;
-            for (const event of events) {
-                const actual = damage && isDamage(event) ? damage[hitIndex++] : [event];
-                for (const portion of actual) {
-                    if (portion.perform()) {
-                        performed.push(portion);
-                        checkedPerformed ||= event === checked;
-                    }
+            for (const event of pending) {
+                if (event.perform()) {
+                    performed.push(event);
+                    checkedPerformed ||= event === checked || checkedPortions.includes(event);
                 }
             }
             // 615.5: Additional prevention effects follow the damage event, before priority or state checks.
@@ -420,13 +442,17 @@ class GameEventManager {
             .flatMap(subscription => "notify" in subscription ? [subscription.notify] : []));
     }
 
-    private captureGameListeners(): CapturedListeners {
+    private captureGameListeners(pending: readonly GameEvent[]): CapturedListeners {
         // 603.10: Capture look-back subscriptions before any event in the batch changes the game state.
         const captured = new Map<GameEventType, Listener[]>();
         for (const [type, subscriptions] of this.gameListenersByType) {
-            const listeners = [...subscriptions].flatMap(subscription => "capture" in subscription ? [subscription.capture()] : []);
-            if (listeners.length)
-                captured.set(type, listeners);
+            const lookbacks = [...subscriptions].filter(subscription => "capture" in subscription);
+            if (!lookbacks.length)
+                continue;
+            const candidates = pending.filter(event => type === GameEventType.All || type === event.type
+                || event.additionalPerformedTypes.includes(type));
+            if (candidates.length)
+                captured.set(type, lookbacks.map(subscription => subscription.capture(candidates)));
         }
         return captured;
     }

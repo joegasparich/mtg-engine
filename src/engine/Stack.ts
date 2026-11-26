@@ -64,7 +64,11 @@ export class Stack extends Zone<Spell | StackAbility> {
     }
 
     abilityTriggered(controller: Player, ability: Ability, signal: string, inputs: Ability["slate"]) {
-        this.waitingTriggers.push(new StackAbility(controller, ability.source, ability, signal, inputs));
+        this.queueTrigger(new StackAbility(controller, ability.source, ability, signal, inputs));
+    }
+
+    queueTrigger(trigger: StackAbility) {
+        this.waitingTriggers.push(trigger);
     }
 
     putWaitingTriggersOnStack(): boolean {

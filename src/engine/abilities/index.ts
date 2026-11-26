@@ -25,7 +25,7 @@ export const HardcodedSignals = {
 function expandParts(parts: AbilityDef["parts"]): [string, object][] {
     return Object.entries(parts ?? {}).flatMap(([name, config]): [string, object][] => {
         if (name !== "SimpleAura")
-            return [[name, config]];
+            return Array.isArray(config) ? config.map(part => [name, part]) : [[name, config]];
 
         const { targetValidator } = parts.SimpleAura;
         const target = "ENCHANTED";
@@ -67,6 +67,7 @@ enum GrammarProperty {
     Owner = "owner",
     AttachedTo = "attachedTo",
     Power = "power",
+    Toughness = "toughness",
     ChosenX = "chosenX",
 }
 
@@ -89,6 +90,9 @@ export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): Gramma
                 break;
             case GrammarProperty.Power:
                 result = result.power;
+                break;
+            case GrammarProperty.Toughness:
+                result = result.toughness;
                 break;
             case GrammarProperty.ChosenX:
                 // 107.3a: Use the X announced for this particular spell.

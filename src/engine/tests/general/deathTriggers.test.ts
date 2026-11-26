@@ -1,12 +1,14 @@
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
-import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
+import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_SacrificePermanent } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { addTestCard,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { Battlefield } from "@engine/Zone";
+import { StackAbility } from "@engine/GameObject";
+import { Battlefield,ZoneKind } from "@engine/Zone";
+import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
-test("zone-change listeners can filter successful battlefield departures and use pre-batch state", () => {
+test("beforeZoneChange prepares each candidate before the batch and confirms only successful departures", () => {
     Game.init();
     const player = game.addPlayer([]);
     const bear = cardData[GRIZZLY_BEARS];
@@ -23,14 +25,18 @@ test("zone-change listeners can filter successful battlefield departures and use
         expect(battlefieldSize).toBe(2);
     });
     const moves = vi.fn();
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, departures, {
-        matches: event => event.oldZone instanceof Battlefield,
-        captureBeforeBatch: () => player.battlefield.objects.length,
+    const prepare = vi.fn((event: GameEvent_ChangeCardZone) => {
+        const battlefieldSize = player.battlefield.objects.length;
+        expect(battlefieldSize).toBe(2);
+        if (event.oldZone instanceof Battlefield)
+            return () => departures(event, battlefieldSize);
     });
+    gameEventManager.beforeZoneChange(prepare);
     gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, moves);
 
     gameEventManager.performSimultaneous([destroy, obsolete, returnToHand, discard]);
 
+    expect(prepare.mock.calls.map(([event]) => event)).toEqual([destroy, obsolete, returnToHand, discard]);
     expect(departures.mock.calls.map(([event]) => event)).toEqual([destroy, returnToHand]);
     expect(moves.mock.calls).toEqual([[destroy], [returnToHand], [discard]]);
 });
@@ -77,4 +83,95 @@ test("a creature that loses its death ability before it dies produces no trigger
 
     expect(player.graveyard.objects.at(-1).card).toBe(recipient.card);
     expect(game.stack.objects).toHaveLength(0);
+});
+
+test("three simultaneous deaths resolve independently using one pre-move slate per occurrence", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    const bear = cardData[GRIZZLY_BEARS];
+    const watcher = addTestCard({
+        ...bear, power: 1,
+        abilities: [{ parts: {
+            AbilityPart_Trigger_Dies: { subject: { cardType: CardType.Creature }, storeAs: "DYING", beforeMoveSignal: "READ" },
+            AbilityPart_ReadValue: [
+                { inSignal: "READ", value: "DYING.power", saveAs: "AMOUNT" },
+                { inSignal: "READ", value: "DYING.controller", saveAs: "PLAYER" },
+            ],
+            AbilityPart_SelectObjectsFromZone: {
+                inSignal: "READ", zone: ZoneKind.Battlefield, targetValidator: { cardType: CardType.Creature }, saveAs: "CREATURES",
+            },
+            AbilityPart_Effect_DealDamage: { source: "THIS", target: "PLAYER", amount: "AMOUNT" },
+        } }],
+    }, player, player.battlefield);
+    const second = addTestCard({ ...bear, power: 3 }, opponent, opponent.battlefield);
+    const third = addTestCard({ ...bear, power: 5 }, player, player.battlefield);
+    const returned = addTestCard(bear, player, player.battlefield);
+    const land = addTestCard(cardData.find(card => card.name === "Forest"), player, player.battlefield);
+    const sourceSlate = watcher.abilities[0].slate;
+    sourceSlate.AMOUNT = [9];
+
+    gameEventManager.performSimultaneous([
+        new GameEvent_DestroyPermanent(watcher),
+        new GameEvent_ChangeCardZone(returned, player.hand),
+        new GameEvent_DestroyPermanent(returned),
+        new GameEvent_SacrificePermanent(player, second),
+        new GameEvent_SacrificePermanent(opponent, second),
+        new GameEvent_DestroyPermanent(third),
+        new GameEvent_DestroyPermanent(third),
+        new GameEvent_DestroyPermanent(land),
+    ]);
+    game.checkState();
+
+    const slates = game.stack.objects.map(object => {
+        expect(object).toBeInstanceOf(StackAbility);
+        return (object as StackAbility).ability.slate;
+    });
+    expect(slates.map(slate => slate.DYING[0])).toEqual([watcher, second, third]);
+    expect(slates.map(slate => slate.AMOUNT[0])).toEqual([1, 3, 5]);
+    expect(slates.map(slate => slate.PLAYER[0])).toEqual([player, opponent, player]);
+    for (const slate of slates)
+        expect(slate.CREATURES).toEqual([watcher, third, returned, second]);
+    expect(new Set([sourceSlate, ...slates]).size).toBe(4);
+    expect(sourceSlate.AMOUNT).toEqual([9]);
+    expect(sourceSlate.DYING).toBeUndefined();
+
+    passPriorityRound();
+    expect([player.life, opponent.life]).toEqual([15, 20]);
+    passPriorityRound();
+    expect([player.life, opponent.life]).toEqual([15, 17]);
+    passPriorityRound();
+    expect([player.life, opponent.life]).toEqual([14, 17]);
+});
+
+test("a later death keeps its own reads while the previous trigger is still on the stack", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    const bear = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...bear, abilities: [{ parts: {
+            AbilityPart_Trigger_Dies: { subject: "WATCHED", beforeMoveSignal: "READ" },
+            AbilityPart_ReadValue: { inSignal: "READ", value: "WATCHED.power", saveAs: "AMOUNT" },
+            AbilityPart_Effect_DealDamage: { source: "THIS", target: "CONTROLLER", amount: "AMOUNT" },
+        } }],
+    }, player, player.battlefield);
+    const slate = source.abilities[0].slate;
+    const first = addTestCard({ ...bear, power: 2 }, player, player.battlefield);
+    const second = addTestCard({ ...bear, power: 4 }, opponent, opponent.battlefield);
+
+    slate.WATCHED = [first];
+    gameEventManager.addEvent(new GameEvent_DestroyPermanent(first));
+    source.controller = opponent;
+    slate.WATCHED = [second];
+    gameEventManager.addEvent(new GameEvent_DestroyPermanent(second));
+    expect(game.stack.objects).toHaveLength(2);
+    expect(slate.AMOUNT).toBeUndefined();
+
+    passPriorityRound();
+    expect([player.life, opponent.life]).toEqual([20, 16]);
+    passPriorityRound();
+    expect([player.life, opponent.life]).toEqual([18, 16]);
 });

@@ -3471,3 +3471,73 @@ describe("Copy Artifact", () => {
         expect(original.types).toEqual([CardType.Artifact]);
     });
 });
+
+describe("Creature Bond", () => {
+    const def = cardData.find(card => card.name === "Creature Bond");
+    let caster: Player;
+    let opponent: Player;
+    let creature: Permanent;
+    let aura: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        creature = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        creature.controller = opponent;
+        const card = addTestCard(def, caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        game.pendingTargeter.onTargeted([creature]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+        aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(creature);
+    });
+
+    test("the Aura damages the last controller for the creature's modified toughness", () => {
+        const armor = addTestCard(cardData.find(card => card.name === "Holy Strength"), opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, armor, [creature])).toBe(true);
+        passPriorityRound();
+        creature.damageTaken = 1;
+        expect(creature.toughness).toBe(4);
+        const hits: GameEvent_DealDamage[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (hit: GameEvent_DealDamage) => hits.push(hit));
+
+        // 603.10a: All three permanents leave together, including the toughness bonus.
+        gameEventManager.performSimultaneous([
+            new GameEvent_DestroyPermanent(aura),
+            new GameEvent_DestroyPermanent(opponent.battlefield.objects.find(object => object.card === armor.card)),
+            new GameEvent_DestroyPermanent(creature),
+        ]);
+        game.checkState();
+        expect(game.stack.objects).toHaveLength(1);
+        expect(game.stack.objects[0]).toMatchObject({ controller: caster, source: aura });
+        expect(opponent.life).toBe(20);
+        passPriorityRound();
+        expect(hits).toHaveLength(1);
+        expect(hits[0]).toMatchObject({ source: aura, recipient: opponent, amount: 4 });
+        expect(opponent.life).toBe(16);
+        expect(caster.life).toBe(20);
+    });
+
+    test("ignores another creature dying and the enchanted creature being exiled", () => {
+        const other = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(other));
+        moveTestCard(creature, game.exile);
+        expect(caster.graveyard.objects.at(-1).card).toBe(aura.card);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("triggers at negative toughness and deals zero damage", () => {
+        const hits = vi.fn();
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, hits);
+        creature.toughness = -1;
+        game.checkState();
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(hits).not.toHaveBeenCalled();
+        expect(opponent.life).toBe(20);
+    });
+});

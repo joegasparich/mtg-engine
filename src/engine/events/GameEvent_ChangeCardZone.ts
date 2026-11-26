@@ -35,9 +35,19 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
     private entering?: Permanent;
 
+    protected get canMove() {
+        return !this.oldObject.retired && this.oldObject.zone === this.oldZone && this.oldZone !== this.newZone
+            && (!(this.newZone instanceof Stack) || !!this.options?.targets);
+    }
+
+    get departingPermanent() {
+        return this.oldObject instanceof Permanent && this.oldZone instanceof Battlefield && this.canMove
+            ? this.oldObject : undefined;
+    }
+
     override get entryPreparation() {
-        const { oldObject, oldZone, newZone } = this;
-        if (!(newZone instanceof Battlefield) || oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
+        const { oldObject, newZone } = this;
+        if (!(newZone instanceof Battlefield) || !this.canMove)
             return undefined;
         const player = this.options?.controller ?? oldObject.controller ?? oldObject.owner;
         return { player, prepare: (resume: () => void) => this.prepareEntry(player, resume) };
@@ -69,14 +79,12 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
     perform(): boolean {
         const { oldObject, oldZone, newZone, options } = this;
-        if (oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
+        if (!this.canMove)
             return false;
 
         // 400.7: Each zone change creates a new rules object for the same physical card.
         const controller = options?.controller ?? oldObject.controller ?? oldObject.owner;
         if (newZone instanceof Stack) {
-            if (!options?.targets)
-                return false;
             this.newObject = new Spell(oldObject.card, controller, options.targets, options.chosenX, options.chosenMode);
         } else if (newZone instanceof Battlefield) {
             const permanent = this.entering;
@@ -138,9 +146,13 @@ export class GameEvent_SacrificePermanent extends GameEvent_ChangeCardZone {
         super(permanent, permanent.owner.graveyard);
     }
 
-    perform(): boolean {
+    protected override get canMove() {
         // 701.21a: Only a permanent's controller can sacrifice it.
-        if (this.permanent.controller !== this.player || !(this.permanent.zone instanceof Battlefield) || !super.perform())
+        return this.permanent.controller === this.player && this.permanent.zone instanceof Battlefield && super.canMove;
+    }
+
+    perform(): boolean {
+        if (!super.perform())
             return false;
 
         this.label = `Player ${this.player.id} sacrificed ${this.permanent.logName}`;
@@ -155,9 +167,13 @@ export class GameEvent_DiscardCard extends GameEvent_ChangeCardZone {
         super(cardObject, player.graveyard);
     }
 
-    perform(): boolean {
+    protected override get canMove() {
         // 701.9a: Discard from the owner's hand.
-        if (this.cardObject.owner !== this.player || this.cardObject.zone !== this.player.hand || !super.perform())
+        return this.cardObject.owner === this.player && this.cardObject.zone === this.player.hand && super.canMove;
+    }
+
+    perform(): boolean {
+        if (!super.perform())
             return false;
 
         this.label = `Player ${this.player.id} discarded ${this.cardObject.logName}`;

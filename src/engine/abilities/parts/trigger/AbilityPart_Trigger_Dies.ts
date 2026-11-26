@@ -1,30 +1,42 @@
 import type { Ability } from "@engine/abilities/Ability";
+import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import type { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
+import gameEventManager from "@engine/events/GameEventManager";
+import { game } from "@engine/Game";
+import { StackAbility } from "@engine/GameObject";
 import { Battlefield,Graveyard } from "@engine/Zone";
+import type { TargetValidator } from "~/defs";
 import { AbilityPart_Trigger } from "./AbilityPart_Trigger";
 
 @RegisterAbilityPart
 export class AbilityPart_Trigger_Dies extends AbilityPart_Trigger {
+    subject: GrammarKey | TargetValidator = "THIS";
+    storeAs?: GrammarKey;
+    beforeMoveSignal?: string;
     private stopListening?: () => void;
 
     setup(ability: Ability) {
         super.setup(ability);
-        const { source } = ability;
-        if (!(source.zone instanceof Battlefield))
+        if (!(ability.source.zone instanceof Battlefield))
             return;
 
-        // 603.10a, 700.4, and 113.8: The ability and controller come from before the move to the graveyard.
-        this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.ChangeCardZone,
-            (_event: GameEvent_ChangeCardZone, controller) => {
-                if (controller)
-                    this.onTrigger({}, controller);
-            }, {
-                matches: event => event.oldObject === source && event.oldZone instanceof Battlefield
-                    && event.newZone instanceof Graveyard,
-                captureBeforeBatch: () => source.controller,
-            });
+        this.stopListening ??= gameEventManager.beforeZoneChange(move => {
+            const dying = move.departingPermanent;
+            if (!dying || !(move.newZone instanceof Graveyard))
+                return;
+            const matches = typeof this.subject === "string" ? dying === resolveAbilityGrammar(this.subject, ability)
+                : matchesTargetValidator(dying, this.subject);
+            if (!matches)
+                return;
+
+            // 603.2c, 603.10a: Each matching death reads the pre-move battlefield into its own slate.
+            const inputs = this.storeAs ? { [this.storeAs]: [dying] } : {};
+            const trigger = new StackAbility(ability.source.controller, ability.source, ability, this.outSignal, inputs);
+            if (this.beforeMoveSignal)
+                trigger.ability.fireSignal(this.beforeMoveSignal);
+            return () => game.stack.queueTrigger(trigger);
+        });
     }
 
     cleanup() {
