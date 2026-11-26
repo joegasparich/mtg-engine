@@ -13,7 +13,7 @@ export class PlayerAction_DeclareAttacker extends PlayerAction<Permanent> {
 
     perform(player: Player, _targets?: ActionTarget[]) {
         const defender = CombatManager.defendingPlayer;
-        if (!defender || !this.canEdit(player) || !CombatManager.canAttack(this.object))
+        if (!defender || !this.canEdit(player) || !CombatManager.canAttack(this.object, defender))
             return;
 
         CombatManager.attackingCreatures.set(this.object, defender);

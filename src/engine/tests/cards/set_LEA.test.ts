@@ -3,7 +3,7 @@ import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
-import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision } from "@engine/events";
+import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
 import { GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
@@ -1646,6 +1646,144 @@ test("Holy Armor's controller can pay {W} repeatedly for extra toughness until c
 
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
     expect(creature).toMatchObject({ power: 2, toughness: 4 });
+});
+
+describe("Island Sanctuary", () => {
+    const def = cardData.find(card => card.name === "Island Sanctuary");
+    const bears = cardData[GRIZZLY_BEARS];
+    let controller: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        opponent = game.addPlayer(BASIC_DECK);
+        controller = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    function startDrawStep() {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Draw));
+        expect(game.currentTurnPlayer()).toBe(controller);
+        expect(game.currentStepIndex).toBe(StepIndex.Draw);
+    }
+
+    test("casts for {1}{W} and only offers to skip its controller's draws during their draw step", () => {
+        const card = addTestCard(def, controller, controller.hand);
+        startDrawStep();
+        expect(game.pendingOptionalChoice).toBeNull();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+
+        controller.manaPool[ManaColour.W] = 1;
+        expect(playerActionManager.getCardActions(card, controller)).toHaveLength(0);
+        controller.manaPool[ManaColour.G] = 1;
+        const [cast] = playerActionManager.getCardActions(card, controller);
+        cast.perform(controller);
+        passPriorityRound();
+        expect(controller.battlefield.objects.some(permanent => permanent.card === card.card)).toBe(true);
+
+        const extra = controller.library.getTopCard().card;
+        gameEventManager.addEvent(new GameEvent_DrawCard(controller));
+        expect(game.pendingOptionalChoice).toBeNull();
+        expect(controller.hand.objects.at(-1).card).toBe(extra);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Draw));
+        expect(game.pendingOptionalChoice).toBeNull();
+        startDrawStep();
+        expect(game.pendingOptionalChoice?.player).toBe(controller);
+        game.pendingOptionalChoice.submit(controller, OptionalDecision.Decline);
+        const ground = addTestCard(bears, opponent, opponent.battlefield);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ground, controller))).toBe(true);
+
+        const opposingDraw = opponent.library.getTopCard().card;
+        gameEventManager.addEvent(new GameEvent_DrawCard(opponent));
+        expect(game.pendingOptionalChoice).toBeNull();
+        expect(opponent.hand.objects.at(-1).card).toBe(opposingDraw);
+    });
+
+    test("lets the player decide independently for every draw, including draws from a resolving spell", () => {
+        addTestCard(def, controller, controller.battlefield);
+        const recall = addTestCard(cardData[ANCESTRAL_RECALL], controller, controller.hand);
+        const first = controller.library.getTopCard().card;
+        startDrawStep();
+        expect(game.priorityPlayer).toBeNull();
+        game.pendingOptionalChoice.submit(controller, OptionalDecision.Decline);
+        expect(controller.hand.objects.at(-1).card).toBe(first);
+        expect(game.priorityPlayer).toBe(controller);
+
+        const next = controller.library.getTopCard().card;
+        const before = controller.hand.objects.length - 1;
+        expect(game.stack.spellCast(controller, recall, [controller])).toBe(true);
+        passPriorityRound();
+        const draw = vi.fn();
+        gameEventManager.onPerformed(GameEventType.DrawCard, draw);
+        try {
+            game.pendingOptionalChoice.submit(controller, OptionalDecision.Accept);
+            expect(game.stack.isResolving).toBe(true);
+            expect(controller.hand.objects).toHaveLength(before);
+            expect(controller.library.getTopCard().card).toBe(next);
+
+            game.pendingOptionalChoice.submit(controller, OptionalDecision.Decline);
+            expect(controller.hand.objects.at(-1).card).toBe(next);
+            game.pendingOptionalChoice.submit(controller, OptionalDecision.Accept);
+            expect(controller.hand.objects).toHaveLength(before + 1);
+            expect(draw).toHaveBeenCalledTimes(1);
+            expect(game.pendingOptionalChoice).toBeNull();
+            expect(game.stack.objects).toHaveLength(0);
+        } finally {
+            gameEventManager.offPerformed(GameEventType.DrawCard, draw);
+        }
+    });
+
+    test("allows flying and granted islandwalk to attack after the source leaves, until the next turn starts", () => {
+        const sanctuary = addTestCard(def, controller, controller.battlefield);
+        const ground = addTestCard(bears, opponent, opponent.battlefield);
+        const flyer = addTestCard(cardData.find(card => card.name === "Air Elemental"), opponent, opponent.battlefield);
+        const merfolk = addTestCard({ ...bears, subtypes: ["Merfolk"] }, opponent, opponent.battlefield);
+        const lord = addTestCard(cardData.find(card => card.name === "Lord of Atlantis"), opponent, opponent.battlefield);
+        startDrawStep();
+        game.pendingOptionalChoice.submit(controller, OptionalDecision.Accept);
+        moveTestCard(sanctuary, controller.graveyard);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(CombatManager.defendingPlayer).toBe(controller);
+        expect(playerActionManager.getCardActions(ground, opponent)).toHaveLength(0);
+        new PlayerActions.DeclareAttacker(ground).perform(opponent);
+        expect(CombatManager.attackingCreatures.has(ground)).toBe(false);
+        const [attackWithFlyer] = playerActionManager.getCardActions(flyer, opponent);
+        attackWithFlyer.perform(opponent);
+        expect(CombatManager.attackingCreatures.get(flyer)).toBe(controller);
+        expect(playerActionManager.getCardActions(merfolk, opponent)[0]).toBeInstanceOf(PlayerActions.DeclareAttacker);
+        moveTestCard(lord, opponent.graveyard);
+        expect(playerActionManager.getCardActions(merfolk, opponent)).toHaveLength(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentTurnPlayer()).toBe(controller);
+        expect(game.currentStepIndex).toBe(StepIndex.Untap);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ground, controller))).toBe(true);
+    });
+
+    test("another copy can replace a draw after the first copy is declined, even with an empty library", () => {
+        addTestCard(def, controller, controller.battlefield);
+        addTestCard(def, controller, controller.battlefield);
+        for (const card of [...controller.library.objects])
+            moveTestCard(card, controller.graveyard);
+
+        startDrawStep();
+        const first = game.pendingOptionalChoice;
+        first.submit(controller, OptionalDecision.Decline);
+        expect(game.pendingOptionalChoice).toBeTruthy();
+        expect(game.pendingOptionalChoice).not.toBe(first);
+        game.pendingOptionalChoice.submit(controller, OptionalDecision.Accept);
+
+        expect(game.pendingOptionalChoice).toBeNull();
+        expect(controller.library.objects).toHaveLength(0);
+        expect(game.priorityPlayer).toBe(controller);
+        const ground = addTestCard(bears, opponent, opponent.battlefield);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ground, controller))).toBe(false);
+    });
 });
 
 describe("Lord of Atlantis", () => {

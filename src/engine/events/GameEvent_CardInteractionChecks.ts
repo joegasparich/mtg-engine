@@ -1,4 +1,5 @@
 import type { CardObject,Permanent } from "@engine/GameObject";
+import type Player from "@engine/Player";
 import type { BasicLandType } from "~/defs";
 import { GameEvent,GameEventType } from "./GameEventManager";
 
@@ -24,7 +25,7 @@ export class GameEvent_DeclareAttacker extends GameEvent {
     type = GameEventType.DeclareAttacker;
     label = "";
 
-    constructor(readonly attacker: Permanent) {
+    constructor(readonly attacker: Permanent, readonly defender: Player | null = null) {
         super();
     }
 }

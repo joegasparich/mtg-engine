@@ -2,7 +2,7 @@ import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerAction
 import {
     CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,
     GameEvent_DiscardCard,GameEvent_GoToStep,GameEvent_PlayLand,GameEvent_SacrificePermanent,
-    GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,
+    GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision,
 } from "@engine/events";
 import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -33,6 +33,29 @@ function hand(player: Player, count: number) {
 }
 
 beforeEach(() => Game.init());
+
+test.each([OptionalDecision.Accept, OptionalDecision.Decline])("validates a two-option choice and resumes once (%s)", decision => {
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    const resume = vi.fn();
+    const details = { player, sourceName: "Test ability", prompt: "Proceed?", acceptLabel: "Yes", declineLabel: "No" };
+    game.requestOptionalChoice(details, resume);
+
+    const choice = game.pendingOptionalChoice;
+    expect(choice).toMatchObject(details);
+    expect(game.priorityPlayer).toBeNull();
+    choice.submit(opponent, decision);
+    choice.submit(player, -1 as OptionalDecision);
+    expect(game.pendingOptionalChoice).toBe(choice);
+    expect(resume).not.toHaveBeenCalled();
+
+    choice.submit(player, decision);
+    choice.submit(player, decision);
+    expect(resume).toHaveBeenCalledExactlyOnceWith(decision);
+    expect(game.pendingOptionalChoice).toBeNull();
+    expect(game.priorityPlayer).toBe(player);
+});
 
 test("an optional payment runs its success effect once after the cost is paid", () => {
     const caster = game.addPlayer([]);

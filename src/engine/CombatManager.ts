@@ -202,7 +202,7 @@ export class CombatManager {
         }
     }
 
-    static canAttack(attacker: Permanent) {
+    static canAttack(attacker: Permanent, defender = CombatManager.defendingPlayer) {
         if (attacker.controller !== CombatManager.attackingPlayer)
             return false;
 
@@ -216,7 +216,7 @@ export class CombatManager {
             return false;
 
         // 508.1c: Check restrictions on declaring this creature as an attacker.
-        return gameEventManager.checkEvent(new GameEvent_DeclareAttacker(attacker));
+        return gameEventManager.checkEvent(new GameEvent_DeclareAttacker(attacker, defender));
     }
 
     static canBlock(blocker: Permanent) {

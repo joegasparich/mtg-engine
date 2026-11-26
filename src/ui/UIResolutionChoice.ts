@@ -1,4 +1,4 @@
-import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,ManaPaymentDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,ManaPaymentDecision,OptionalDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
@@ -27,6 +27,17 @@ export class UIResolutionChoice {
             this.confirm.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Pay));
             decline.addEventListener("click", () => choice.submit(choice.player, ManaPaymentDecision.Decline));
             this.panel.append(this.confirm, decline);
+            return;
+        }
+        if (choice.kind === ResolutionChoiceKind.Optional) {
+            const prompt = document.createElement("p");
+            const accept = document.createElement("button");
+            prompt.textContent = choice.prompt;
+            this.confirm.textContent = choice.declineLabel;
+            accept.textContent = choice.acceptLabel;
+            this.confirm.addEventListener("click", () => choice.submit(choice.player, OptionalDecision.Decline));
+            accept.addEventListener("click", () => choice.submit(choice.player, OptionalDecision.Accept));
+            this.panel.append(prompt, this.confirm, accept);
             return;
         }
         if (choice.kind === ResolutionChoiceKind.SpellX) {
@@ -239,7 +250,7 @@ export class UIResolutionChoice {
 
     private showPanel() {
         document.body.append(this.panel);
-        if (this.choice.kind === ResolutionChoiceKind.ManaPayment)
+        if (this.choice.kind === ResolutionChoiceKind.ManaPayment || this.choice.kind === ResolutionChoiceKind.Optional)
             this.confirm.focus();
         else if (this.firstInput) {
             this.firstInput.focus();

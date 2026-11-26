@@ -3,7 +3,11 @@ import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManage
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
-import { type CardChoice,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type ResolutionChoice,ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
+import {
+    type CardChoice,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,
+    GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type OptionalChoiceDetails,OptionalDecision,
+    type OptionalResolutionChoice,type ResolutionChoice,ResolutionChoiceKind,
+} from "@engine/events/GameEvent_ResolutionChoice";
 import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { GameEvent_TakeSpecialAction } from "@engine/events/GameEvent_TakeSpecialAction";
 import gameEventManager,{ type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
@@ -50,6 +54,9 @@ export default class Game {
     }
     get pendingManaPaymentChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaPayment ? this.resolutionChoice : null;
+    }
+    get pendingOptionalChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.Optional ? this.resolutionChoice : null;
     }
     get pendingSpellXChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.SpellX ? this.resolutionChoice : null;
@@ -111,6 +118,17 @@ export default class Game {
                         ? isStillEligible(card)
                         : !!card.zone && optionZones.get(card) === card.zone)), () => resume(selected));
             },
+        };
+        this.openResolutionChoice(choice);
+    }
+
+    requestOptionalChoice(details: OptionalChoiceDetails, resume: (decision: OptionalDecision) => void) {
+        const choice: OptionalResolutionChoice = {
+            ...details,
+            kind: ResolutionChoiceKind.Optional,
+            submit: (player, decision) => this.submitResolutionChoice(choice, player,
+                () => decision === OptionalDecision.Accept || decision === OptionalDecision.Decline,
+                () => resume(decision)),
         };
         this.openResolutionChoice(choice);
     }

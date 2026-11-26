@@ -716,6 +716,18 @@
         ]
     },
     {
+        "name": "Island Sanctuary",
+        "image_url": "https://cards.scryfall.io/large/front/3/c/3c25c773-c64a-4197-9d25-c4c3ffb8be0c.jpg?1783919580",
+        "oracle_text": "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.",
+        "type": "Enchantment",
+        "cost": "{1}{W}",
+        "abilities": [
+            {
+                "parts": { "AbilityPart_IslandSanctuary": {} }
+            }
+        ]
+    },
+    {
         "name": "Lord of Atlantis",
         "image_url": "https://cards.scryfall.io/large/front/8/f/8f005191-0e0e-4ba3-acde-9c279ca589f6.jpg?1783919555",
         "oracle_text": "Other Merfolk get +1/+1 and have islandwalk. (They can't be blocked as long as defending player controls an Island.)",
