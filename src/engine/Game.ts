@@ -385,6 +385,10 @@ export default class Game {
         if (skipEmptyCombat && this.currentStepIndex === StepIndex.DeclareAttackers
             && !CombatManager.declaredAnyAttackers && !CombatManager.attackingCreatures.size) {
             this.currentStepIndex = StepIndex.EndOfCombat;
+        } else if (this.currentStepIndex === StepIndex.DeclareBlockers) {
+            // 510.4: Insert the first damage step only when a combatant has first or double strike.
+            this.currentStepIndex = CombatManager.prepareFirstStrikeDamage()
+                ? StepIndex.FirstStrikeDamage : StepIndex.CombatDamage;
         } else {
             this.currentStepIndex++;
         }
@@ -418,7 +422,9 @@ export default class Game {
             return false;
 
         const advance = () => {
-            if (this.currentStepIndex === index) {
+            // A request for the optional first strike step stops at regular damage if it was skipped.
+            if (this.currentStepIndex === index
+                || (index === StepIndex.FirstStrikeDamage && this.currentStepIndex === StepIndex.CombatDamage)) {
                 this.autoAdvance = autoSkip;
                 return;
             }

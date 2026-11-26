@@ -780,5 +780,31 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Lance",
+        "image_url": "https://cards.scryfall.io/large/front/3/a/3a6199d9-1253-473b-afbb-bc498f648631.jpg?1783919578",
+        "oracle_text": "Enchant creature\nEnchanted creature has first strike.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
+                        "grant": { "keyword": "first strike" }
+                    }
+                }
+            }
+        ]
     }
 ]

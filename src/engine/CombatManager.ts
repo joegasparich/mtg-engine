@@ -7,7 +7,7 @@ import { game } from "@engine/Game";
 import Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
 import gameEventManager from "@engine/events/GameEventManager";
-import { CardType } from "~/defs";
+import { CardType,Keyword } from "~/defs";
 
 export class CombatManager {
     static attackingPlayer: Player;
@@ -16,6 +16,7 @@ export class CombatManager {
     private static bands: Set<Permanent>[] = [];
     private static readonly effectiveBlocks = new Map<Permanent, Set<Permanent>>();
     private static readonly blockedAttackers = new Set<Permanent>();
+    private static readonly firstStrikeSources = new Set<Permanent>();
     private static attackersConfirmed = false;
     static declaredAnyAttackers = false;
     private static blocksConfirmed = false;
@@ -32,6 +33,7 @@ export class CombatManager {
         CombatManager.bands = [];
         CombatManager.effectiveBlocks.clear();
         CombatManager.blockedAttackers.clear();
+        CombatManager.firstStrikeSources.clear();
         CombatManager.attackersConfirmed = false;
         CombatManager.declaredAnyAttackers = false;
         CombatManager.blocksConfirmed = false;
@@ -282,7 +284,18 @@ export class CombatManager {
         return false;
     }
 
-    static assignCombatDamage() {
+    static prepareFirstStrikeDamage(): boolean {
+        // 510.4: Use the keywords at the start of the step, even if a creature assigns no damage.
+        const creatures = [...CombatManager.attackingCreatures.keys(), ...CombatManager.effectiveBlocks.keys()];
+        CombatManager.firstStrikeSources.clear();
+        for (const creature of creatures) {
+            if (creature.hasKeyword(Keyword.FirstStrike) || creature.hasKeyword(Keyword.DoubleStrike))
+                CombatManager.firstStrikeSources.add(creature);
+        }
+        return CombatManager.firstStrikeSources.size > 0;
+    }
+
+    static assignCombatDamage(firstStrike = false) {
         const blockersByAttacker = new Map<Permanent, Permanent[]>();
         for (const attacker of CombatManager.attackingCreatures.keys())
             blockersByAttacker.set(attacker, []);
@@ -292,7 +305,11 @@ export class CombatManager {
         }
 
         // 510.1: Assign damage from attackers first, then from blockers.
-        const sources = [...blockersByAttacker, ...CombatManager.effectiveBlocks];
+        const sources = [...blockersByAttacker, ...CombatManager.effectiveBlocks].filter(([source]) => {
+            // 510.4: Earlier sources assign in the second step only with current double strike.
+            const firstStrikeSource = CombatManager.firstStrikeSources.has(source);
+            return firstStrike ? firstStrikeSource : !firstStrikeSource || source.hasKeyword(Keyword.DoubleStrike);
+        });
         const damage: GameEvent_DealDamage[] = [];
         let index = 0;
         const addDamage = (source: Permanent, recipient: Permanent | Player, amount: number) => {

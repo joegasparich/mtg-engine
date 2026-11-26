@@ -66,9 +66,11 @@ export class DeclareBlockersStep implements Step {
 }
 
 export class CombatDamageStep implements Step {
+    constructor(private readonly firstStrike = false) {}
+
     onStart(): void {
         // 510.1–2: An assignment choice can pause this turn-based action.
-        CombatManager.assignCombatDamage();
+        CombatManager.assignCombatDamage(this.firstStrike);
     }
 }
 
@@ -92,6 +94,7 @@ export enum StepIndex {
     BeginningOfCombat,
     DeclareAttackers,
     DeclareBlockers,
+    FirstStrikeDamage,
     CombatDamage,
     EndOfCombat,
     SecondMain,
@@ -116,6 +119,7 @@ export namespace Step {
         new BeginningOfCombatStep(),
         new DeclareAttackersStep(),
         new DeclareBlockersStep(),
+        new CombatDamageStep(true),
         new CombatDamageStep(),
         new EndOfCombatStep(),
         {},
@@ -150,6 +154,7 @@ export namespace Step {
             case StepIndex.BeginningOfCombat: return "Beginning of combat";
             case StepIndex.DeclareAttackers: return "Declare attackers";
             case StepIndex.DeclareBlockers: return "Declare blockers";
+            case StepIndex.FirstStrikeDamage: return "First strike damage";
             case StepIndex.CombatDamage: return "Combat damage";
             case StepIndex.EndOfCombat: return "End of combat";
             case StepIndex.SecondMain: return "Second main";

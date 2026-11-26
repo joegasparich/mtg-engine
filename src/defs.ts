@@ -65,6 +65,8 @@ export type AbilityDef = {
 export enum Keyword {
     Banding = "banding",
     Defender = "defender",
+    DoubleStrike = "double strike",
+    FirstStrike = "first strike",
     Flying = "flying",
     Indestructible = "indestructible",
     Islandwalk = "islandwalk",

@@ -1887,6 +1887,77 @@ describe("Karma", () => {
     });
 });
 
+describe("Lance", () => {
+    const def = cardData.find(card => card.name === "Lance");
+    const plainsDef = cardData.find(card => card.name === BasicLandType.Plains);
+    let caster: Player;
+    let opponent: Player;
+    let lance: CardObject;
+    let plains: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        lance = addTestCard(def, caster, caster.hand);
+        plains = addTestCard(plainsDef, caster, caster.battlefield);
+    });
+
+    function castLance(target: Permanent) {
+        const [cast] = playerActionManager.getCardActions(lance, caster);
+        cast.perform(caster);
+        const request = game.pendingTargeter;
+        expect(request.validateTargets([plains])).toBe(false);
+        expect(plains.tapped).toBe(false);
+
+        request.onTargeted([target]);
+        expect(plains.tapped).toBe(true);
+        expect(target.hasKeyword(Keyword.FirstStrike)).toBe(false);
+        passPriorityRound();
+
+        const aura = caster.battlefield.objects.find(object => object.card === lance.card);
+        expect(aura?.attachedTo).toBe(target);
+        expect(target.hasKeyword(Keyword.FirstStrike)).toBe(true);
+        return aura;
+    }
+
+    test("enchants either player's creature and transfers the grant with the Aura", () => {
+        const friendlyCard = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.hand);
+        expect(playerActionManager.getCardActions(lance, caster)).toHaveLength(0);
+
+        const opposing = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const aura = castLance(opposing);
+        const friendly = moveTestCard(friendlyCard, caster.battlefield);
+        expect(friendly.hasKeyword(Keyword.FirstStrike)).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(aura, friendly));
+        expect(opposing.hasKeyword(Keyword.FirstStrike)).toBe(false);
+        expect(friendly.hasKeyword(Keyword.FirstStrike)).toBe(true);
+
+        moveTestCard(aura, caster.graveyard);
+        expect(friendly.hasKeyword(Keyword.FirstStrike)).toBe(false);
+    });
+
+    test("lets the enchanted creature win combat against an equal blocker", () => {
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const blocker = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        castLance(attacker);
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        new PlayerActions.DeclareAttacker(attacker).perform(caster, [opponent]);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+        new PlayerActions.DeclareBlocker(blocker).perform(opponent, [attacker]);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.FirstStrikeDamage));
+
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(blocker.retired).toBe(true);
+        passPriorityRound();
+        expect(attacker.zone).toBe(caster.battlefield);
+        expect(attacker.damageTaken).toBe(0);
+    });
+});
+
 describe("Lord of Atlantis", () => {
     const def = cardData.find(card => card.name === "Lord of Atlantis");
     const merfolk: CardDef = {

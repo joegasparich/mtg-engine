@@ -6,7 +6,8 @@ import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager"
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard } from "@engine/tests/testData";
+import type { CardObject,Permanent } from "@engine/GameObject";
+import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard,passPriorityRound } from "@engine/tests/testData";
 import { BasicLandType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -35,6 +36,134 @@ test("should trade", () => {
 
     expect(playerA.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsA.card }));
     expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsB.card }));
+});
+
+describe("first strike and double strike", () => {
+    function beginDamage(attackers: Permanent[], blocks: [Permanent, Permanent][] = []) {
+        game.startGame();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        for (const attacker of attackers)
+            new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+        gameEventManager.addEvent(new GameEvent_Advance(playerA));
+        passPriorityRound();
+
+        for (const [blocker, attacker] of blocks)
+            new PlayerActions.DeclareBlocker(blocker).perform(playerB, [attacker]);
+        gameEventManager.addEvent(new GameEvent_Advance(playerB));
+        passPriorityRound();
+    }
+
+    test.each(["attacker", "blocker"])("a first-striking %s survives lethal combat", firstStriker => {
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+        const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+        const [winner, loser] = firstStriker === "attacker" ? [attacker, blocker] : [blocker, attacker];
+        winner.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, winner);
+
+        beginDamage([attacker], [[blocker, attacker]]);
+
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(loser.retired).toBe(true);
+        expect(winner.damageTaken).toBe(0);
+        expect(game.priorityPlayer).toBe(playerA);
+
+        passPriorityRound();
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(winner.damageTaken).toBe(0);
+        expect(playerB.life).toBe(20);
+    });
+
+    test("a first striker outside combat does not add a combat damage step", () => {
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+        const bystander = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+        bystander.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, bystander);
+
+        beginDamage([attacker]);
+
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(playerB.life).toBe(18);
+        passPriorityRound();
+        expect(game.currentStepIndex).toBe(StepIndex.EndOfCombat);
+    });
+
+    test.each([0, 2])("regular damage uses the first strike snapshot even at first-step power %i", power => {
+        const first = addTestCard({ ...cardData[GRIZZLY_BEARS], power }, playerA, playerA.battlefield);
+        const second = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+        const { revoke } = first.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, first);
+
+        beginDamage([first, second]);
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(playerB.life).toBe(20 - power);
+
+        revoke();
+        first.power = 2;
+        second.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, second);
+        passPriorityRound();
+
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(playerB.life).toBe(18 - power);
+    });
+
+    test("double strike by itself creates two damage steps", () => {
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+        attacker.grantAbility({ keyword: Keyword.DoubleStrike, parts: {} }, attacker);
+
+        beginDamage([attacker]);
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(playerB.life).toBe(18);
+        passPriorityRound();
+
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(playerB.life).toBe(16);
+    });
+
+    test("double strike can be gained or lost before regular damage", () => {
+        const [keepsStrike, losesStrike, gainsStrike] = Array.from({ length: 3 },
+            () => addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield));
+        const doubleStrike = { keyword: Keyword.DoubleStrike, parts: {} };
+        keepsStrike.grantAbility(doubleStrike, keepsStrike);
+        const { revoke } = losesStrike.grantAbility(doubleStrike, losesStrike);
+        // 702.4d: A creature that already has first strike can gain a second hit.
+        gainsStrike.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, gainsStrike);
+
+        const hits: CardObject[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
+            if (event.recipient === playerB)
+                hits.push(event.source);
+        });
+        beginDamage([keepsStrike, losesStrike, gainsStrike]);
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(hits).toEqual([keepsStrike, losesStrike, gainsStrike]);
+
+        revoke();
+        gainsStrike.grantAbility(doubleStrike, gainsStrike);
+        passPriorityRound();
+
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(hits.slice(3)).toEqual([keepsStrike, gainsStrike]);
+    });
+
+    test("a first strike damage split resolves before priority and remaining blockers deal regular damage", () => {
+        const attacker = addTestCard({ ...cardData[GRIZZLY_BEARS], toughness: 3 }, playerA, playerA.battlefield);
+        const first = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+        const second = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+        attacker.grantAbility({ keyword: Keyword.FirstStrike, parts: {} }, attacker);
+
+        beginDamage([attacker], [[first, attacker], [second, attacker]]);
+        expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+        expect(game.priorityPlayer).toBeNull();
+        const choice = game.pendingCombatDamageChoice;
+        expect(choice).toMatchObject({ player: playerA, source: attacker, recipients: [first, second], total: 2 });
+        choice.submit(playerA, [2, 0]);
+
+        expect(first.retired).toBe(true);
+        expect(attacker.damageTaken).toBe(0);
+        expect(game.priorityPlayer).toBe(playerA);
+        passPriorityRound();
+
+        expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+        expect(attacker.damageTaken).toBe(2);
+        expect(second.damageTaken).toBe(0);
+    });
 });
 
 test("unblocked attackers deal player damage simultaneously with blocked combat damage", () => {

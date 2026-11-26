@@ -11,6 +11,14 @@
             "AbilityPart_Defender": {}
         }
     },
+    "double strike": {
+        "keyword": "double strike",
+        "parts": {}
+    },
+    "first strike": {
+        "keyword": "first strike",
+        "parts": {}
+    },
     "flying": {
         "keyword": "flying",
         "parts": {

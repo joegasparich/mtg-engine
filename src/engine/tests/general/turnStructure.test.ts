@@ -57,6 +57,15 @@ test("should advance to specific step", () => {
     expect(game.currentStepIndex).toBe(StepIndex.SecondMain);
 });
 
+test("advancing to first strike damage stops at regular damage when first strike is skipped", () => {
+    game.startGame();
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.FirstStrikeDamage));
+
+    expect(game.turnNumber).toBe(0);
+    expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+});
+
 test("should change turns", () => {
     const playerTwo = game.addPlayer(BASIC_DECK);
 
