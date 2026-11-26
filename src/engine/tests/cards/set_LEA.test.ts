@@ -2390,6 +2390,81 @@ describe("Purelace", () => {
     });
 });
 
+describe("Reverse Damage", () => {
+    const def = cardData.find(card => card.name === "Reverse Damage");
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    test("costs {1}{W}{W} and reverses only the chosen source's next damage to the caster", () => {
+        const other = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        const land = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const hidden = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        caster.manaPool[ManaColour.W] = 1;
+        expect(playerActionManager.getCardActions(card, caster)).toEqual([]);
+        caster.manaPool[ManaColour.W] = 2;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(land.tapped).toBe(true);
+        expect(game.pendingTargeter).toBeNull();
+        expect(game.pendingResolutionChoice).toBeNull();
+
+        const chosen = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        passPriorityRound();
+        const choice = game.pendingResolutionChoice;
+        expect(choice.player).toBe(caster);
+        expect(choice.options).toContain(land);
+        expect(choice.options).not.toContain(hidden);
+        choice.submit(caster, [chosen]);
+        expect(caster.graveyard.objects[0].card).toBe(card.card);
+        gameEventManager.addEvent(new GameEvent_DealDamage(chosen, opponent, 2));
+        gameEventManager.addEvent(new GameEvent_DealDamage(other, caster, 1));
+        expect([caster.life, opponent.life]).toEqual([19, 18]);
+        gameEventManager.addEvent(new GameEvent_DealDamage(chosen, caster, 4));
+        expect(caster.life).toBe(23);
+        gameEventManager.addEvent(new GameEvent_DealDamage(chosen, caster, 4));
+        expect(caster.life).toBe(19);
+    });
+
+    test("can choose an instant on the stack before that spell deals damage", () => {
+        const burn = addTestCard({
+            ...cardData[ANCESTRAL_RECALL],
+            abilities: [{ parts: {
+                AbilityPart_Target: { saveAs: "TARGET", validTargets: ["Player"] },
+                AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "TARGET", amount: 3 },
+            } }],
+        }, opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, burn, [caster])).toBe(true);
+        const source = game.stack.objects[0] as Spell;
+        expect(game.stack.spellCast(caster, card)).toBe(true);
+        passPriorityRound();
+        expect(game.pendingResolutionChoice.options).toContain(source);
+        game.pendingResolutionChoice.submit(caster, [source]);
+        expect(caster.life).toBe(20);
+        passPriorityRound();
+        expect(caster.life).toBe(23);
+    });
+
+    test("an unused shield expires during cleanup", () => {
+        const source = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, card)).toBe(true);
+        passPriorityRound();
+        game.pendingResolutionChoice.submit(caster, [source]);
+        gameEventManager.addEvent(new GameEvent_Cleanup(caster));
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, caster, 3));
+        expect(caster.life).toBe(17);
+    });
+});
+
 describe("Resurrection", () => {
     const def = cardData.find(card => card.name === "Resurrection");
     const creature = cardData[GRIZZLY_BEARS];

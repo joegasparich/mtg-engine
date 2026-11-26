@@ -10,7 +10,8 @@
                 "activateString": "{1}: Prevent damage from a black source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
-                    "AbilityPart_Effect_CircleOfProtection": { "colour": "B" }
+                    "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "B" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": { "inSignal": "SOURCE_CHOSEN", "source": "SOURCE", "targetValidator": { "colour": "B" } }
                 }
             }
         ]

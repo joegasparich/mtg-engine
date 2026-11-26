@@ -34,6 +34,7 @@ export type DamagePrevention =
         recipient: DamageRecipient;
         source: CardObject;
         matches?: DamagePreventionMatch;
+        onPrevented?: (amount: number) => void;
         // Share a key only when the matching conditions are identical for the same ability definition.
         equivalenceKey?: PropertyKey;
     }
@@ -70,9 +71,19 @@ export class DamagePreventionSystem {
     }
 
     getSourceReferences(): CardObject[] {
-        return [...this.rules].flatMap(({ effect }) => effect.kind === DamagePreventionKind.NextHit
-            ? [effect.source, ...(effect.source.resolvedDamageSource ? [effect.source.resolvedDamageSource] : [])]
-            : []);
+        const references: CardObject[] = [];
+        for (const { effect } of this.rules) {
+            if (effect.kind === DamagePreventionKind.NextHit) {
+                references.push(effect.source);
+                if (effect.source.resolvedDamageSource)
+                    references.push(effect.source.resolvedDamageSource);
+            }
+            if (effect.kind !== DamagePreventionKind.EveryHit && "card" in effect.recipient)
+                references.push(effect.recipient);
+            if (effect.kind === DamageRedirectionKind.Points && "card" in effect.destination)
+                references.push(effect.destination);
+        }
+        return references;
     }
 
     preview(hit: GameEvent_DealDamage): boolean {
@@ -89,13 +100,14 @@ export class DamagePreventionSystem {
     }
 
     resolve(events: readonly GameEvent_DealDamage[], choices: DamagePreventionChoices,
-        commit: (resolved: readonly GameEvent_DealDamage[][]) => void, consume = true) {
+        commit: (resolved: readonly GameEvent_DealDamage[][], afterDamage: readonly (() => void)[]) => void, consume = true) {
         const hits: Hit[] = events.map((event, originalIndex) => ({
             event, originalIndex, amount: event.canDealDamage() ? event.amount : 0,
             appliedRedirections: new Set<Registration>(),
         }));
         const remaining = new Map([...this.rules].map(rule => [rule, rule.remaining]));
         const players = choices.turnOrder();
+        const afterDamage: (() => void)[] = [];
 
         const applicationsFor = (player: Player): Application[] => {
             const applications: Application[] = [];
@@ -119,9 +131,14 @@ export class DamagePreventionSystem {
             const { rule, hits: eligible, capacity } = application;
             const { effect } = rule;
             if (!isPoints(effect)) {
-                eligible[0].amount = 0;
-                if (effect.kind === DamagePreventionKind.NextHit)
+                if (effect.kind === DamagePreventionKind.NextHit) {
+                    const { onPrevented } = effect;
+                    const { amount } = eligible[0];
+                    if (consume && onPrevented)
+                        afterDamage.push(() => onPrevented(amount));
                     remaining.set(rule, 0);
+                }
+                eligible[0].amount = 0;
                 return true;
             }
 
@@ -209,7 +226,7 @@ export class DamagePreventionSystem {
                 for (const event of portions.slice(0, -1))
                     event.callback = undefined;
             }
-            commit(resolved);
+            commit(resolved, afterDamage);
         };
         advance();
     }
@@ -261,6 +278,7 @@ export class DamagePreventionSystem {
         if (first.kind === DamagePreventionKind.NextHit && second.kind === DamagePreventionKind.NextHit) {
             const sameKey = first.equivalenceKey !== undefined
                 && first.equivalenceKey === second.equivalenceKey
+                && first.onPrevented === second.onPrevented
                 && a.rule.by.ability?.def === b.rule.by.ability?.def;
             return (a.rule === b.rule || sameKey)
                 && first.recipient === second.recipient && first.source === second.source

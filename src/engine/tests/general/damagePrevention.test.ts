@@ -1,5 +1,5 @@
 import { PlayerActions } from "@engine/actions";
-import { DamagePreventionKind } from "@engine/effects/DamagePrevention";
+import { DamagePreventionKind,DamageRedirectionKind } from "@engine/effects/DamagePrevention";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToStep,ResolutionChoiceKind } from "@engine/events";
 import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEventType } from "@engine/events/GameEventManager";
@@ -77,6 +77,32 @@ test("a finite shield carries over and observers see only damage that was actual
     expect(protectedPlayer.life).toBe(17);
 });
 
+test("source selection and prevention both check the configured creature and tapped requirements", () => {
+    const targetValidator = { cardType: CardType.Creature, tapped: true };
+    circle = addTestCard({ ...redCircle, abilities: [{ parts: {
+        AbilityPart_Activate_Mana: { cost: "{0}" },
+        AbilityPart_Effect_ChooseDamageSource: { targetValidator, saveAs: "SOURCE", outSignal: "CHOSEN" },
+        AbilityPart_Effect_PreventNextDamageFromSource: { inSignal: "CHOSEN", source: "SOURCE", targetValidator },
+    } }] }, protectedPlayer, protectedPlayer.battlefield);
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    attacker.tapped = true;
+    circle.tapped = true;
+    addTestCard(redCreature, opponent, opponent.battlefield);
+
+    activate();
+    passPriorityRound();
+    const choice = game.pendingResolutionChoice;
+    expect(choice.options).toEqual([attacker]);
+    choice.submit(protectedPlayer, [attacker]);
+
+    attacker.tapped = false;
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
+    attacker.tapped = true;
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
+});
+
 test("a next-hit shield evaluates its source predicate when damage would be dealt", () => {
     const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
     gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
@@ -97,6 +123,30 @@ test("a next-hit shield evaluates its source predicate when damage would be deal
     expect(protectedPlayer.life).toBe(18);
     gameEventManager.addEvent(hit(attacker));
     expect(protectedPlayer.life).toBe(16);
+});
+
+test.each([1, 4])("a next-hit follow-up sees only damage left after a %i-point shield", capacity => {
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    const prevented = vi.fn((_amount: number) => expect(opponent.life).toBe(18));
+    gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: { kind: DamagePreventionKind.NextHit, source: attacker, recipient: protectedPlayer, onPrevented: prevented },
+    });
+    shield(protectedPlayer, capacity);
+    expect(gameEventManager.checkEvent(hit(attacker, 4))).toBe(false);
+    gameEventManager.performSimultaneous([hit(attacker, 4), new GameEvent_DealDamage(attacker, opponent, 2)]);
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a prevention order choice");
+    expect(prevented).not.toHaveBeenCalled();
+    choice.submit(protectedPlayer, choice.options.findIndex(option => option.startsWith("Finite shield")));
+    if (capacity === 4) {
+        expect(prevented).not.toHaveBeenCalled();
+        gameEventManager.addEvent(hit(attacker, 3));
+    }
+    expect(prevented).toHaveBeenCalledExactlyOnceWith(3);
+    gameEventManager.addEvent(hit(attacker));
+    expect(protectedPlayer.life).toBe(18);
 });
 
 test("different next-hit shield keys preserve the choice of which shield to spend", () => {
@@ -358,6 +408,43 @@ test("an activation can resolve without eligible sources", () => {
     const exposed = moveTestCard(hidden, opponent.battlefield);
     gameEventManager.addEvent(hit(exposed));
     expect(protectedPlayer.life).toBe(18);
+});
+
+test("a targeted stack ability keeps its departed target eligible as a damage source", () => {
+    const target = addTestCard(redCreature, opponent, opponent.battlefield);
+    const permanent = addTestCard({ ...redCreature, abilities: [{ parts: {
+        AbilityPart_Activate_Mana: { cost: "{0}" },
+        AbilityPart_Target: { saveAs: "TARGET", validTargets: ["Permanent"] },
+    } }] }, protectedPlayer, protectedPlayer.battlefield);
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(protectedPlayer, permanent, permanent.abilities[0], [target]));
+    const newCard = moveTestCard(target, opponent.graveyard);
+    activate();
+    passPriorityRound();
+    const choice = game.pendingResolutionChoice;
+    expect(choice.options).toContain(target);
+    expect(choice.options).not.toContain(newCard);
+    choice.submit(protectedPlayer, [target]);
+    gameEventManager.addEvent(hit(target));
+    expect(protectedPlayer.life).toBe(20);
+});
+
+test("waiting damage effects retain references to their recipients and redirection destinations", () => {
+    const makeCreature = () => addTestCard(redCreature, opponent, opponent.battlefield);
+    const protectedCreature = makeCreature();
+    const from = makeCreature();
+    const to = makeCreature();
+    shield(protectedCreature, 1);
+    gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: { kind: DamageRedirectionKind.Points, recipient: from, destination: to, amount: 1 },
+    });
+    const referenced = [protectedCreature, from, to];
+    for (const permanent of referenced)
+        moveTestCard(permanent, opponent.graveyard);
+    activate();
+    passPriorityRound();
+    expect(game.pendingResolutionChoice.options).toEqual(referenced);
+    game.pendingResolutionChoice.submit(protectedPlayer, [to]);
 });
 
 test("source selection uses the resolution state and rejects choices that become ineligible", () => {

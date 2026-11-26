@@ -358,7 +358,7 @@ class GameEventManager {
 
     private commitPrepared(events: GameEvent[],
         notify: (performed: GameEvent[], checkedPerformed: boolean, captured: CapturedListeners) => void, checked?: GameEvent) {
-        const commit = (damage?: readonly GameEvent_DealDamage[][]) => {
+        const commit = (damage?: readonly GameEvent_DealDamage[][], afterDamage: readonly (() => void)[] = []) => {
             const captured = this.captureGameListeners();
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
@@ -372,6 +372,9 @@ class GameEventManager {
                     }
                 }
             }
+            // 615.5: Additional prevention effects follow the damage event, before priority or state checks.
+            for (const followUp of afterDamage)
+                followUp();
             notify(performed, checkedPerformed, captured);
         };
 
@@ -382,9 +385,9 @@ class GameEventManager {
         }
 
         this.damagePending = true;
-        this.effects.damagePrevention.resolve(hits, this.damageChoices, damage => {
+        this.effects.damagePrevention.resolve(hits, this.damageChoices, (damage, afterDamage) => {
             this.damagePending = false;
-            commit(damage);
+            commit(damage, afterDamage);
         });
     }
 

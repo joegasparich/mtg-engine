@@ -390,7 +390,7 @@ export class Spell extends CardObject {
 
 export class StackAbility extends GameObject {
     readonly ability: Ability;
-    private readonly targets: readonly ActionTarget[];
+    readonly targets: readonly ActionTarget[];
 
     constructor(readonly controller: Player, readonly source: CardObject, ability: Ability,
         private readonly signal: string, inputs: Ability["slate"] = {}, targets: readonly ActionTarget[] = []) {

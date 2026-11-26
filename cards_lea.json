@@ -408,7 +408,8 @@
                 "activateString": "{1}: Prevent damage from a blue source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
-                    "AbilityPart_Effect_CircleOfProtection": { "colour": "U" }
+                    "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "U" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": { "inSignal": "SOURCE_CHOSEN", "source": "SOURCE", "targetValidator": { "colour": "U" } }
                 }
             }
         ]
@@ -424,7 +425,8 @@
                 "activateString": "{1}: Prevent damage from a green source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
-                    "AbilityPart_Effect_CircleOfProtection": { "colour": "G" }
+                    "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "G" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": { "inSignal": "SOURCE_CHOSEN", "source": "SOURCE", "targetValidator": { "colour": "G" } }
                 }
             }
         ]
@@ -440,7 +442,8 @@
                 "activateString": "{1}: Prevent damage from a red source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
-                    "AbilityPart_Effect_CircleOfProtection": { "colour": "R" }
+                    "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "R" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": { "inSignal": "SOURCE_CHOSEN", "source": "SOURCE", "targetValidator": { "colour": "R" } }
                 }
             }
         ]
@@ -456,7 +459,8 @@
                 "activateString": "{1}: Prevent damage from a white source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
-                    "AbilityPart_Effect_CircleOfProtection": { "colour": "W" }
+                    "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "W" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": { "inSignal": "SOURCE_CHOSEN", "source": "SOURCE", "targetValidator": { "colour": "W" } }
                 }
             }
         ]
@@ -914,6 +918,26 @@
                         "target": "TARGET_CREATURE",
                         "destination": "battlefield"
                     }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Reverse Damage",
+        "image_url": "https://cards.scryfall.io/large/front/0/7/07d5b8f7-d4ae-42ad-87bf-a64dd74f9687.jpg?1783919574",
+        "oracle_text": "The next time a source of your choice would deal damage to you this turn, prevent that damage. You gain life equal to the damage prevented this way.",
+        "type": "Instant",
+        "cost": "{1}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Effect_ChooseDamageSource": { "inSignal": "SPELL_RESOLVE", "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
+                    "AbilityPart_Effect_PreventNextDamageFromSource": {
+                        "inSignal": "SOURCE_CHOSEN",
+                        "source": "SOURCE",
+                        "onPrevented": { "saveAs": "PREVENTED", "outSignal": "DAMAGE_PREVENTED" }
+                    },
+                    "AbilityPart_Effect_GainLife": { "inSignal": "DAMAGE_PREVENTED", "target": "THIS.controller", "amount": "PREVENTED" }
                 }
             }
         ]

@@ -1,26 +1,24 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import { DamagePreventionKind } from "@engine/effects/DamagePrevention";
-import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { CardChoicePresentation,CardChoiceVisibility } from "@engine/events/GameEvent_ResolutionChoice";
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject,Spell } from "@engine/GameObject";
-import type { CardColour } from "~/defs";
-import { AbilityPart_Effect } from "../effect/AbilityPart_Effect";
+import type { TargetValidator } from "~/defs";
+import { AbilityPart_Effect } from "./AbilityPart_Effect";
 
-// TODO: Next time we add a card that chooses a source of damage, refactor that part of this out of here
 @RegisterAbilityPart
-export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
-    colour: CardColour;
+export class AbilityPart_Effect_ChooseDamageSource extends AbilityPart_Effect {
+    targetValidator?: TargetValidator;
+    saveAs: string;
+    outSignal: string;
 
     perform() {
-        const player = this.ability.controller;
+        const player = this.ability.controller ?? this.ability.source.controller;
         if (!player)
             return;
 
-        const { colour } = this;
-        const hasColour = (source: CardObject) => source.colours.has(colour);
-        const eligibleSources = () => this.getDamageSources().filter(hasColour);
+        const eligibleSources = () => this.getDamageSources().filter(source => matchesTargetValidator(source, this));
         const options = eligibleSources();
         if (options.length === 0)
             return;
@@ -35,16 +33,8 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
             earlierChoices: [],
             presentation: CardChoicePresentation.SingleCardList,
         }, ([source]) => {
-            gameEventManager.startContinuousUntilEndOfTurn(this.ability, {
-                kind: ContinuousEffectKind.DamageEffect,
-                rule: {
-                    kind: DamagePreventionKind.NextHit,
-                    recipient: player,
-                    source,
-                    matches: ({ source }) => hasColour(source),
-                    equivalenceKey: colour,
-                },
-            });
+            this.ability.slate[this.saveAs] = [source];
+            this.ability.fireSignal(this.outSignal);
         }, source => eligibleSources().includes(source));
     }
 
@@ -54,7 +44,7 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
         for (const entry of game.stack.objects) {
             const references = entry instanceof Spell
                 ? [entry, ...entry.targets]
-                : [entry.source, ...Object.values(entry.ability.slate).flat()];
+                : [entry.source, ...entry.targets, ...Object.values(entry.ability.slate).flat()];
             for (const reference of references) {
                 if (reference instanceof CardObject)
                     sources.add(reference);
