@@ -47,6 +47,7 @@ export type TargetValidator = {
     cardTypes?: readonly CardType[];
     onBattlefield?: boolean;
     cardSubtype?: string;
+    colour?: CardColour;
     // Match the subtype before continuous type changes are applied.
     baseSubtype?: string;
     tapped?: boolean;

@@ -499,6 +499,29 @@
         ]
     },
     {
+        "name": "Crusade",
+        "image_url": "https://cards.scryfall.io/large/front/b/9/b99452c0-5d1c-4a73-90b6-0ec3ac0af893.jpg",
+        "oracle_text": "White creatures get +1/+1.",
+        "type": "Enchantment",
+        "cost": "{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                        "saveAs": "WHITE_CREATURES",
+                        "zone": "battlefield",
+                        "targetValidator": { "cardType": "Creature", "colour": "W" }
+                    },
+                    "AbilityPart_ModifyPowerToughness": {
+                        "permanentsFrom": "WHITE_CREATURES",
+                        "power": 1,
+                        "toughness": 1
+                    }
+                }
+            }
+        ]
+    },
+    {
         "name": "Death Ward",
         "image_url": "https://cards.scryfall.io/large/front/5/7/577da5a4-4030-484d-b1d1-77326611f0a4.jpg?1783919584",
         "oracle_text": "Regenerate target creature.",

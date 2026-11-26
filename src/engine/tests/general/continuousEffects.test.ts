@@ -82,6 +82,35 @@ test("a static modifier reads a live selection from the slate until the ability 
     expect(bears.toughness).toBe(2);
 });
 
+test("a continuous zone selection filters by current colour alongside card type", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...bearsDef,
+        type: CardType.Enchantment,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectsFromZoneContinuously: {
+                saveAs: "GREEN_CREATURES",
+                zone: ZoneKind.Battlefield,
+                targetValidator: { cardType: CardType.Creature, colour: "G" },
+            },
+        } }],
+    }, player, player.battlefield);
+    const { slate } = source.abilities[0];
+    expect(slate.GREEN_CREATURES).toEqual([]);
+
+    const bears = addTestCard(bearsDef, player, player.battlefield);
+    const multicoloured = addTestCard({ ...bearsDef, cost: "{G}{U}" }, player, player.battlefield);
+    addTestCard({ ...bearsDef, cost: "{2}" }, player, player.battlefield);
+    expect(slate.GREEN_CREATURES).toEqual([bears, multicoloured]);
+    bears.colours = new Set(["U"]);
+    expect(slate.GREEN_CREATURES).toEqual([multicoloured]);
+
+    moveTestCard(source, player.graveyard);
+    expect(slate).not.toHaveProperty("GREEN_CREATURES");
+});
+
 test("the tapped filter matches only permanents in the requested state", () => {
     Game.init();
     const player = game.addPlayer([]);

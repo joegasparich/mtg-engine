@@ -1104,6 +1104,57 @@ describe("Castle", () => {
     });
 });
 
+describe("Crusade", () => {
+    const def = cardData.find(card => card.name === "Crusade");
+    const heroDef = cardData.find(card => card.name === "Benalish Hero");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    test("casts for {W}{W} and gives both players' white creatures +1/+1 on the battlefield", () => {
+        const crusade = addTestCard(def, caster, caster.hand);
+        const hero = addTestCard(heroDef, caster, caster.battlefield);
+        const opposingHero = addTestCard(heroDef, opponent, opponent.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const heroInHand = addTestCard(heroDef, opponent, opponent.hand);
+        gameEventManager.addEvent(new GameEvent_TapCard(opposingHero));
+        const plainsDef = cardData.find(card => card.name === "Plains");
+        const firstPlains = addTestCard(plainsDef, caster, caster.battlefield);
+        const forest = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(crusade, caster)).toHaveLength(0);
+
+        const secondPlains = addTestCard(plainsDef, caster, caster.battlefield);
+        const [cast] = playerActionManager.getCardActions(crusade, caster);
+        cast.perform(caster);
+        expect([firstPlains.tapped, secondPlains.tapped, forest.tapped]).toEqual([true, true, false]);
+        expect([hero.power, hero.toughness]).toEqual([1, 1]);
+        passPriorityRound();
+
+        expect([hero.power, hero.toughness]).toEqual([2, 2]);
+        expect([opposingHero.power, opposingHero.toughness]).toEqual([2, 2]);
+        expect([bears.power, bears.toughness]).toEqual([2, 2]);
+        expect([heroInHand.power, heroInHand.toughness]).toEqual([1, 1]);
+    });
+
+    test("bonuses stack for a multicoloured creature entering later and end as each Crusade leaves", () => {
+        const first = addTestCard(def, caster, caster.battlefield);
+        const second = addTestCard(def, opponent, opponent.battlefield);
+        const hero = addTestCard({ ...heroDef, cost: "{W}{G}" }, opponent, opponent.battlefield);
+        expect([hero.power, hero.toughness]).toEqual([3, 3]);
+
+        moveTestCard(first, caster.graveyard);
+        expect([hero.power, hero.toughness]).toEqual([2, 2]);
+        moveTestCard(second, opponent.graveyard);
+        expect([hero.power, hero.toughness]).toEqual([1, 1]);
+    });
+});
+
 describe("Armageddon", () => {
     let caster: Player;
     let opponent: Player;
