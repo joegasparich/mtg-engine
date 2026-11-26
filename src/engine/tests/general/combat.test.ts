@@ -6,8 +6,8 @@ import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager"
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS } from "@engine/tests/testData";
-import { Keyword } from "~/defs";
+import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard } from "@engine/tests/testData";
+import { BasicLandType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 let playerA: Player;
@@ -152,6 +152,27 @@ test("flyer can't be blocked by non flyer", () => {
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
 
     expect(playerActionManager.getCardActions(bears, playerB, false).length).toBe(0);
+});
+
+test("islandwalk prevents blocks while the defender controls a land with the Island subtype", () => {
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+    const islandwalker = { ...cardData[GRIZZLY_BEARS], abilities: [{ keyword: Keyword.Islandwalk, parts: {} }] };
+    const attacker = addTestCard(islandwalker, playerA, playerA.battlefield);
+    const blocker = addTestCard(islandwalker, playerB, playerB.battlefield);
+    addTestCard(island, playerA, playerA.battlefield);
+    addTestCard(island, playerB, playerB.hand);
+    const land = addTestCard(cardData[MOUNTAIN], playerB, playerB.battlefield);
+
+    game.startGame({ allowAutoSkip: false });
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+    gameEventManager.addEvent(new GameEvent_GoToNextStep());
+
+    expect(CombatManager.canBlockAttacker(blocker, attacker)).toBe(true);
+    land.subtypes = [BasicLandType.Mountain, BasicLandType.Island];
+    expect(CombatManager.canBlockAttacker(blocker, attacker)).toBe(false);
+    moveTestCard(land, playerB.graveyard);
+    expect(CombatManager.canBlockAttacker(blocker, attacker)).toBe(true);
 });
 
 test("non flyer can be blocked by flyer", () => {

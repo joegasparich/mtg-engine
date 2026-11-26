@@ -18,7 +18,7 @@ export class AbilityPart_Effect_GrantAbilityUntilEndOfTurn extends AbilityPart_E
             // 611.2a and 514.2: A spell's temporary effect ends during cleanup.
             const revoke = gameEventManager.effects.startContinuous(this.ability, {
                 kind: ContinuousEffectKind.AbilityGrant,
-                recipient,
+                recipients: [recipient],
                 grant: this.grant,
             });
             gameEventManager.onGamePerformed(GameEventType.Cleanup, revoke, { once: true });

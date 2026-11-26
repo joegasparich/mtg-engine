@@ -981,13 +981,19 @@ describe.each([
         const attachedWard = castWard();
         const otherCreature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
         const [initialGrant] = creature.abilities;
+        attachedWard.colours = new Set(["W", colour]);
 
-        attachedWard.attachedTo = otherCreature;
+        const { revoke } = otherCreature.grantAbility(protection, plains);
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(attachedWard, otherCreature));
+        expect(attachedWard.attachedTo).toBe(creature);
+        expect(creature.abilities[0]).toBe(initialGrant);
+        revoke();
+
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(attachedWard, otherCreature));
+        expect(attachedWard.attachedTo).toBe(otherCreature);
         expect(creature.abilities).toHaveLength(0);
         expect(otherCreature.abilities).toEqual([expect.objectContaining({ source: otherCreature, grantedBy: attachedWard })]);
         expect(otherCreature.abilities).not.toContain(initialGrant);
-        attachedWard.colours = new Set(["W", colour]);
-        game.checkState();
         expect(attachedWard.zone).toBe(caster.battlefield);
 
         attachedWard.attachedTo = undefined;
@@ -1022,9 +1028,8 @@ describe.each([
             ...wardDef,
             cost: "{1}",
             abilities: [...wardDef.abilities, { parts: {
-                AbilityPart_GrantAttachedAbility: {
-                    grant: protection,
-                },
+                AbilityPart_SelectObjectContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
+                AbilityPart_GrantAbilityContinuously: { permanentsFrom: "ENCHANTED_CREATURE", grant: protection },
             } }],
         }, caster, caster.hand);
         const attachedWard = castWard();
@@ -1641,4 +1646,90 @@ test("Holy Armor's controller can pay {W} repeatedly for extra toughness until c
 
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
     expect(creature).toMatchObject({ power: 2, toughness: 4 });
+});
+
+describe("Lord of Atlantis", () => {
+    const def = cardData.find(card => card.name === "Lord of Atlantis");
+    const merfolk: CardDef = {
+        ...cardData[GRIZZLY_BEARS],
+        name: "Test Merfolk",
+        subtypes: ["Merfolk"],
+        power: 1,
+        toughness: 1,
+    };
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+    });
+
+    test("casts for {U}{U} and gives other Merfolk on both sides +1/+1 and islandwalk", () => {
+        startMainPhase();
+        const card = addTestCard(def, caster, caster.hand);
+        const friendly = addTestCard(merfolk, caster, caster.battlefield);
+        const opposing = addTestCard(merfolk, opponent, opponent.hand);
+        const bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.G] = 1;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+
+        caster.manaPool[ManaColour.U] = 2;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(friendly).toMatchObject({ power: 1, toughness: 1 });
+
+        passPriorityRound();
+        const lord = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(lord).toMatchObject({ power: 2, toughness: 2 });
+        expect(lord.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(opposing).toMatchObject({ power: 1, toughness: 1 });
+        expect(opposing.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(bear).toMatchObject({ power: 2, toughness: 2 });
+        expect(bear.hasKeyword(Keyword.Islandwalk)).toBe(false);
+
+        const opposingPermanent = moveTestCard(opposing, opponent.battlefield);
+        for (const recipient of [friendly, opposingPermanent]) {
+            expect(recipient).toMatchObject({ power: 2, toughness: 2 });
+            expect(recipient.hasKeyword(Keyword.Islandwalk)).toBe(true);
+        }
+        opposingPermanent.subtypes = ["Bear"];
+        expect(opposingPermanent).toMatchObject({ power: 1, toughness: 1 });
+        expect(opposingPermanent.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        opposingPermanent.subtypes = merfolk.subtypes;
+        expect(opposingPermanent).toMatchObject({ power: 2, toughness: 2 });
+        expect(opposingPermanent.hasKeyword(Keyword.Islandwalk)).toBe(true);
+    });
+
+    test("two Lords grant each other islandwalk and stack their bonuses on other Merfolk", () => {
+        const lord = addTestCard(def, caster, caster.battlefield);
+        const otherLord = addTestCard(def, opponent, opponent.battlefield);
+        const friendly = addTestCard(merfolk, caster, caster.battlefield);
+        const blocker = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        addTestCard(cardData.find(card => card.name === BasicLandType.Island), opponent, opponent.battlefield);
+        for (const recipient of [lord, otherLord, friendly]) {
+            expect(recipient).toMatchObject({ power: 3, toughness: 3 });
+            expect(recipient.hasKeyword(Keyword.Islandwalk)).toBe(true);
+        }
+
+        game.startGame({ allowAutoSkip: false });
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        new PlayerActions.DeclareAttacker(lord).perform(caster, [opponent]);
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        expect(CombatManager.canBlockAttacker(blocker, lord)).toBe(false);
+
+        moveTestCard(otherLord, opponent.graveyard);
+        expect(lord).toMatchObject({ power: 2, toughness: 2 });
+        expect(lord.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(CombatManager.canBlockAttacker(blocker, lord)).toBe(true);
+        expect(friendly).toMatchObject({ power: 2, toughness: 2 });
+        expect(friendly.hasKeyword(Keyword.Islandwalk)).toBe(true);
+
+        moveTestCard(lord, caster.graveyard);
+        expect(friendly).toMatchObject({ power: 1, toughness: 1 });
+        expect(friendly.hasKeyword(Keyword.Islandwalk)).toBe(false);
+    });
 });

@@ -20,7 +20,7 @@ export class AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn extends Abili
         // 611.2a, 611.2c, and 514.2: Fix the recipient at resolution and end the effect during cleanup.
         const end = gameEventManager.effects.startContinuous(this.ability, {
             kind: ContinuousEffectKind.ModifyPowerToughness,
-            appliesTo: candidate => candidate === recipient,
+            recipients: [recipient],
             power: this.power,
             toughness: this.toughness,
         });

@@ -92,7 +92,10 @@ test("protection removes matching Auras and prevents new ones", () => {
     expect(attachedWhiteAura?.attachedTo).toBe(target);
 
     const protectionAura = addTestCard({
-        ...aura, cost: "{W}", abilities: [enchantCreature, { parts: { AbilityPart_GrantAttachedAbility: { grant: protection } } }],
+        ...aura, cost: "{W}", abilities: [enchantCreature, { parts: {
+            AbilityPart_SelectObjectContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
+            AbilityPart_GrantAbilityContinuously: { permanentsFrom: "ENCHANTED_CREATURE", grant: protection },
+        } }],
     }, player, player.hand);
     expect(game.stack.spellCast(player, protectionAura, [target])).toBe(true);
     game.stack.resolveAll();

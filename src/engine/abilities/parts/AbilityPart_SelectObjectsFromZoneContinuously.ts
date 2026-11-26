@@ -14,6 +14,7 @@ export class AbilityPart_SelectObjectsFromZoneContinuously extends AbilityPart i
     zoneOf?: GrammarKey;
     controlledBy?: GrammarKey;
     targetValidator?: TargetValidator;
+    excludeSource = false;
     private clearSelection?: () => void;
 
     setup(ability: Ability) {
@@ -23,7 +24,10 @@ export class AbilityPart_SelectObjectsFromZoneContinuously extends AbilityPart i
             return;
 
         // 611.3a, 611.3c: A static effect sees the current selection, including permanents as they enter.
-        this.clearSelection = defineComputedProperty(slate, this.saveAs, () => selectObjectsFromZone(ability, this));
+        this.clearSelection = defineComputedProperty(slate, this.saveAs, () => {
+            const objects = selectObjectsFromZone(ability, this);
+            return this.excludeSource ? objects.filter(object => object !== source) : objects;
+        });
     }
 
     cleanup() {

@@ -2,9 +2,9 @@ import { resolveAbilityGrammar,type GrammarKey } from "@engine/abilities";
 import type { Ability } from "@engine/abilities/Ability";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { game } from "@engine/Game";
-import { CardObject,type GameObject } from "@engine/GameObject";
+import { CardObject,type GameObject,Permanent } from "@engine/GameObject";
 import Player from "@engine/Player";
-import { type Zone,ZoneKind } from "@engine/Zone";
+import { Battlefield,type Zone,ZoneKind } from "@engine/Zone";
 import type { TargetValidator } from "~/defs";
 
 export type ZoneSelection = {
@@ -25,6 +25,11 @@ export function selectObjectsFromZone(ability: Ability, selection: ZoneSelection
     return getSelectionZones(ability, selection).flatMap(zone => zone.objects.filter(object =>
         (!controller || ("controller" in object && object.controller === controller))
         && (!targetValidator || (object instanceof CardObject && matchesTargetValidator(object, targetValidator)))));
+}
+
+export function getBattlefieldPermanentsFromSlate(ability: Ability, key: GrammarKey): readonly Permanent[] {
+    const objects: readonly GameObject[] = ability.slate[key] ?? [];
+    return objects.filter((object): object is Permanent => object instanceof Permanent && object.zone instanceof Battlefield);
 }
 
 function getSelectionZones(ability: Ability, { zone, zoneOf }: ZoneSelection): readonly Zone[] {

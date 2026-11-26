@@ -168,7 +168,9 @@
             },
             {
                 "parts": {
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
                         "grant": {
                             "parts": {
@@ -177,7 +179,7 @@
                         }
                     },
                     "AbilityPart_KeepGrantingAuraAttached": {
-                        "grantFrom": "GRANTED_PROTECTION"
+                        "grantsFrom": "GRANTED_PROTECTION"
                     }
                 }
             }
@@ -253,7 +255,9 @@
             },
             {
                 "parts": {
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
                         "grant": {
                             "parts": {
@@ -262,7 +266,7 @@
                         }
                     },
                     "AbilityPart_KeepGrantingAuraAttached": {
-                        "grantFrom": "GRANTED_PROTECTION"
+                        "grantsFrom": "GRANTED_PROTECTION"
                     }
                 }
             }
@@ -308,7 +312,9 @@
             },
             {
                 "parts": {
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
                         "grant": {
                             "parts": {
@@ -317,7 +323,7 @@
                         }
                     },
                     "AbilityPart_KeepGrantingAuraAttached": {
-                        "grantFrom": "GRANTED_PROTECTION"
+                        "grantsFrom": "GRANTED_PROTECTION"
                     }
                 }
             }
@@ -340,7 +346,9 @@
             },
             {
                 "parts": {
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
                         "grant": {
                             "parts": {
@@ -349,7 +357,7 @@
                         }
                     },
                     "AbilityPart_KeepGrantingAuraAttached": {
-                        "grantFrom": "GRANTED_PROTECTION"
+                        "grantsFrom": "GRANTED_PROTECTION"
                     }
                 }
             }
@@ -372,7 +380,9 @@
             },
             {
                 "parts": {
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
                         "grant": {
                             "parts": {
@@ -381,7 +391,7 @@
                         }
                     },
                     "AbilityPart_KeepGrantingAuraAttached": {
-                        "grantFrom": "GRANTED_PROTECTION"
+                        "grantsFrom": "GRANTED_PROTECTION"
                     }
                 }
             }
@@ -464,7 +474,9 @@
                     "SimpleAura": {
                         "targetValidator": { "cardType": "Land" }
                     },
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_LAND",
                         "grant": { "keyword": "indestructible" }
                     },
                     "AbilityPart_PreventOtherAurasOnAttachment": {}
@@ -632,7 +644,9 @@
                     "SimpleAura": {
                         "targetValidator": { "cardType": "Land" }
                     },
-                    "AbilityPart_GrantAttachedAbility": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "ENCHANTED_LAND",
                         "grant": {
                             "parts": {
                                 "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "controllerOnly": true },
@@ -697,6 +711,33 @@
                 "parts": {
                     "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "ENCHANTED_CREATURE", "power": 1, "toughness": 2 }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Lord of Atlantis",
+        "image_url": "https://cards.scryfall.io/large/front/8/f/8f005191-0e0e-4ba3-acde-9c279ca589f6.jpg?1783919555",
+        "oracle_text": "Other Merfolk get +1/+1 and have islandwalk. (They can't be blocked as long as defending player controls an Island.)",
+        "type": "Creature",
+        "subtypes": ["Merfolk"],
+        "cost": "{U}{U}",
+        "power": 2,
+        "toughness": 2,
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                        "saveAs": "OTHER_MERFOLK",
+                        "zone": "battlefield",
+                        "excludeSource": true,
+                        "targetValidator": { "cardSubtype": "Merfolk" }
+                    },
+                    "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "OTHER_MERFOLK", "power": 1, "toughness": 1 },
+                    "AbilityPart_GrantAbilityContinuously": {
+                        "permanentsFrom": "OTHER_MERFOLK",
+                        "grant": { "keyword": "islandwalk" }
+                    }
                 }
             }
         ]

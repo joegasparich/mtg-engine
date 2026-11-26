@@ -77,6 +77,8 @@ export class CardObject extends GameObject {
     set type(type: CardType) {
         this.baseType = type;
         this.refreshBaseAbilities();
+        if (this.zone instanceof Battlefield)
+            gameEventManager.effects.refreshAbilityGrants();
     }
 
     get subtypes(): readonly string[] {
@@ -87,6 +89,8 @@ export class CardObject extends GameObject {
     set subtypes(subtypes: readonly string[]) {
         this.baseSubtypes = subtypes;
         this.refreshBaseAbilities();
+        if (this.zone instanceof Battlefield)
+            gameEventManager.effects.refreshAbilityGrants();
     }
 
     hasBaseSubtype(subtype: string): boolean {
@@ -189,14 +193,20 @@ export class CardObject extends GameObject {
             if (this.grantedAbilities.has(ability))
                 ability.setup();
         });
+        // 611.3c: Grant abilities before a permanent's entry is observed by triggers.
+        if (zone instanceof Battlefield)
+            gameEventManager.effects.refreshAbilityGrants();
     }
 
     retire() {
+        const wasOnBattlefield = this.zone instanceof Battlefield;
         this.activeBaseAbilities.forEach(ability => ability.cleanup());
         this.activeBaseAbilities.clear();
         this.grantedAbilities.forEach(ability => ability.cleanup());
         this.grantedAbilities.clear();
         super.retire();
+        if (wasOnBattlefield)
+            gameEventManager.effects.refreshAbilityGrants();
     }
 
     canPlay() {
@@ -287,13 +297,8 @@ export class Permanent extends CardObject {
             return;
 
         this.attachment = target;
-        if (!(this.zone instanceof Battlefield))
-            return;
-
-        for (const ability of this.abilities) {
-            for (const part of ability.parts)
-                part.onAttachmentChanged?.();
-        }
+        if (this.zone instanceof Battlefield)
+            gameEventManager.effects.refreshAbilityGrants();
     }
 
     public getPotentialMana(actor: Player): Readonly<ManaAmount> {

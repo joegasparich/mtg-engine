@@ -39,15 +39,27 @@ export enum ContinuousEffectKind {
     DamagePrevention,
 }
 
+type Recipients = readonly Permanent[] | (() => readonly Permanent[]);
+
+function getRecipients(recipients: Recipients): readonly Permanent[] {
+    return typeof recipients === "function" ? recipients() : recipients;
+}
+
 type PowerToughnessModifier = { power: number; toughness: number };
 type PowerToughnessEffect = PowerToughnessModifier & {
     kind: ContinuousEffectKind.ModifyPowerToughness;
-    appliesTo: (recipient: CardObject) => boolean;
+    recipients: Recipients;
+};
+type AbilityGrantEffect = {
+    kind: ContinuousEffectKind.AbilityGrant;
+    grant: AbilityDef;
+    recipients: Recipients;
+    onGrantsUpdated?: (grants: readonly Ability[]) => void;
 };
 export type ContinuousEffect =
     | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
-    | { kind: ContinuousEffectKind.AbilityGrant; recipient: Permanent; grant: AbilityDef; onGrantChanged?: (granted?: Ability) => void }
+    | AbilityGrantEffect
     | { kind: ContinuousEffectKind.DamagePrevention; prevention: DamagePrevention }
     | PowerToughnessEffect;
 
@@ -82,6 +94,7 @@ export class EffectSystem {
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
     private readonly powerToughnessEffects = new Set<PowerToughnessEffect>();
+    private readonly updateAbilityGrants = new Set<() => void>();
 
     constructor(private readonly events: EventDispatcher) {}
 
@@ -104,11 +117,16 @@ export class EffectSystem {
             end();
     }
 
+    refreshAbilityGrants() {
+        for (const update of this.updateAbilityGrants)
+            update();
+    }
+
     getModifiedPowerToughness(recipient: CardObject, stat: keyof PowerToughnessModifier, base: number): number {
         // 613.4c: Add each applicable power or toughness modifier to the underlying characteristic.
         let value = base;
         for (const effect of this.powerToughnessEffects) {
-            if (effect.appliesTo(recipient))
+            if (getRecipients(effect.recipients).some(permanent => permanent === recipient))
                 value += effect[stat];
         }
         return value;
@@ -132,20 +150,45 @@ export class EffectSystem {
             case ContinuousEffectKind.DamagePrevention:
                 return this.damagePrevention.register(effect.prevention,
                     { object: ability.source, keyword: ability.def.keyword, ability });
-            case ContinuousEffectKind.AbilityGrant: {
-                const { ability: granted, revoke } = effect.recipient.grantAbility(effect.grant, ability.source);
-                effect.onGrantChanged?.(granted);
-                return () => {
-                    effect.onGrantChanged?.();
-                    revoke();
-                };
-            }
+            case ContinuousEffectKind.AbilityGrant:
+                return this.applyAbilityGrant(ability, effect);
             case ContinuousEffectKind.ModifyPowerToughness: {
-                const modifier = { ...effect };
+                const { recipients } = effect;
+                const modifier = { ...effect, recipients: typeof recipients === "function" ? recipients : [...recipients] };
                 this.powerToughnessEffects.add(modifier);
                 return () => { this.powerToughnessEffects.delete(modifier); };
             }
         }
+    }
+
+    private applyAbilityGrant(ability: Ability, { recipients, grant, onGrantsUpdated }: AbilityGrantEffect): () => void {
+        const grants = new Map<Permanent, ReturnType<Permanent["grantAbility"]>>();
+        const update = () => {
+            // 611.3a, 613.1f: Keep the same grant instance while a permanent remains eligible.
+            const selected = new Set(getRecipients(recipients));
+            for (const [recipient, { revoke }] of grants) {
+                if (!selected.has(recipient)) {
+                    grants.delete(recipient);
+                    revoke();
+                }
+            }
+            for (const recipient of selected) {
+                if (!grants.has(recipient))
+                    grants.set(recipient, recipient.grantAbility(grant, ability.source));
+            }
+            onGrantsUpdated?.([...grants.values()].map(granted => granted.ability));
+        };
+
+        if (typeof recipients === "function")
+            this.updateAbilityGrants.add(update);
+        update();
+        return () => {
+            this.updateAbilityGrants.delete(update);
+            for (const { revoke } of grants.values())
+                revoke();
+            grants.clear();
+            onGrantsUpdated?.([]);
+        };
     }
 
     onCheck(check: CheckListener, source?: CheckSource, { beforeCommit, references }: EventCheckOptions = {}) {

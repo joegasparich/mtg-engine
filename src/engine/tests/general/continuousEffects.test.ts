@@ -1,5 +1,10 @@
+import { makeAbility } from "@engine/abilities";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
+import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import type { GameEvent_ChangeCardZone } from "@engine/events";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
+import { Permanent } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import { addTestCard,GRIZZLY_BEARS,moveTestCard,startMainPhase } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
@@ -109,6 +114,118 @@ test("a continuous zone selection filters by current colour alongside card type"
 
     moveTestCard(source, player.graveyard);
     expect(slate).not.toHaveProperty("GREEN_CREATURES");
+});
+
+test("a continuous zone selection can exclude its source across all battlefields", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const sourceDef = {
+        ...bearsDef,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectsFromZoneContinuously: {
+                saveAs: "OTHER_CREATURES",
+                zone: ZoneKind.Battlefield,
+                excludeSource: true,
+                targetValidator: { cardType: CardType.Creature },
+            },
+        } }],
+    };
+    const source = addTestCard(sourceDef, player, player.battlefield);
+    const other = addTestCard(sourceDef, opponent, opponent.battlefield);
+
+    expect(source.abilities[0].slate.OTHER_CREATURES).toEqual([other]);
+    expect(other.abilities[0].slate.OTHER_CREATURES).toEqual([source]);
+});
+
+test("a continuous grant follows battlefield membership and card types before entry is announced", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const observeEntry = vi.fn((event: GameEvent_ChangeCardZone) => {
+        expect(event.newObject).toBeInstanceOf(Permanent);
+        expect(event.newObject.hasKeyword(Keyword.Flying)).toBe(true);
+    });
+    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, observeEntry, {
+        matches: event => event.newZone === player.battlefield && event.oldObject.def === bearsDef,
+    });
+    const source = addTestCard({
+        ...bearsDef,
+        type: CardType.Enchantment,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectsFromZoneContinuously: {
+                saveAs: "CREATURES",
+                zone: ZoneKind.Battlefield,
+                targetValidator: { cardType: CardType.Creature },
+            },
+            AbilityPart_GrantAbilityContinuously: {
+                permanentsFrom: "CREATURES",
+                saveAs: "GRANTED_FLIGHT",
+                grant: { keyword: Keyword.Flying },
+            },
+        } }],
+    }, player, player.battlefield);
+    const { slate } = source.abilities[0];
+    expect(slate).not.toHaveProperty("GRANTED_FLIGHT");
+    const bears = addTestCard(bearsDef, player, player.battlefield);
+    expect(observeEntry).toHaveBeenCalledOnce();
+    const [granted] = bears.abilities;
+    expect(granted.grantedBy).toBe(source);
+    expect(slate.GRANTED_FLIGHT[0]).toBe(granted);
+
+    const other = addTestCard(bearsDef, player, player.battlefield);
+    expect(slate.GRANTED_FLIGHT).toHaveLength(2);
+    expect(slate.GRANTED_FLIGHT[0]).toBe(granted);
+    expect(slate.GRANTED_FLIGHT[1]).toBe(other.abilities[0]);
+    bears.type = CardType.Artifact;
+    expect(bears.hasKeyword(Keyword.Flying)).toBe(false);
+    expect(slate.GRANTED_FLIGHT).toHaveLength(1);
+    expect(slate.GRANTED_FLIGHT[0]).toBe(other.abilities[0]);
+    bears.type = CardType.Creature;
+    expect(bears.hasKeyword(Keyword.Flying)).toBe(true);
+    expect(moveTestCard(other, player.graveyard).hasKeyword(Keyword.Flying)).toBe(false);
+
+    source.abilities = [];
+    expect(bears.hasKeyword(Keyword.Flying)).toBe(false);
+    expect(slate).not.toHaveProperty("GRANTED_FLIGHT");
+});
+
+test("ability grants and stat modifiers accept the same fixed list of recipients", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const first = addTestCard(bearsDef, player, player.battlefield);
+    const second = addTestCard(bearsDef, player, player.battlefield);
+    const other = addTestCard(bearsDef, player, player.battlefield);
+    const ability = makeAbility({ parts: {} }, other);
+    const recipients = [first, second];
+    const endGrant = gameEventManager.effects.startContinuous(ability, {
+        kind: ContinuousEffectKind.AbilityGrant,
+        recipients,
+        grant: { keyword: Keyword.Flying, parts: {} },
+    });
+    const endModifier = gameEventManager.effects.startContinuous(ability, {
+        kind: ContinuousEffectKind.ModifyPowerToughness,
+        recipients,
+        power: 1,
+        toughness: 2,
+    });
+
+    recipients[1] = other;
+    for (const creature of [first, second]) {
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(true);
+        expect(creature).toMatchObject({ power: 3, toughness: 4 });
+    }
+    expect(other.hasKeyword(Keyword.Flying)).toBe(false);
+    expect(other).toMatchObject({ power: 2, toughness: 2 });
+
+    endGrant();
+    endModifier();
+    for (const creature of [first, second]) {
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(false);
+        expect(creature).toMatchObject({ power: 2, toughness: 2 });
+    }
 });
 
 test("the tapped filter matches only permanents in the requested state", () => {

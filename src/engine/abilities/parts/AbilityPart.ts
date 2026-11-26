@@ -9,7 +9,6 @@ export abstract class AbilityPart {
     checkState?(actions: GameEvent[]): void;
     canAttachTo?(target: Permanent): boolean;
     canCast?(): boolean;
-    onAttachmentChanged?(): void;
 
     setup(ability: Ability) {
         this.ability = ability;
