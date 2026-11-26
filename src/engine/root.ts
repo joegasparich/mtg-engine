@@ -15,12 +15,16 @@ declare global {
 }
 
 const playtestDeck = Object.entries({
-    "Copy Artifact": 12,
-    Island: 24,
-    "Black Lotus": 8,
-    "Animate Artifact": 4,
-    "Celestial Prism": 8,
-    Clone: 4,
+    Island: 18,
+    Plains: 6,
+    "Control Magic": 5,
+    Counterspell: 5,
+    "Creature Bond": 5,
+    "Lord of Atlantis": 6,
+    "Air Elemental": 5,
+    Disenchant: 3,
+    "Wrath of God": 3,
+    "Black Lotus": 4,
 }).flatMap(([name, copies]) => {
     const index = cardData.findIndex(card => card.name === name);
     if (index < 0)

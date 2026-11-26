@@ -109,6 +109,14 @@ class GameEventManager {
     private choices: DamagePreventionChoices;
     private commitPending = false;
     private currentBatch: GameEvent[] = [];
+    private afterBatch?: Set<() => void>;
+
+    afterSimultaneousChanges(update: () => void) {
+        if (this.afterBatch)
+            this.afterBatch.add(update);
+        else
+            update();
+    }
 
     startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean,
         damageChoices: DamagePreventionChoices) {
@@ -387,11 +395,21 @@ class GameEventManager {
             const captured = this.captureGameListeners(pending);
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
-            for (const event of pending) {
-                if (event.perform()) {
-                    performed.push(event);
-                    checkedPerformed ||= event === checked || checkedPortions.includes(event);
+            const previousBatch = this.afterBatch;
+            if (events.length > 1)
+                this.afterBatch ??= new Set();
+            try {
+                for (const event of pending) {
+                    if (event.perform()) {
+                        performed.push(event);
+                        checkedPerformed ||= event === checked || checkedPortions.includes(event);
+                    }
                 }
+            } finally {
+                const updates = this.afterBatch;
+                this.afterBatch = previousBatch;
+                if (!previousBatch)
+                    updates?.forEach(update => update());
             }
             // 615.5: Additional prevention effects follow the damage event, before priority or state checks.
             for (const followUp of afterDamage)

@@ -1264,6 +1264,31 @@
         }]
     },
     {
+        "name": "Control Magic",
+        "image_url": "https://cards.scryfall.io/large/front/0/4/04cbe4e4-37a3-49fb-81bd-85f1b06687df.jpg?1783919562",
+        "oracle_text": "Enchant creature\nYou control enchanted creature.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{2}{U}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Creature" } } } },
+            { "parts": { "AbilityPart_ControlEnchantedPermanent": {} } }
+        ]
+    },
+    {
+        "name": "Counterspell",
+        "image_url": "https://cards.scryfall.io/large/front/6/8/68787949-4c50-47a1-a28c-05ea37dd13cd.jpg?1783919561",
+        "oracle_text": "Counter target spell.",
+        "types": ["Instant"],
+        "cost": "{U}{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_Target": { "saveAs": "SPELL", "validTargets": ["Spell"] },
+                "AbilityPart_Effect_ChangeZones": { "inSignal": "SPELL_RESOLVE", "target": "SPELL", "destination": "graveyard" }
+            }
+        }]
+    },
+    {
         "name": "Creature Bond",
         "image_url": "https://cards.scryfall.io/large/front/5/d/5d89669b-f08a-400c-8673-7ffd91c05f5d.jpg?1783919561",
         "oracle_text": "Enchant creature\nWhen enchanted creature dies, this Aura deals damage equal to that creature's toughness to the creature's controller.",

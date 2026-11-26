@@ -33,6 +33,7 @@ export default class UICard extends PIXI.Container {
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
     private face?: Readonly<CardDef>;
+    private stopWatchingPermanent?: () => void;
     private copyIcon?: PIXI.Graphics;
     private originalFace?: PIXI.Sprite;
     private powerToughness?: UICardPowerToughness;
@@ -104,7 +105,11 @@ export default class UICard extends PIXI.Container {
     }
 
     setObject(object: CardObject) {
+        this.stopWatchingPermanent?.();
+        this.stopWatchingPermanent = undefined;
         this.object = object;
+        if (object instanceof Permanent)
+            this.stopWatchingPermanent = object.onControlOrAttachmentChanged(() => this.syncBattlefieldGroup(object));
         const face = object instanceof Permanent ? object.printedFace : object.def;
         if (this.face !== face) {
             this.face = face;
@@ -142,6 +147,19 @@ export default class UICard extends PIXI.Container {
             if (texture && !original.destroyed)
                 original.texture = texture;
         });
+    }
+
+    private syncBattlefieldGroup(permanent: Permanent) {
+        const group = this.battlefieldGroup;
+        if (!group)
+            return;
+        const host = uiRoot.getCardView(permanent.attachedTo)?.battlefieldGroup;
+        if (host && host !== group) {
+            group.battlefield.removeCard(this);
+            host.addCard(this);
+        } else if (group.permanent === this && permanent.zone !== group.battlefield.zone) {
+            uiRoot.playerToUIPlayer.get(permanent.controller)?.battlefield.takeGroup(group);
+        }
     }
 
     private setHovered(hovered: boolean) {

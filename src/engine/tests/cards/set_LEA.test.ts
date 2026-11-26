@@ -3472,6 +3472,145 @@ describe("Copy Artifact", () => {
     });
 });
 
+describe("Control Magic", () => {
+    const def = cardData.find(card => card.name === "Control Magic");
+    let caster: Player;
+    let opponent: Player;
+    let creature: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        startMainPhase();
+    });
+
+    function enchant(player: Player, target: Permanent) {
+        const card = addTestCard(def, player, player.hand);
+        expect(game.stack.spellCast(player, card, [target])).toBe(true);
+        passPriorityRound();
+        return player.battlefield.objects.find(object => object.card === card.card);
+    }
+
+    test("pays {2}{U}{U}, takes the existing creature, and returns it when the Aura leaves", () => {
+        const card = addTestCard(def, caster, caster.hand);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 4;
+        creature.tapped = true;
+        creature.damageTaken = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        game.pendingTargeter.onTargeted([creature]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(creature.controller).toBe(opponent);
+        passPriorityRound();
+
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(creature);
+        expect(caster.battlefield.objects).toContain(creature);
+        expect(opponent.battlefield.objects).toEqual([land]);
+        expect(creature).toMatchObject({ controller: caster, owner: opponent, tapped: true, damageTaken: 1 });
+        expect(creature.controlledSinceTurnStart).toBe(false);
+
+        moveTestCard(aura, caster.graveyard);
+        expect(creature.zone).toBe(opponent.battlefield);
+        expect(creature.controller).toBe(opponent);
+        expect(creature.retired).toBe(false);
+    });
+
+    test("simultaneously losing both Auras keeps an attacker under its original controller", () => {
+        const older = enchant(caster, creature);
+        const newer = enchant(opponent, creature);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        new PlayerActions.DeclareAttacker(creature).perform(opponent, [caster]);
+        expect(CombatManager.attackingCreatures.get(creature)).toBe(caster);
+
+        gameEventManager.performSimultaneous([
+            new GameEvent_DestroyPermanent(newer), new GameEvent_DestroyPermanent(older),
+        ]);
+        expect(creature.controller).toBe(opponent);
+        expect(creature.controlledSinceTurnStart).toBe(true);
+        expect(CombatManager.attackingCreatures.get(creature)).toBe(caster);
+    });
+
+    test("the newest attachment wins and reattaching restores the older effect", () => {
+        const older = enchant(caster, creature);
+        const newer = enchant(opponent, creature);
+        expect(creature.controller).toBe(opponent);
+
+        const other = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(newer, other));
+        expect(creature.controller).toBe(caster);
+        expect(other.controller).toBe(opponent);
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(older, other));
+        expect(creature.controller).toBe(opponent);
+        expect(other.controller).toBe(caster);
+
+        moveTestCard(newer, opponent.graveyard);
+        expect(other.controller).toBe(caster);
+        older.controller = opponent;
+        expect(other.controller).toBe(opponent);
+        moveTestCard(older, caster.graveyard);
+        expect(other.controller).toBe(caster);
+    });
+});
+
+describe("Counterspell", () => {
+    test("rejects a triggered ability and cannot counter a new casting of the same card", () => {
+        Game.init();
+        const player = game.addPlayer([]);
+        const opponent = game.addPlayer([]);
+        startMainPhase();
+        const counter = addTestCard(cardData.find(def => def.name === "Counterspell"), player, player.hand);
+        const incarnation = addTestCard(cardData.find(def => def.name === "Personal Incarnation"), opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(incarnation));
+        const [trigger] = game.stack.objects;
+        expect(trigger).toBeInstanceOf(StackAbility);
+        expect(game.stack.spellCast(player, counter, [trigger])).toBe(false);
+
+        const first = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+        expect(game.stack.spellCast(player, first)).toBe(true);
+        const spell = game.stack.objects.at(-1) as Spell;
+        expect(game.stack.spellCast(player, counter, [spell])).toBe(true);
+        const returned = moveTestCard(spell, player.hand);
+        expect(game.stack.spellCast(player, returned)).toBe(true);
+        game.stack.resolveAll();
+        expect(player.battlefield.objects.map(object => object.card)).toEqual([first.card]);
+        expect(player.graveyard.objects.map(object => object.card)).toEqual([counter.card]);
+    });
+
+    test("pays {U}{U} to counter the chosen spell while another spell still resolves", () => {
+        Game.init();
+        const caster = game.addPlayer([]);
+        const opponent = game.addPlayer([]);
+        startMainPhase();
+        const card = addTestCard(cardData.find(def => def.name === "Counterspell"), caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 2;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        const bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        const recall = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
+        const libraryCard = addTestCard(cardData[FOREST], opponent, opponent.library);
+        expect(game.stack.spellCast(opponent, bear)).toBe(true);
+        expect(game.stack.spellCast(opponent, recall, [opponent])).toBe(true);
+        const [bearSpell, recallSpell] = game.stack.objects;
+
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([opponent])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([bearSpell])).toBe(true);
+        game.pendingTargeter.onTargeted([recallSpell]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+        expect(game.stack.objects).toEqual([bearSpell]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([recall.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+        passPriorityRound();
+        expect(opponent.battlefield.objects[0].card).toBe(bear.card);
+        expect(opponent.library.getTopCard()).toBe(libraryCard);
+    });
+});
+
 describe("Creature Bond", () => {
     const def = cardData.find(card => card.name === "Creature Bond");
     let caster: Player;

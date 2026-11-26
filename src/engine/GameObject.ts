@@ -12,13 +12,14 @@ import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { Battlefield,Zone } from "@engine/Zone";
+import { removeItem } from "@utility/arrayUtility";
 import { type AbilityDef,type CardColour,type CardDef,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 
 export abstract class GameObject {
     readonly id = idCounter++;
-    private currentZone?: Zone;
+    protected currentZone?: Zone;
     private hasRetired = false;
 
     get zone() { return this.currentZone; }
@@ -328,7 +329,10 @@ export class Permanent extends CardObject {
     }
 
     private attachment?: Permanent;
+    private baseController: Player;
     private currentController: Player;
+    private readonly controlEffects = new Map<Ability, Player>();
+    private readonly controlOrAttachmentListeners = new Set<() => void>();
     private controlledSinceTurn: number;
     tapped = false;
     damageTaken = 0;
@@ -342,13 +346,48 @@ export class Permanent extends CardObject {
     override get controller() { return this.currentController; }
 
     override set controller(player: Player) {
-        if (this.currentController !== player) {
-            // 506.4: Changing controllers ends a permanent's participation in combat.
-            if (this.zone instanceof Battlefield)
-                CombatManager.removeFromCombat(this);
-            this.currentController = player;
-            this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
+        this.baseController = player;
+        this.updateController();
+    }
+
+    setControlEffect(ability: Ability, controller?: Player) {
+        if (controller)
+            this.controlEffects.set(ability, controller);
+        else
+            this.controlEffects.delete(ability);
+        // Reconcile overlapping effects once, before observers see a simultaneous batch.
+        gameEventManager.afterSimultaneousChanges(this.refreshBattlefieldController);
+    }
+
+    private readonly refreshBattlefieldController = () => {
+        if (this.zone instanceof Battlefield)
+            this.updateController();
+    };
+
+    private updateController() {
+        // 613.1b, 613.7: The most recently applied control effect wins in layer 2.
+        const controller = [...this.controlEffects.values()].at(-1) ?? this.baseController;
+        if (controller === this.currentController)
+            return;
+        this.currentController = controller;
+        this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
+        const zone = this.zone;
+        if (zone instanceof Battlefield) {
+            // 400.1, 506.4: Control changes on the same battlefield, but the permanent leaves combat.
+            CombatManager.removeFromCombat(this);
+            if (zone !== controller.battlefield) {
+                removeItem(zone.objects, this);
+                controller.battlefield.objects.push(this);
+                this.currentZone = controller.battlefield;
+            }
+            this.controlOrAttachmentListeners.forEach(update => update());
+            gameEventManager.effects.refreshAbilityGrants();
         }
+    }
+
+    onControlOrAttachmentChanged(update: () => void) {
+        this.controlOrAttachmentListeners.add(update);
+        return () => this.controlOrAttachmentListeners.delete(update);
     }
 
     get controlledSinceTurnStart() {
@@ -368,8 +407,10 @@ export class Permanent extends CardObject {
             return;
 
         this.attachment = target;
-        if (this.zone instanceof Battlefield)
+        if (this.zone instanceof Battlefield) {
+            this.controlOrAttachmentListeners.forEach(update => update());
             gameEventManager.effects.refreshAbilityGrants();
+        }
     }
 
     public getPotentialMana(actor: Player): Readonly<ManaAmount> {

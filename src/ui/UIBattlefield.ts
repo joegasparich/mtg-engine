@@ -11,7 +11,7 @@ const AURA_TITLE_OFFSET = 28;
 export class BattlefieldCardGroup extends Container<UICard> {
     private drag?: { view: UICard; offset: PointData };
 
-    constructor(readonly battlefield: UIBattlefield, readonly permanent: UICard) {
+    constructor(public battlefield: UIBattlefield, readonly permanent: UICard) {
         super();
         this.addCard(permanent);
     }
@@ -118,8 +118,20 @@ export class UIBattlefield extends UIZone<BattlefieldCardGroup> {
             return;
         }
 
-        const index = this.children.length - 1;
-        uiCard.layout((index % 6 - 2.5) * 145, -pixi.screen.height / 3 - Math.floor(index / 6) * 190);
+        this.layoutGroup(group);
+    }
+
+    takeGroup(group: BattlefieldCardGroup) {
+        for (const card of group.children)
+            card.leaveZone();
+        this.addChild(group);
+        group.battlefield = this;
+        this.layoutGroup(group);
+    }
+
+    private layoutGroup(group: BattlefieldCardGroup) {
+        const index = this.getChildIndex(group);
+        group.permanent.layout((index % 6 - 2.5) * 145, -pixi.screen.height / 3 - Math.floor(index / 6) * 190);
     }
 
     removeCard(uiCard: UICard) {

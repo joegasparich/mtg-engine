@@ -36,8 +36,13 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     private entering?: Permanent;
 
     protected get canMove() {
-        return !this.oldObject.retired && this.oldObject.zone === this.oldZone && this.oldZone !== this.newZone
-            && (!(this.newZone instanceof Stack) || !!this.options?.targets);
+        // 400.1: Both players' battlefield lists represent the same zone.
+        const origin = this.oldObject.zone;
+        const fromBattlefield = origin instanceof Battlefield;
+        const stillInOrigin = origin === this.oldZone || (fromBattlefield && this.oldZone instanceof Battlefield);
+        return !this.oldObject.retired && stillInOrigin && origin !== this.newZone
+            && (!(this.newZone instanceof Stack) || !!this.options?.targets)
+            && !(fromBattlefield && this.newZone instanceof Battlefield);
     }
 
     get departingPermanent() {
@@ -79,6 +84,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
     perform(): boolean {
         const { oldObject, oldZone, newZone, options } = this;
+        const origin = oldObject.zone;
         if (!this.canMove)
             return false;
 
@@ -108,8 +114,8 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
         if (oldObject instanceof Permanent)
             CombatManager.removeFromCombat(oldObject);
-        if (oldZone)
-            oldZone.onLeave(oldObject);
+        if (origin)
+            origin.onLeave(oldObject);
         else
             oldObject.retire();
 
