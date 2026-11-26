@@ -1156,5 +1156,56 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Blue Elemental Blast",
+        "image_url": "https://cards.scryfall.io/large/front/4/8/4822809c-7041-4ebd-9a5b-7702452011fb.jpg?1783919565",
+        "oracle_text": "Choose one —\n• Counter target red spell.\n• Destroy target red permanent.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [],
+        "spellModes": [
+            {
+                "text": "Counter target red spell.",
+                "abilities": [{
+                    "parts": {
+                        "AbilityPart_Target": {
+                            "saveAs": "SPELL", "validTargets": ["Spell"], "targetValidator": { "colour": "R" }
+                        },
+                        "AbilityPart_Effect_ChangeZones": {
+                            "inSignal": "SPELL_RESOLVE", "target": "SPELL", "destination": "graveyard"
+                        }
+                    }
+                }]
+            },
+            {
+                "text": "Destroy target red permanent.",
+                "abilities": [{
+                    "parts": {
+                        "AbilityPart_Target": {
+                            "saveAs": "PERMANENT", "validTargets": ["Permanent"], "targetValidator": { "colour": "R" }
+                        },
+                        "AbilityPart_Effect_DestroyPermanents": {
+                            "inSignal": "SPELL_RESOLVE", "permanentsFrom": "PERMANENT"
+                        }
+                    }
+                }]
+            }
+        ]
+    },
+    {
+        "name": "Braingeyser",
+        "image_url": "https://cards.scryfall.io/large/front/9/b/9b2b7122-4326-4459-8291-1e13a6999061.jpg?1783919565",
+        "oracle_text": "Target player draws X cards.",
+        "types": ["Sorcery"],
+        "cost": "{X}{U}{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_Target": { "saveAs": "TARGET_PLAYER", "validTargets": ["Player"] },
+                "AbilityPart_Effect_DrawCards": {
+                    "inSignal": "SPELL_RESOLVE", "target": "TARGET_PLAYER", "count": "THIS.chosenX"
+                }
+            }
+        }]
     }
 ]

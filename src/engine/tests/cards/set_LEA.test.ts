@@ -3067,6 +3067,134 @@ describe("Celestial Prism", () => {
     });
 });
 
+describe("Braingeyser", () => {
+    const def = cardData.find(card => card.name === "Braingeyser");
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    test("requires two blue mana and draws the chosen number for the targeted player", () => {
+        caster.manaPool[ManaColour.G] = 3;
+        caster.manaPool[ManaColour.U] = 1;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingSpellXChoice.max).toBe(3);
+        game.pendingSpellXChoice.submit(caster, 2);
+        const targeting = game.pendingTargeter;
+        expect(targeting.validateTargets([])).toBe(false);
+        expect(targeting.validateTargets([addTestCard(cardData[FOREST], opponent, opponent.battlefield)])).toBe(false);
+        expect(targeting.validateTargets([caster])).toBe(true);
+        targeting.onTargeted([opponent]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(caster.manaPool[ManaColour.G]).toBe(1);
+
+        const drawn = opponent.library.getTopXCards(2).reverse().map(object => object.card);
+        const hand = opponent.hand.objects.map(object => object.card);
+        const casterHandSize = caster.hand.objects.length;
+        passPriorityRound();
+        expect(opponent.hand.objects.map(object => object.card)).toEqual([...hand, ...drawn]);
+        expect(caster.hand.objects).toHaveLength(casterHandSize);
+        expect(caster.graveyard.objects.at(-1)?.card).toBe(card.card);
+    });
+
+    test("X = 0 still costs {U}{U} and requires a player target", () => {
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingSpellXChoice.max).toBe(0);
+        game.pendingSpellXChoice.submit(caster, 0);
+        expect(game.pendingTargeter.validateTargets([])).toBe(false);
+        game.pendingTargeter.onTargeted([caster]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        const library = [...caster.library.objects];
+        passPriorityRound();
+        expect(caster.library.objects).toEqual(library);
+        expect(caster.graveyard.objects.at(-1)?.card).toBe(card.card);
+    });
+});
+
+describe("Blue Elemental Blast", () => {
+    const blast = cardData.find(card => card.name === "Blue Elemental Blast");
+    const goblins = cardData[MONS_GOBLIN_RAIDERS];
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        card = addTestCard(blast, caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 1;
+    });
+
+    test("pays {U} to counter a red spell and leaves the red permanent alone", () => {
+        const permanent = addTestCard(goblins, opponent, opponent.battlefield);
+        const red = addTestCard(goblins, opponent, opponent.hand);
+        const green = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, green)).toBe(true);
+        expect(game.stack.spellCast(opponent, red)).toBe(true);
+        const [greenSpell, redSpell] = game.stack.objects;
+
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingSpellModeChoice.options).toEqual([
+            { text: "Counter target red spell.", enabled: true },
+            { text: "Destroy target red permanent.", enabled: true },
+        ]);
+        game.pendingSpellModeChoice.submit(caster, 0);
+        expect(game.pendingTargeter.validateTargets([permanent])).toBe(false);
+        expect(game.pendingTargeter.validateTargets([greenSpell])).toBe(false);
+        game.pendingTargeter.onTargeted([redSpell]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+
+        passPriorityRound();
+        expect(game.stack.objects).toEqual([greenSpell]);
+        expect(opponent.battlefield.objects).toEqual([permanent]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([red.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+    });
+
+    test("offers destruction only when a red permanent is the only legal target", () => {
+        const green = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        const permanent = addTestCard(goblins, caster, caster.battlefield);
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingSpellModeChoice.options.map(option => option.enabled)).toEqual([false, true]);
+        game.pendingSpellModeChoice.submit(caster, 1);
+        expect(game.pendingTargeter.validateTargets([green])).toBe(false);
+        game.pendingTargeter.onTargeted([permanent]);
+        passPriorityRound();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([permanent.card, card.card]);
+    });
+
+    test.each([0, 1])("rechecks the target's colour when mode %i resolves", mode => {
+        const red = addTestCard(goblins, opponent, opponent.hand);
+        let target: CardObject;
+        if (mode === 0) {
+            expect(game.stack.spellCast(opponent, red)).toBe(true);
+            target = game.stack.objects[0] as Spell;
+        } else {
+            target = moveTestCard(red, opponent.battlefield);
+        }
+        expect(game.stack.spellCast(caster, card, [target], 0, mode)).toBe(true);
+        const purelace = addTestCard(cardData.find(def => def.name === "Purelace"), opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, purelace, [target])).toBe(true);
+        game.stack.resolveAll();
+
+        expect(opponent.battlefield.objects.map(object => object.card)).toEqual([red.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+    });
+});
+
 describe("Animate Artifact", () => {
     const animate = cardData.find(card => card.name === "Animate Artifact");
     const prism = cardData.find(card => card.name === "Celestial Prism");

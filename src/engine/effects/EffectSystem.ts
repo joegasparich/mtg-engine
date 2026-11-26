@@ -137,6 +137,8 @@ export class EffectSystem {
         }
     }
 
+    // TODO: When adding “loses all abilities” or “can't have flying”, resolve active abilities in layer 6 (613.1f).
+    // Reconcile that result here so continuing grants keep their identity and listeners start or stop as eligibility changes.
     private applyAbilityGrant(ability: Ability, { recipients, grant, onGrantsUpdated }: AbilityGrantEffect): () => void {
         const grants = new Map<Permanent, ReturnType<Permanent["grantAbility"]>>();
         const update = () => {

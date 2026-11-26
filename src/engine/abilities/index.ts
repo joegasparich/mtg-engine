@@ -1,4 +1,4 @@
-import { CardObject,Permanent } from "@engine/GameObject";
+import { CardObject,Permanent,Spell } from "@engine/GameObject";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
 import { Ability } from ".";
@@ -67,6 +67,7 @@ enum GrammarProperty {
     Owner = "owner",
     AttachedTo = "attachedTo",
     Power = "power",
+    ChosenX = "chosenX",
 }
 
 export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
@@ -88,6 +89,10 @@ export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): Gramma
                 break;
             case GrammarProperty.Power:
                 result = result.power;
+                break;
+            case GrammarProperty.ChosenX:
+                // 107.3a: Use the X announced for this particular spell.
+                result = result instanceof Spell ? result.chosenX : undefined;
                 break;
             default:
                 return undefined;

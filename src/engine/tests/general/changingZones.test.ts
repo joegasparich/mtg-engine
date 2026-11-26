@@ -107,6 +107,29 @@ test.each([ZoneKind.Hand, ZoneKind.Library, ZoneKind.Graveyard] as const)("a zon
     expect(opponent[destination].objects).toEqual([expect.objectContaining({ card: bears.card })]);
 });
 
+test("moving a spell from the stack to its owner's graveyard skips its effects", () => {
+    const opponent = game.addPlayer([]);
+    const recall = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
+    const topCard = addTestCard(cardData[FOREST], opponent, opponent.library);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+    expect(game.stack.spellCast(player, bears)).toBe(true);
+    expect(game.stack.spellCast(opponent, recall, [opponent])).toBe(true);
+
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: { AbilityPart_Effect_ChangeZones: { target: "SPELL", destination: ZoneKind.Graveyard } } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    ability.slate.SPELL = [game.stack.objects.at(-1)];
+    // 701.6a: The removed spell never resolves. Other spells still resolve normally.
+    ability.fireSignal("default");
+    game.stack.resolveAll();
+
+    expect(opponent.graveyard.objects.map(object => object.card)).toEqual([recall.card]);
+    expect(opponent.library.objects).toEqual([topCard]);
+    expect(player.battlefield.objects.map(object => object.card)).toContain(bears.card);
+});
+
 test("a battlefield zone change effect can put a land onto the battlefield from a hand", () => {
     const opponent = game.addPlayer([]);
     const forest = addTestCard(cardData[FOREST], opponent, opponent.hand);

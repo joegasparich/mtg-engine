@@ -1,6 +1,25 @@
+import { resolveAbilityGrammar } from "@engine/abilities";
 import Game,{ game } from "@engine/Game";
+import { Spell } from "@engine/GameObject";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { cardData } from "~/index";
+
+test("chosenX belongs to each individual spell on the stack", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const def = {
+        ...cardData[GRIZZLY_BEARS], cost: "{X}{G}",
+        abilities: [{ parts: {} }],
+    };
+    for (const x of [0, 3]) {
+        const card = addTestCard(def, player, player.hand);
+        expect(resolveAbilityGrammar("THIS.chosenX", card.abilities[0])).toBeUndefined();
+        expect(game.stack.spellCast(player, card, [], x)).toBe(true);
+    }
+    const values = game.stack.objects.filter(object => object instanceof Spell)
+        .map(spell => resolveAbilityGrammar("THIS.chosenX", spell.abilities[0]));
+    expect(values).toEqual([0, 3]);
+});
 
 test.each(["TARGET.controller", "TARGET.power", "TARGET"])("ReadValue snapshots %s when signalled", value => {
     Game.init();
