@@ -1,6 +1,6 @@
 import { CombatManager } from "@engine/CombatManager";
 import Player from "@engine/Player";
-import { GameEvent_Cleanup,GameEvent_DrawCard,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
+import { GameEvent_Cleanup,GameEvent_DrawCard,GameEvent_TapAttacker,GameEvent_UntapCard } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 
 interface Step {
@@ -47,7 +47,7 @@ export class DeclareAttackersStep implements Step {
         CombatManager.confirmAttackers();
         // 508.1f
         for (const attacker of CombatManager.attackingCreatures.keys())
-            gameEventManager.addEvent(new GameEvent_TapCard(attacker));
+            gameEventManager.addEvent(new GameEvent_TapAttacker(attacker));
     }
 }
 

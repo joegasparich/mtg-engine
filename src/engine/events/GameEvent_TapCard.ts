@@ -22,3 +22,6 @@ export class GameEvent_TapCard extends GameEvent {
         return true;
     }
 }
+
+// 508.1f: Tapping a declared attacker is a turn-based action.
+export class GameEvent_TapAttacker extends GameEvent_TapCard {}

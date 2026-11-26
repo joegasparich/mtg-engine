@@ -77,4 +77,5 @@ export enum Keyword {
     Indestructible = "indestructible",
     Islandwalk = "islandwalk",
     Reach = "reach",
+    Vigilance = "vigilance",
 }

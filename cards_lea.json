@@ -999,5 +999,19 @@
         "cost": "{W}",
         "power": 2,
         "toughness": 1
+    },
+    {
+        "name": "Serra Angel",
+        "image_url": "https://cards.scryfall.io/large/front/1/4/14c86103-ea57-47ef-8249-01b15e1469bc.jpg?1783919571",
+        "oracle_text": "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
+        "type": "Creature",
+        "subtypes": ["Angel"],
+        "cost": "{3}{W}{W}",
+        "power": 4,
+        "toughness": 4,
+        "abilities": [
+            { "keyword": "flying" },
+            { "keyword": "vigilance" }
+        ]
     }
 ]

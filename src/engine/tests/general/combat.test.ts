@@ -1,7 +1,7 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep } from "@engine/events";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapAttacker,GameEvent_TapCard } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
@@ -344,6 +344,34 @@ test("flyer can be blocked by flyer", () => {
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
 
     expect(playerActionManager.getCardActions(elementalB, playerB, false).length).toBe(1);
+});
+
+test("an attacker with vigilance stays untapped and deals combat damage alongside an ordinary attacker", () => {
+    const angel = addTestCard(cardData.find(card => card.name === "Serra Angel"), playerA, playerA.battlefield);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const groundBlocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of [angel, bears])
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    expect(angel.tapped).toBe(false);
+    expect(bears.tapped).toBe(true);
+    expect(CombatManager.canBlockAttacker(groundBlocker, angel)).toBe(false);
+    expect(CombatManager.canBlockAttacker(groundBlocker, bears)).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.CombatDamage));
+    expect(playerB.life).toBe(14);
+});
+
+test("the vigilance part applies only to attack taps and ends when its grant is revoked", () => {
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const { revoke } = bears.grantAbility({ parts: { AbilityPart_Vigilance: {} } }, bears);
+    expect(gameEventManager.checkEvent(new GameEvent_TapAttacker(bears))).toBe(false);
+    expect(gameEventManager.performImmediate(new GameEvent_TapCard(bears))).toBe(true);
+    expect(bears.tapped).toBe(true);
+    revoke();
+    expect(gameEventManager.checkEvent(new GameEvent_TapAttacker(bears))).toBe(true);
 });
 
 test("can withdraw an attacker before confirming and only taps confirmed attackers", () => {

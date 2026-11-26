@@ -42,5 +42,11 @@
         "parts": {
             "AbilityPart_Reach": {}
         }
+    },
+    "vigilance": {
+        "keyword": "vigilance",
+        "parts": {
+            "AbilityPart_Vigilance": {}
+        }
     }
 }
