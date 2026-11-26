@@ -1786,6 +1786,107 @@ describe("Island Sanctuary", () => {
     });
 });
 
+describe("Karma", () => {
+    const def = cardData.find(card => card.name === "Karma");
+    const swamp = cardData.find(card => card.name === BasicLandType.Swamp);
+    let controller: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        controller = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    function startNextUpkeep(player: Player) {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.currentStepIndex).toBe(StepIndex.Upkeep);
+        expect(game.priorityPlayer).toBe(player);
+    }
+
+    test("casts for {2}{W}{W} and deals damage to each player on their own upkeep", () => {
+        const card = addTestCard(def, controller, controller.hand);
+        controller.manaPool[ManaColour.G] = 3;
+        controller.manaPool[ManaColour.W] = 1;
+        expect(playerActionManager.getCardActions(card, controller)).toHaveLength(0);
+
+        controller.manaPool[ManaColour.G] = 2;
+        controller.manaPool[ManaColour.W] = 2;
+        const [cast] = playerActionManager.getCardActions(card, controller);
+        cast.perform(controller);
+        passPriorityRound();
+        expect(controller.manaPool[ManaColour.G]).toBe(0);
+        expect(controller.manaPool[ManaColour.W]).toBe(0);
+        const karma = controller.battlefield.objects.find(permanent => permanent.card === card.card);
+        expect(karma).toBeDefined();
+
+        addTestCard(swamp, controller, controller.battlefield);
+        addTestCard(swamp, opponent, opponent.battlefield);
+        const dualLand = addTestCard({
+            ...swamp, name: "Test dual land", subtypes: [BasicLandType.Swamp, BasicLandType.Island],
+        }, opponent, controller.battlefield);
+        addTestCard(swamp, opponent, opponent.hand);
+        addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+
+        startNextUpkeep(opponent);
+        gameEventManager.addEvent(new GameEvent_TapCard(dualLand));
+        expect(dualLand.tapped).toBe(true);
+        expect(game.stack.objects).toHaveLength(1);
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        expect(game.stack.objects[0]).toMatchObject({ source: karma, controller });
+        expect(game.pendingTargeter).toBeNull();
+        expect(opponent.life).toBe(20);
+        passPriorityRound();
+        expect(opponent.life).toBe(18);
+        expect(controller.life).toBe(20);
+
+        startNextUpkeep(controller);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(controller.life).toBe(19);
+        expect(opponent.life).toBe(18);
+    });
+
+    test("counts Swamps at resolution even if Karma has left the battlefield", () => {
+        const karma = addTestCard(def, controller, controller.battlefield);
+        const original = addTestCard(swamp, opponent, opponent.battlefield);
+
+        startNextUpkeep(opponent);
+        expect(game.stack.objects).toHaveLength(1);
+        moveTestCard(original, opponent.graveyard);
+        addTestCard(swamp, opponent, opponent.battlefield);
+        addTestCard(swamp, opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(karma));
+
+        const onDamage = vi.fn();
+        const stopListening = gameEventManager.onGamePerformed(GameEventType.DealDamage, onDamage);
+        try {
+            passPriorityRound();
+            expect(opponent.life).toBe(18);
+            expect(onDamage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ source: karma, recipient: opponent, amount: 2 }));
+        } finally {
+            stopListening();
+        }
+
+        startNextUpkeep(controller);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("still triggers on the upkeep of a player with zero Swamps", () => {
+        addTestCard(def, controller, controller.battlefield);
+        addTestCard(swamp, controller, controller.battlefield);
+
+        startNextUpkeep(opponent);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(opponent.life).toBe(20);
+        expect(controller.life).toBe(20);
+    });
+});
+
 describe("Lord of Atlantis", () => {
     const def = cardData.find(card => card.name === "Lord of Atlantis");
     const merfolk: CardDef = {

@@ -1,4 +1,5 @@
 import { selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { StackAbility } from "@engine/GameObject";
 import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
@@ -38,6 +39,39 @@ test("a signalled selection stores a snapshot of matching cards in the chosen pl
     expect(ability.slate.CHOSEN).toEqual([matchingCard]);
     ability.fireSignal("SELECT");
     expect(ability.slate.CHOSEN).toEqual([]);
+});
+
+test("damage can use the size of a slate selection and deals nothing for an empty list", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const creature = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...creature,
+        abilities: [{ parts: {
+            AbilityPart_Effect_DealDamage: { source: "THIS", target: "RECIPIENT", amount: { countFrom: "SELECTED" } },
+        } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    ability.slate.RECIPIENT = [opponent];
+    ability.slate.SELECTED = [];
+    const onDamage = vi.fn();
+    const stopListening = gameEventManager.onGamePerformed(GameEventType.DealDamage, onDamage);
+    try {
+        ability.fireSignal("default");
+        expect(opponent.life).toBe(20);
+        expect(onDamage).not.toHaveBeenCalled();
+
+        ability.slate.SELECTED = [
+            addTestCard(creature, player, player.hand),
+            addTestCard(creature, player, player.hand),
+        ];
+        ability.fireSignal("default");
+        expect(opponent.life).toBe(18);
+        expect(onDamage).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ source, recipient: opponent, amount: 2 }));
+    } finally {
+        stopListening();
+    }
 });
 
 test("a live graveyard selection sees cards from every player enter and leave", () => {

@@ -2,10 +2,11 @@ import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerAction
 import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
+import { StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN } from "@engine/tests/testData";
+import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -69,6 +70,30 @@ test("should change turns", () => {
     expect(nextStepSpy).toHaveBeenCalledTimes(11);
     expect(game.currentStepIndex).toBe(StepIndex.Untap);
     expect(game.turnNumber).toBe(1);
+});
+
+test("a step-start trigger can pass the turn player to its effect", () => {
+    const controller = game.addPlayer(BASIC_DECK);
+    startMainPhase();
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_Trigger_StepStart: { step: StepIndex[StepIndex.End], savePlayerAs: "STEP_PLAYER" },
+            AbilityPart_Effect_GainLife: { target: "STEP_PLAYER", amount: 1 },
+        } }],
+    }, controller, controller.battlefield);
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+    expect(game.stack.objects).toHaveLength(1);
+    const [trigger] = game.stack.objects;
+    expect(trigger).toBeInstanceOf(StackAbility);
+    expect(trigger).toMatchObject({ source, controller });
+    expect(game.priorityPlayer).toBe(player);
+    expect(player.life).toBe(20);
+
+    passPriorityRound();
+    expect(player.life).toBe(21);
+    expect(controller.life).toBe(20);
 });
 
 test.each([false, true])("only the starting player's first draw step is skipped with auto-skip %s", allowAutoSkip => {

@@ -728,6 +728,33 @@
         ]
     },
     {
+        "name": "Karma",
+        "image_url": "https://cards.scryfall.io/large/front/1/6/16bb2840-a763-4695-99de-de448cd65adf.jpg?1783919579",
+        "oracle_text": "At the beginning of each player's upkeep, this enchantment deals damage to that player equal to the number of Swamps they control.",
+        "type": "Enchantment",
+        "cost": "{2}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "savePlayerAs": "UPKEEP_PLAYER" },
+                    "AbilityPart_SelectObjectsFromZone": {
+                        "zone": "battlefield",
+                        "controlledBy": "UPKEEP_PLAYER",
+                        "targetValidator": { "cardType": "Land", "cardSubtype": "Swamp" },
+                        "saveAs": "SWAMPS",
+                        "outSignal": "SWAMPS_SELECTED"
+                    },
+                    "AbilityPart_Effect_DealDamage": {
+                        "inSignal": "SWAMPS_SELECTED",
+                        "source": "THIS",
+                        "target": "UPKEEP_PLAYER",
+                        "amount": { "countFrom": "SWAMPS" }
+                    }
+                }
+            }
+        ]
+    },
+    {
         "name": "Lord of Atlantis",
         "image_url": "https://cards.scryfall.io/large/front/8/f/8f005191-0e0e-4ba3-acde-9c279ca589f6.jpg?1783919555",
         "oracle_text": "Other Merfolk get +1/+1 and have islandwalk. (They can't be blocked as long as defending player controls an Island.)",
