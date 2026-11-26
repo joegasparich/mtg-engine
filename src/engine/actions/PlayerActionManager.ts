@@ -1,6 +1,6 @@
 import { PlayerActions } from "@engine/actions/index";
 import { PlayerAction } from "@engine/actions/PlayerAction";
-import { CardObject,GameObject,Permanent } from "@engine/GameObject";
+import { CardObject,GameObject,Permanent,Spell } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ActivateAbility } from "@engine/events";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
@@ -15,17 +15,20 @@ import { CardType } from "~/defs";
 export enum TargetType {
     None = 0,
     Player = 1 << 0,
-    Card = 1 << 1,
+    Permanent = 1 << 1,
+    Spell = 1 << 2,
 }
 export enum TargetTypeKeys {
     None = "None",
     Player = "Player",
-    Card = "Card"
+    Permanent = "Permanent",
+    Spell = "Spell",
 }
 export const TargetTypesMap: Record<TargetTypeKeys, TargetType> = {
-    None: TargetType.None,
-    Player: TargetType.Player,
-    Card: TargetType.Card
+    [TargetTypeKeys.None]: TargetType.None,
+    [TargetTypeKeys.Player]: TargetType.Player,
+    [TargetTypeKeys.Permanent]: TargetType.Permanent,
+    [TargetTypeKeys.Spell]: TargetType.Spell,
 };
 
 export type ActionTarget = GameObject | Player;
@@ -36,6 +39,17 @@ export type Targeter = {
     validateTargets: (targets: ActionTarget[]) => boolean;
     onTargeted: (targets: ActionTarget[]) => void;
     onCancelled: () => void;
+}
+
+export function getTargetTypeKey(target: ActionTarget): TargetTypeKeys {
+    // 110.1 and 112.1: A permanent is on the battlefield and a spell is on the stack.
+    if (target instanceof Permanent && target.zone instanceof Battlefield)
+        return TargetTypeKeys.Permanent;
+    if (target instanceof Spell && target.zone === game.stack)
+        return TargetTypeKeys.Spell;
+    if (target instanceof Player && game.players.includes(target))
+        return TargetTypeKeys.Player;
+    return TargetTypeKeys.None;
 }
 
 class PlayerActionManager {

@@ -1,8 +1,10 @@
+import { makeAbility } from "@engine/abilities";
 import { PlayerActions } from "@engine/actions";
-import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { GameEvent_CastSpell,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_PlayLand } from "@engine/events";
 import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
+import { StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
@@ -27,8 +29,8 @@ test("shows each mode, rejects unavailable choices, and can cancel before choosi
     const other = game.addPlayer([]);
     startMainPhase();
     const targetCreature = { parts: { AbilityPart_Target: {
-        saveAs: "CREATURE", validTargets: [TargetTypeKeys.Card],
-        targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+        saveAs: "CREATURE", validTargets: [TargetTypeKeys.Permanent],
+        targetValidator: { cardType: CardType.Creature },
     } } };
     const targetPlayer = { parts: { AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] } } };
     const def: CardDef = {
@@ -177,8 +179,8 @@ test("target card types accept any listed type and still enforce other target fi
     const spell = addTestCard({
         ...creature, type: CardType.Instant, abilities: [{ parts: {
             AbilityPart_Target: {
-                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card],
-                targetValidator: { cardTypes: [CardType.Creature, CardType.Artifact], onBattlefield: true, tapped: true },
+                saveAs: "TARGET", validTargets: [TargetTypeKeys.Permanent],
+                targetValidator: { cardTypes: [CardType.Creature, CardType.Artifact], tapped: true },
             },
         } }],
     }, player, player.hand);
@@ -191,6 +193,42 @@ test("target card types accept any listed type and still enforce other target fi
     expect(spellTargeter.validateTargets([target])).toBe(true);
     target.type = CardType.Enchantment;
     expect(spellTargeter.validateTargets([target])).toBe(false);
+});
+
+test.each([
+    { key: TargetTypeKeys.Permanent, mask: TargetType.Permanent },
+    { key: TargetTypeKeys.Spell, mask: TargetType.Spell },
+])("a $key target request only accepts that kind of object", ({ key, mask }) => {
+    const other = game.addPlayer([]);
+    startMainPhase();
+    const creature = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...creature, type: CardType.Instant, cost: "{G}", abilities: [{ parts: {
+            AbilityPart_Target: { saveAs: "TARGET", validTargets: [key] },
+        } }],
+    }, player, player.hand);
+    const inHand = addTestCard(creature, other, other.hand);
+    const toCast = addTestCard(creature, other, other.hand);
+    expect(source.spellTargeter.hasLegalTargets()).toBe(false);
+
+    const permanent = addTestCard(creature, other, other.battlefield);
+    const stackAbility = new StackAbility(other, permanent, makeAbility({ parts: {} }, permanent), "unused");
+    game.stack.onEnter(stackAbility);
+    expect(source.spellTargeter.hasLegalTargets()).toBe(key === TargetTypeKeys.Permanent);
+    expect(game.stack.spellCast(other, toCast)).toBe(true);
+    const spell = game.stack.objects.at(-1);
+
+    player.manaPool[ManaColour.G] = 1;
+    new PlayerActions.PlayCard(source).perform(player);
+    const request = game.pendingTargeter;
+    const target = key === TargetTypeKeys.Permanent ? permanent : spell;
+    expect(request.targetType).toBe(mask);
+    expect(request.validateTargets([permanent])).toBe(key === TargetTypeKeys.Permanent);
+    expect(request.validateTargets([spell])).toBe(key === TargetTypeKeys.Spell);
+    expect(request.validateTargets([stackAbility])).toBe(false);
+    expect(request.validateTargets([inHand])).toBe(false);
+    request.onTargeted([target]);
+    expect(game.stack.objects.at(-1)).toMatchObject({ card: source.card, targets: [target] });
 });
 
 test.each([StepIndex.Main, StepIndex.SecondMain])("plays the first land directly onto the battlefield in main phase step %s", step => {

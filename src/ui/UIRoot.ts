@@ -1,6 +1,6 @@
 import * as PIXI from "pixi.js";
 
-import { ActionTarget,Targeter,TargetType } from "@engine/actions";
+import { ActionTarget,getTargetTypeKey,Targeter,TargetType,TargetTypesMap } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_Advance,GameEvent_ChangeCardZone,type GameEvent_TurnStart } from "@engine/events";
@@ -89,7 +89,7 @@ export class UITargeter {
             });
         };
 
-        if ((targetType & TargetType.Card) != 0)
+        if ((targetType & (TargetType.Permanent | TargetType.Spell)) !== 0)
             uiEventManager.on(UIEventType.CardClicked, this.onCardTargetClicked);
 
         if ((targetType & TargetType.Player) != 0) {
@@ -127,6 +127,10 @@ export class UITargeter {
 
     @autobind
     private onCardTargetClicked(event: UIEvent_CardClicked) {
+        const clickedType = TargetTypesMap[getTargetTypeKey(event.object)];
+        if ((this.targetType & clickedType) === 0)
+            return;
+
         const uiCard = uiRoot.getCardView(event.object);
 
         // TODO: Handle multi-targeting
@@ -165,7 +169,7 @@ export class UITargeter {
             this.playerAreas.length = 0;
         }
 
-        if ((this.targetType & TargetType.Card) != 0)
+        if ((this.targetType & (TargetType.Permanent | TargetType.Spell)) !== 0)
             uiEventManager.off(UIEventType.CardClicked, this.onCardTargetClicked);
     }
 }

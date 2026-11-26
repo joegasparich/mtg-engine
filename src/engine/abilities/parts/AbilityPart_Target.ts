@@ -1,11 +1,10 @@
-import { TargetTypeKeys,type ActionTarget } from "@engine/actions/PlayerActionManager";
+import { type ActionTarget,getTargetTypeKey,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { GameEvent_CheckTarget } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
-import Player from "@engine/Player";
 import type { TargetValidator } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
@@ -19,7 +18,7 @@ export class AbilityPart_Target extends AbilityPart {
     hasLegalTargets(): boolean {
         return this.count === 0
             || game.players.some(player => this.canTarget(player)
-                || player.zones.some(zone => zone.objects.some(object => this.canTarget(object))))
+                || player.battlefield.objects.some(object => this.canTarget(object)))
             || game.stack.objects.some(object => this.canTarget(object));
     }
 
@@ -32,10 +31,14 @@ export class AbilityPart_Target extends AbilityPart {
     }
 
     protected canTarget(target: ActionTarget): boolean {
-        if (target instanceof Player)
-            return this.validTargets.includes(TargetTypeKeys.Player) && game.players.includes(target);
+        const targetType = getTargetTypeKey(target);
+        if (targetType === TargetTypeKeys.None || !this.validTargets.includes(targetType))
+            return false;
+        if (targetType === TargetTypeKeys.Player)
+            return true;
 
-        return this.validTargets.includes(TargetTypeKeys.Card) && target instanceof CardObject && Boolean(target.zone)
+        // 115.5: A spell on the stack can't target itself.
+        return target instanceof CardObject && (targetType !== TargetTypeKeys.Spell || target !== this.ability.source)
             && matchesTargetValidator(target, this)
             && gameEventManager.checkEvent(new GameEvent_CheckTarget(this.ability.source, target));
     }

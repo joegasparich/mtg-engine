@@ -1,10 +1,9 @@
 import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
-import playerActionManager,{ TargetType } from "@engine/actions/PlayerActionManager";
-import { CardObject,Permanent } from "@engine/GameObject";
+import playerActionManager,{ getTargetTypeKey,TargetType,TargetTypesMap } from "@engine/actions/PlayerActionManager";
+import { type CardObject,Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
-import Player from "@engine/Player";
 import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
 import { Battlefield,Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
@@ -417,11 +416,7 @@ export default class UICard extends PIXI.Container {
                 return;
             }
 
-            let targetType = TargetType.None;
-            if (action.targets.some(target => target instanceof CardObject))
-                targetType |= TargetType.Card;
-            if (action.targets.some(target => target instanceof Player))
-                targetType |= TargetType.Player;
+            const targetType = action.targets.reduce((type, target) => type | TargetTypesMap[getTargetTypeKey(target)], TargetType.None);
 
             const targeter = new UITargeter(
                 this,

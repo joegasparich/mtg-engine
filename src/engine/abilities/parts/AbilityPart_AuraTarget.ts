@@ -5,7 +5,7 @@ import { AbilityPart_Target } from "./AbilityPart_Target";
 
 @RegisterAbilityPart
 export class AbilityPart_AuraTarget extends AbilityPart_Target {
-    validTargets = [TargetTypeKeys.Card];
+    validTargets = [TargetTypeKeys.Permanent];
 
     protected override canTarget(target: ActionTarget): boolean {
         // 303.4a and 702.5a: An Aura spell must be able to enchant its target.

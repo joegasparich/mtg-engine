@@ -7,7 +7,6 @@ type TargetValidatorConfig = TargetValidator & { targetValidator?: TargetValidat
 export function matchesTargetValidator(target: CardObject, config: TargetValidatorConfig): boolean {
     // Explicit parts can still declare their filters directly.
     const { baseSubtype, cardType, cardTypes, cardSubtype, colour, onBattlefield, tapped } = config.targetValidator ?? config;
-    // 109.2: An unqualified card type in rules text refers to a battlefield permanent.
     // 105.2: An object can match any of its current colours.
     return (!onBattlefield || target.zone instanceof Battlefield)
         && (!cardType || target.type === cardType)

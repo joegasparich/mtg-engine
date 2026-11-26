@@ -1,3 +1,4 @@
+import { makeAbility } from "@engine/abilities";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone } from "@engine/events";
 import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
@@ -52,6 +53,20 @@ test("an Aura enters attached under its caster's control and follows state-based
     expect(returned.card).toBe(target.card);
     expect(attached.attachedTo).toBeUndefined();
     expect(caster.graveyard.objects.map(object => object.card)).toContain(aura.card);
+});
+
+test("an Aura's changed colour applies during attachment checks on entry", () => {
+    expect(game.stack.spellCast(caster, aura, [target])).toBe(true);
+    const [spell] = game.stack.objects;
+    const recolour = makeAbility({ parts: { AbilityPart_Effect_SetColour: { target: "RECIPIENT", colour: "G" } } }, aura);
+    recolour.slate.RECIPIENT = [spell];
+    recolour.fireSignal("default");
+    target.grantAbility({ parts: { AbilityPart_Protection: { colour: "W" } } }, target);
+
+    game.stack.resolveAll();
+
+    const attached = caster.battlefield.objects.find(object => object.card === aura.card);
+    expect(attached).toMatchObject({ attachedTo: target, colours: new Set(["G"]) });
 });
 
 test.each(["leaves", "leaves and returns", "stops being a creature"])("an Aura fails to resolve if the target %s", change => {

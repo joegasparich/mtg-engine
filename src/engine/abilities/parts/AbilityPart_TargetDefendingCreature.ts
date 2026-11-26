@@ -8,8 +8,7 @@ import { AbilityPart_Target } from "./AbilityPart_Target";
 
 @RegisterAbilityPart
 export class AbilityPart_TargetDefendingCreature extends AbilityPart_Target {
-    validTargets = [TargetTypeKeys.Card];
-    override targetValidator = { onBattlefield: true };
+    validTargets = [TargetTypeKeys.Permanent];
 
     protected override canTarget(target: ActionTarget): boolean {
         // 506.2: The defending player is identified before attackers are declared.

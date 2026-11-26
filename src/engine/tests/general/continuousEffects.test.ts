@@ -116,6 +116,38 @@ test("a continuous zone selection filters by current colour alongside card type"
     expect(slate).not.toHaveProperty("GREEN_CREATURES");
 });
 
+test("setting an object's colour updates colour-dependent ability grants", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...bearsDef,
+        type: CardType.Enchantment,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectsFromZoneContinuously: {
+                saveAs: "BLUE_CREATURES",
+                zone: ZoneKind.Battlefield,
+                targetValidator: { cardType: CardType.Creature, colour: "U" },
+            },
+            AbilityPart_GrantAbilityContinuously: {
+                permanentsFrom: "BLUE_CREATURES",
+                grant: { keyword: Keyword.Flying },
+            },
+        } }],
+    }, player, player.battlefield);
+    const creature = addTestCard({ ...bearsDef, cost: "{2}" }, player, player.battlefield);
+    expect(creature.colours.size).toBe(0);
+    expect(creature.hasKeyword(Keyword.Flying)).toBe(false);
+
+    for (const [colour, shouldFly] of [["U", true], ["B", false]] as const) {
+        const ability = makeAbility({ parts: { AbilityPart_Effect_SetColour: { target: "RECIPIENT", colour } } }, source);
+        ability.slate.RECIPIENT = [creature];
+        ability.fireSignal("default");
+        expect(creature.colours).toEqual(new Set([colour]));
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(shouldFly);
+    }
+});
+
 test("a continuous zone selection can exclude its source across all battlefields", () => {
     Game.init();
     const player = game.addPlayer([]);

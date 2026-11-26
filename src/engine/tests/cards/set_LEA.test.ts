@@ -1,6 +1,6 @@
-import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
+import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { PlayerActions } from "@engine/actions";
-import { type CardObject,type Permanent,StackAbility } from "@engine/GameObject";
+import { type CardObject,type Permanent,type Spell,StackAbility } from "@engine/GameObject";
 import type { Zone } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
 import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision } from "@engine/events";
@@ -76,8 +76,8 @@ describe("Guardian Angel", () => {
         cost: "{R}",
         abilities: [{ parts: {
             AbilityPart_Target: {
-                saveAs: "VICTIM", validTargets: ["Card"],
-                targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+                saveAs: "VICTIM", validTargets: [TargetTypeKeys.Permanent],
+                targetValidator: { cardType: CardType.Creature },
             },
             AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "VICTIM", amount: 3 },
         } }],
@@ -438,7 +438,7 @@ describe("Death Ward", () => {
         const plains = addTestCard(cardData.find(card => card.name === "Plains"), caster, caster.battlefield);
         const removal = addTestCard({ ...deathWard, name: "Test destruction spell", abilities: [{ parts: {
             AbilityPart_Target: {
-                saveAs: "TARGET", validTargets: [TargetTypeKeys.Card],
+                saveAs: "TARGET", validTargets: [TargetTypeKeys.Permanent],
                 targetValidator: { cardType: CardType.Creature, onBattlefield: true },
             },
             AbilityPart_Effect_DestroyPermanents: { inSignal: "SPELL_RESOLVE", permanentsFrom: "TARGET" },
@@ -2292,5 +2292,100 @@ describe("Personal Incarnation", () => {
 
         passPriorityRound();
         expect(owner.life).toBe(9);
+    });
+});
+
+describe("Purelace", () => {
+    const def = cardData.find(card => card.name === "Purelace");
+    const creature = cardData[GRIZZLY_BEARS];
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    test("pays {W} and recolours a permanent through cleanup", () => {
+        const target = addTestCard({ ...creature, cost: "{G}{U}" }, opponent, opponent.battlefield);
+        const inHand = addTestCard(creature, opponent, opponent.hand);
+        const inGraveyard = addTestCard(creature, opponent, opponent.graveyard);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        const plains = cardData.find(card => card.name === BasicLandType.Plains);
+        const whiteSource = addTestCard(plains, caster, caster.battlefield);
+        const cost = [...target.cost];
+
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        const request = game.pendingTargeter;
+        expect(request.targetType).toBe(TargetType.Spell | TargetType.Permanent);
+        expect(request.validateTargets([opponent])).toBe(false);
+        expect(request.validateTargets([inHand])).toBe(false);
+        expect(request.validateTargets([inGraveyard])).toBe(false);
+        expect(request.validateTargets([whiteSource])).toBe(true);
+        request.onTargeted([target]);
+        expect(whiteSource.tapped).toBe(true);
+        expect(target.colours).toEqual(new Set(["G", "U"]));
+
+        passPriorityRound();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+        gameEventManager.addEvent(new GameEvent_Cleanup(caster));
+        expect(target.colours).toEqual(new Set(["W"]));
+        expect(target.cost).toEqual(cost);
+
+        const returned = moveTestCard(moveTestCard(target, opponent.hand), opponent.battlefield);
+        expect(returned.colours).toEqual(new Set(["G", "U"]));
+    });
+
+    test("can target a permanent spell and the new permanent enters white", () => {
+        const inHand = addTestCard(creature, opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, inHand)).toBe(true);
+        const [spell] = game.stack.objects;
+        caster.manaPool[ManaColour.W] = 1;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        game.pendingTargeter.onTargeted([spell]);
+        expect(game.stack.objects).toHaveLength(2);
+
+        passPriorityRound();
+        expect(spell).toMatchObject({ colours: new Set(["W"]) });
+        const onEntry = vi.fn((event: GameEvent_ChangeCardZone) => {
+            expect(event.newObject.colours).toEqual(new Set(["W"]));
+            expect(event.newObject.cost).toEqual(inHand.cost);
+        });
+        gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, onEntry, {
+            matches: event => event.oldObject === spell && event.newZone === opponent.battlefield,
+        });
+        passPriorityRound();
+        expect(onEntry).toHaveBeenCalledOnce();
+    });
+
+    test("recolours an instant on the stack and its graveyard card has its original colour", () => {
+        const inHand = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, inHand, [opponent])).toBe(true);
+        const [spell] = game.stack.objects;
+        expect(game.stack.spellCast(caster, card, [spell])).toBe(true);
+        const purelace = game.stack.objects.at(-1) as Spell;
+        expect(purelace.spellTargeter.validateTargets([purelace])).toBe(false);
+
+        passPriorityRound();
+        expect(spell).toMatchObject({ colours: new Set(["W"]) });
+        passPriorityRound();
+        expect(opponent.graveyard.objects.at(-1)).toMatchObject({ card: inHand.card, colours: new Set(["U"]) });
+    });
+
+    test("fails to recolour a target that leaves and returns before resolution", () => {
+        const target = addTestCard(creature, opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, card, [target])).toBe(true);
+        const returned = moveTestCard(moveTestCard(target, opponent.hand), opponent.battlefield);
+
+        passPriorityRound();
+        expect(target.colours).toEqual(new Set(["G"]));
+        expect(returned.colours).toEqual(new Set(["G"]));
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
     });
 });

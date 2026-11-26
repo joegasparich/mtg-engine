@@ -45,6 +45,10 @@ export class GameEvent_ChangeCardZone extends GameEvent {
             this.newObject = new Spell(oldObject.card, controller, options.targets, options.chosenX, options.chosenMode);
         } else if (newZone instanceof Battlefield) {
             const permanent = new Permanent(oldObject.card, controller);
+            // 400.7a: A permanent spell's colour change carries over as it resolves.
+            if (this.resolvesPermanentSpell && oldObject instanceof Spell)
+                permanent.colours = new Set(oldObject.colours);
+
             const attachment = options?.attachedTo;
             if (attachment && !permanent.canAttachTo(attachment)) {
                 const destination = options.illegalAttachmentDestination;

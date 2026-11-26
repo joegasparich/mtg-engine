@@ -544,8 +544,8 @@
                 "parts": {
                     "AbilityPart_Target": {
                         "saveAs": "TARGET_CREATURE",
-                        "validTargets": ["Card"],
-                        "targetValidator": { "cardType": "Creature", "onBattlefield": true }
+                        "validTargets": ["Permanent"],
+                        "targetValidator": { "cardType": "Creature" }
                     },
                     "AbilityPart_Effect_Regenerate": {
                         "inSignal": "SPELL_RESOLVE",
@@ -566,8 +566,8 @@
                 "parts": {
                     "AbilityPart_Target": {
                         "saveAs": "TARGET_PERMANENT",
-                        "validTargets": ["Card"],
-                        "targetValidator": { "cardTypes": ["Artifact", "Enchantment"], "onBattlefield": true }
+                        "validTargets": ["Permanent"],
+                        "targetValidator": { "cardTypes": ["Artifact", "Enchantment"] }
                     },
                     "AbilityPart_Effect_DestroyPermanents": {
                         "inSignal": "SPELL_RESOLVE",
@@ -588,8 +588,8 @@
                 "parts": {
                     "AbilityPart_Target": {
                         "saveAs": "RECIPIENT",
-                        "validTargets": ["Player", "Card"],
-                        "targetValidator": { "cardType": "Creature", "onBattlefield": true }
+                        "validTargets": ["Player", "Permanent"],
+                        "targetValidator": { "cardType": "Creature" }
                     },
                     "AbilityPart_Effect_GuardianAngel": {
                         "inSignal": "SPELL_RESOLVE",
@@ -622,8 +622,8 @@
                     "parts": {
                         "AbilityPart_Target": {
                             "saveAs": "RECIPIENT",
-                            "validTargets": ["Player", "Card"],
-                            "targetValidator": { "cardType": "Creature", "onBattlefield": true }
+                            "validTargets": ["Player", "Permanent"],
+                            "targetValidator": { "cardType": "Creature" }
                         },
                         "AbilityPart_Effect_PreventDamage": { "inSignal": "SPELL_RESOLVE", "target": "RECIPIENT", "amount": 3 }
                     }
@@ -835,8 +835,8 @@
                     "AbilityPart_Activate_Tap": {},
                     "AbilityPart_Target": {
                         "saveAs": "TARGET_PERMANENT",
-                        "validTargets": ["Card"],
-                        "targetValidator": { "colour": "B", "onBattlefield": true }
+                        "validTargets": ["Permanent"],
+                        "targetValidator": { "colour": "B" }
                     },
                     "AbilityPart_Effect_DestroyPermanents": { "permanentsFrom": "TARGET_PERMANENT" }
                 }
@@ -875,6 +875,21 @@
                 "parts": {
                     "AbilityPart_Trigger_Dies": {},
                     "AbilityPart_Effect_LoseLife": { "target": "THIS.owner", "amount": "HalfRoundedUp" }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Purelace",
+        "image_url": "https://cards.scryfall.io/large/front/f/f/ffa2615c-de01-4afd-a260-0ff628ccc4a5.jpg?1783919576",
+        "oracle_text": "Target spell or permanent becomes white. (Mana symbols on that permanent remain unchanged.)",
+        "type": "Instant",
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": { "saveAs": "TARGET", "validTargets": ["Spell", "Permanent"] },
+                    "AbilityPart_Effect_SetColour": { "inSignal": "SPELL_RESOLVE", "target": "TARGET", "colour": "W" }
                 }
             }
         ]

@@ -38,8 +38,8 @@ test("black spells cannot choose protected targets and targets are rechecked on 
         type: CardType.Sorcery,
         abilities: [{ parts: {
             AbilityPart_Target: {
-                saveAs: "CHOSEN", validTargets: [TargetTypeKeys.Card],
-                targetValidator: { cardType: CardType.Creature, onBattlefield: true },
+                saveAs: "CHOSEN", validTargets: [TargetTypeKeys.Permanent],
+                targetValidator: { cardType: CardType.Creature },
             },
             AbilityPart_Effect_DestroyPermanents: destroyChosen,
         } }],
