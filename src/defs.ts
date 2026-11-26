@@ -52,6 +52,7 @@ export type TargetValidator = {
     baseSubtype?: string;
     tapped?: boolean;
     blocking?: boolean;
+    unblocked?: boolean;
 };
 
 export enum AbilityActivator {

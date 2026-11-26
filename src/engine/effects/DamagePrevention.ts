@@ -11,21 +11,19 @@ export enum DamagePreventionKind {
 
 export enum DamageRedirectionKind {
     Points = "RedirectPoints",
+    EveryHit = "RedirectEveryHit",
 }
 
-export type DamageRedirection = {
-    kind: DamageRedirectionKind.Points;
-    recipient: DamageRecipient;
-    destination: DamageRecipient;
-    amount: number;
-};
+type DamageMatch = (hit: Pick<GameEvent_DealDamage, "source" | "recipient">) => boolean;
+
+export type DamageRedirection =
+    | { kind: DamageRedirectionKind.Points; recipient: DamageRecipient; destination: DamageRecipient; amount: number }
+    | { kind: DamageRedirectionKind.EveryHit; readonly destination: DamageRecipient | undefined; matches: DamageMatch };
 
 export enum DamageAllocationAction {
     Prevent = "prevent",
     Redirect = "redirect",
 }
-
-type DamagePreventionMatch = (hit: Pick<GameEvent_DealDamage, "source" | "recipient">) => boolean;
 
 export type DamagePrevention =
     | { kind: DamagePreventionKind.Points; recipient: DamageRecipient; amount: number }
@@ -33,12 +31,12 @@ export type DamagePrevention =
         kind: DamagePreventionKind.NextHit;
         recipient: DamageRecipient;
         source: CardObject;
-        matches?: DamagePreventionMatch;
+        matches?: DamageMatch;
         onPrevented?: (amount: number) => void;
         // Share a key only when the matching conditions are identical for the same ability definition.
         equivalenceKey?: PropertyKey;
     }
-    | { kind: DamagePreventionKind.EveryHit; matches: DamagePreventionMatch };
+    | { kind: DamagePreventionKind.EveryHit; matches: DamageMatch };
 
 export type DamageEffect = DamagePrevention | DamageRedirection;
 
@@ -78,17 +76,20 @@ export class DamagePreventionSystem {
                 if (effect.source.resolvedDamageSource)
                     references.push(effect.source.resolvedDamageSource);
             }
-            if (effect.kind !== DamagePreventionKind.EveryHit && "card" in effect.recipient)
+            if ("recipient" in effect && "card" in effect.recipient)
                 references.push(effect.recipient);
-            if (effect.kind === DamageRedirectionKind.Points && "card" in effect.destination)
-                references.push(effect.destination);
+            const destination = "destination" in effect && effect.destination;
+            if (destination && "card" in destination)
+                references.push(destination);
         }
         return references;
     }
 
     preview(hit: GameEvent_DealDamage): boolean {
-        const destinationPlayers = [...this.rules].flatMap(({ effect }) => effect.kind === DamageRedirectionKind.Points
-            ? [hit.getAffectedPlayer(effect.destination)] : []);
+        const destinationPlayers = [...this.rules].flatMap(({ effect }) => {
+            const destination = "destination" in effect && effect.destination;
+            return destination ? [hit.getAffectedPlayer(destination)] : [];
+        });
         const players = [...new Set([hit.affectedPlayer, ...destinationPlayers])];
         let willDealDamage = false;
         this.resolve([hit], {
@@ -130,32 +131,37 @@ export class DamagePreventionSystem {
         const apply = (application: Application, player: Player, resume: () => void): boolean => {
             const { rule, hits: eligible, capacity } = application;
             const { effect } = rule;
-            if (!isPoints(effect)) {
-                if (effect.kind === DamagePreventionKind.NextHit) {
-                    const { onPrevented } = effect;
-                    const { amount } = eligible[0];
-                    if (consume && onPrevented)
-                        afterDamage.push(() => onPrevented(amount));
-                    remaining.set(rule, 0);
-                }
-                eligible[0].amount = 0;
+            const destination = "destination" in effect ? effect.destination : undefined;
+            // A live selection can be empty when a pending replacement choice resumes.
+            if (effect.kind === DamageRedirectionKind.EveryHit && !destination)
                 return true;
-            }
-
             const spend = (hit: Hit, amount: number) => {
                 hit.amount -= amount;
-                if (amount > 0 && effect.kind === DamageRedirectionKind.Points) {
+                if (amount > 0 && destination) {
                     // 614.5: All portions of the original hit share the redirection history.
                     hit.appliedRedirections.add(rule);
                     // 614.9: The redirected portion has the original source and a new recipient.
                     const redirected = hits.find(other => other.originalIndex === hit.originalIndex
-                        && other.event.recipient === effect.destination);
+                        && other.event.recipient === destination);
                     if (redirected)
                         redirected.amount += amount;
                     else
-                        hits.push({ ...hit, event: hit.event.withRecipient(effect.destination, amount), amount });
+                        hits.push({ ...hit, event: hit.event.withRecipient(destination, amount), amount });
                 }
             };
+
+            if (!isPoints(effect)) {
+                const [hit] = eligible;
+                if (effect.kind === DamagePreventionKind.NextHit) {
+                    const { onPrevented } = effect;
+                    const { amount } = hit;
+                    if (consume && onPrevented)
+                        afterDamage.push(() => onPrevented(amount));
+                    remaining.set(rule, 0);
+                }
+                spend(hit, hit.amount);
+                return true;
+            }
 
             // 615.7 and 616.1: The affected player allocates a limited effect among simultaneous sources.
             const totalDamage = eligible.reduce((total, hit) => total + hit.amount, 0);
@@ -234,9 +240,11 @@ export class DamagePreventionSystem {
     private matches({ effect, by }: Registration, hit: GameEvent_DealDamage): boolean {
         if (!this.canModify(hit, by))
             return false;
-        if (effect.kind === DamageRedirectionKind.Points)
-            return hit.recipient === effect.recipient && effect.destination !== effect.recipient
-                && hit.canDealDamage(effect.destination);
+        if ("destination" in effect) {
+            const { destination } = effect;
+            return !!destination && destination !== hit.recipient && hit.canDealDamage(destination)
+                && (effect.kind === DamageRedirectionKind.Points ? hit.recipient === effect.recipient : effect.matches(hit));
+        }
         if (effect.kind === DamagePreventionKind.Points)
             return hit.recipient === effect.recipient;
 
@@ -253,10 +261,11 @@ export class DamagePreventionSystem {
     private independent(a: Application, b: Application): boolean {
         const couldRedirectTo = ({ rule, hits }: Application, other: Registration) => {
             const { effect } = rule;
-            return effect.kind === DamageRedirectionKind.Points && hits.some(hit =>
+            return "destination" in effect && hits.some(hit =>
                 !hit.appliedRedirections.has(other) && this.matches(other, hit.event.withRecipient(effect.destination, hit.amount)));
         };
-        return a.rule !== b.rule && !a.hits.some(hit => b.hits.includes(hit))
+        const repeatable = a.rule.effect.kind === DamageRedirectionKind.EveryHit || a.rule.effect.kind === DamagePreventionKind.EveryHit;
+        return (a.rule !== b.rule || repeatable) && !a.hits.some(hit => b.hits.includes(hit))
             && !couldRedirectTo(a, b.rule) && !couldRedirectTo(b, a.rule);
     }
 
@@ -290,6 +299,11 @@ export class DamagePreventionSystem {
     private describe({ rule, hits, capacity }: Application): string {
         const name = rule.by.object.name;
         const { event, amount } = hits[0];
+        if (rule.effect.kind === DamageRedirectionKind.EveryHit) {
+            const { destination } = rule.effect;
+            const to = "card" in destination ? destination.logName : event.getRecipientName(destination);
+            return `${name} · redirect ${amount} damage from ${event.source.logName} to ${to}`;
+        }
         if (rule.effect.kind === DamageRedirectionKind.Points)
             return `${name} · redirect ${capacity} damage from ${event.recipientName} to ${event.getRecipientName(rule.effect.destination)}`;
         if (rule.effect.kind === DamagePreventionKind.Points)

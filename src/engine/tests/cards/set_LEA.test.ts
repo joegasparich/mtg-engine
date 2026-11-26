@@ -6,6 +6,7 @@ import { CombatManager } from "@engine/CombatManager";
 import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
 import { GameEvent_SacrificePermanent } from "@engine/events/GameEvent_ChangeCardZone";
+import { ResolutionChoiceKind } from "@engine/events/GameEvent_ResolutionChoice";
 import { type EventCheck,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -2731,5 +2732,94 @@ describe("Swords to Plowshares", () => {
         expect(target.zone).toBe(opponent.battlefield);
         expect(game.exile.objects).toEqual([]);
         expect(opponent.life).toBe(22);
+    });
+});
+
+describe("Veteran Bodyguard", () => {
+    const def = cardData.find(card => card.name === "Veteran Bodyguard");
+    let active: Player;
+    let defender: Player;
+    let guard: Permanent;
+    let attacker: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        active = game.addPlayer(BASIC_DECK);
+        defender = game.addPlayer(BASIC_DECK);
+        attacker = addTestCard(cardData[GRIZZLY_BEARS], active, active.battlefield);
+        guard = addTestCard(def, defender, defender.battlefield);
+    });
+
+    function declareAttackers(...attackers: Permanent[]) {
+        startMainPhase();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        for (const creature of attackers)
+            new PlayerActions.DeclareAttacker(creature).perform(active, [defender]);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    }
+
+    test("takes all simultaneous damage from unblocked attackers, even when the total is lethal", () => {
+        const angel = addTestCard(cardData.find(card => card.name === "Serra Angel"), active, active.battlefield);
+        declareAttackers(attacker, angel);
+        const hits: GameEvent_DealDamage[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => hits.push(event));
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        passPriorityRound();
+
+        expect(hits.map(hit => [hit.source, hit.recipient, hit.amount])).toEqual([[attacker, guard, 2], [angel, guard, 4]]);
+        expect(defender.life).toBe(20);
+        expect(defender.graveyard.objects.map(object => object.card)).toContain(guard.card);
+    });
+
+    test("also redirects noncombat damage, but only while untapped and only for its current controller", () => {
+        declareAttackers(attacker);
+        const hit = (player: Player) => gameEventManager.addEvent(new GameEvent_DealDamage(attacker, player, 1));
+        hit(defender); // 509.1h: The attacker has no blocked or unblocked status yet.
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        hit(defender);
+        gameEventManager.addEvent(new GameEvent_TapCard(guard));
+        hit(defender);
+        gameEventManager.addEvent(new GameEvent_UntapCard(guard));
+        guard.controller = active;
+        hit(defender);
+        hit(active);
+
+        expect(guard.damageTaken).toBe(2);
+        expect(defender.life).toBe(17);
+        expect(active.life).toBe(20);
+    });
+
+    test("a blocked attacker remains blocked after its blocker leaves", () => {
+        const blocker = addTestCard(cardData[GRIZZLY_BEARS], defender, defender.battlefield);
+        declareAttackers(attacker);
+        new PlayerActions.DeclareBlocker(blocker).perform(defender, [attacker]);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        moveTestCard(blocker, defender.hand);
+        gameEventManager.addEvent(new GameEvent_DealDamage(attacker, defender, 3));
+        passPriorityRound();
+
+        expect(guard.damageTaken).toBe(0);
+        expect(defender.life).toBe(17);
+    });
+
+    test("the defender chooses a Bodyguard independently for each unblocked attacker", () => {
+        const otherGuard = addTestCard(def, defender, defender.battlefield);
+        const otherAttacker = addTestCard(cardData[MONS_GOBLIN_RAIDERS], active, active.battlefield);
+        declareAttackers(attacker, otherAttacker);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+        passPriorityRound();
+
+        for (const [source, destination] of [[attacker, otherGuard], [otherAttacker, guard]]) {
+            const choice = game.pendingDamagePreventionChoice;
+            if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+                throw new Error("Expected a choice between Veteran Bodyguards");
+            expect(choice.player).toBe(defender);
+            const option = choice.options.findIndex(label => label.includes(source.logName) && label.includes(destination.logName));
+            expect(option).toBeGreaterThanOrEqual(0);
+            choice.submit(defender, option);
+        }
+        expect(otherGuard.damageTaken).toBe(2);
+        expect(guard.damageTaken).toBe(1);
+        expect(defender.life).toBe(20);
     });
 });

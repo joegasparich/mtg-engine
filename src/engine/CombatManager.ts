@@ -189,6 +189,12 @@ export class CombatManager {
         return CombatManager.blockedAttackers.has(attacker);
     }
 
+    static isUnblocked(creature: Permanent): boolean {
+        // 509.1h: An attacker becomes unblocked only after blockers have been declared.
+        return CombatManager.blocksConfirmed && CombatManager.attackingCreatures.has(creature)
+            && !CombatManager.isBlocked(creature);
+    }
+
     static isBlocking(creature: Permanent): boolean {
         // 509.1g: A declared blocker remains a blocker even if every attacker it blocked leaves combat.
         return CombatManager.effectiveBlocks.has(creature);
@@ -332,7 +338,7 @@ export class CombatManager {
                 if (!recipients.length) {
                     // 509.1h and 510.1b–c: Only unblocked attackers deal damage to the defender.
                     const defender = CombatManager.attackingCreatures.get(source);
-                    if (defender && !CombatManager.isBlocked(source))
+                    if (defender && CombatManager.isUnblocked(source))
                         addDamage(source, defender, total);
                     continue;
                 }

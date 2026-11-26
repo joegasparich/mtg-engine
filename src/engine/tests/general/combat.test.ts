@@ -8,7 +8,7 @@ import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import type { CardObject,Permanent } from "@engine/GameObject";
 import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard,passPriorityRound } from "@engine/tests/testData";
-import { BasicLandType,Keyword } from "~/defs";
+import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 let playerA: Player;
@@ -36,6 +36,30 @@ test("should trade", () => {
 
     expect(playerA.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsA.card }));
     expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsB.card }));
+});
+
+test("unblocked status requires confirmed blocks and ends when an attacker leaves combat", () => {
+    const attackers = Array.from({ length: 3 }, () => addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield));
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const attacker of attackers)
+        new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    expect(attackers.some(CombatManager.isUnblocked)).toBe(false);
+    gameEventManager.addEvent(new GameEvent_Advance(playerB));
+    expect(attackers.every(CombatManager.isUnblocked)).toBe(true);
+
+    const [stolen, changed, remaining] = attackers;
+    stolen.controller = playerB;
+    stolen.controller = playerA;
+    changed.type = CardType.Artifact;
+    changed.type = CardType.Creature;
+    expect(CombatManager.isUnblocked(stolen)).toBe(false);
+    expect(CombatManager.isUnblocked(changed)).toBe(false);
+    expect(CombatManager.isUnblocked(remaining)).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
+    expect(playerB.life).toBe(18);
+    expect(CombatManager.isUnblocked(remaining)).toBe(false);
 });
 
 test("a confirmed blocker remains blocking after its attacker leaves until combat ends", () => {

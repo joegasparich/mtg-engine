@@ -1,5 +1,5 @@
 import { makeAbility } from "@engine/abilities";
-import { DamageAllocationAction,DamagePreventionKind } from "@engine/effects/DamagePrevention";
+import { DamageAllocationAction,DamagePreventionKind,DamageRedirectionKind } from "@engine/effects/DamagePrevention";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { GameEvent_DealDamage,ResolutionChoiceKind } from "@engine/events";
 import type { DamageRecipient } from "@engine/events/GameEvent_DealDamage";
@@ -41,6 +41,61 @@ function prevent(recipient: Permanent | Player, amount = 1) {
         rule: { kind: DamagePreventionKind.Points, recipient, amount },
     });
 }
+
+test("whole-hit redirection competes with prevention and rechecks shields on the destination", () => {
+    gameEventManager.effects.startContinuous(creature.abilities[0], {
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: { kind: DamageRedirectionKind.EveryHit, destination: creature, matches: hit => hit.recipient === owner },
+    });
+    prevent(owner, 1);
+    prevent(creature, 2);
+    const hit = new GameEvent_DealDamage(source, owner, 3);
+    gameEventManager.addEvent(hit);
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a choice between redirection and prevention");
+    expect(choice.player).toBe(owner);
+    choice.submit(owner, choice.options.findIndex(label => label.includes("shield")));
+    expect(creature.damageTaken).toBe(0);
+    expect(owner.life).toBe(20);
+
+    gameEventManager.addEvent(new GameEvent_DealDamage(source, owner, 3));
+    expect(creature.damageTaken).toBe(3);
+    expect(owner.life).toBe(20);
+});
+
+test("continuous redirection follows the selected sources and destination for as long as its permanent remains", () => {
+    const permanent = addTestCard({
+        ...bear,
+        abilities: [{ parts: {
+            AbilityPart_Effect_RedirectDamage: { continuous: true, from: "THIS.owner", to: "TO", sourcesFrom: "SOURCES" },
+        } }],
+    }, owner, owner.battlefield);
+    const { slate } = permanent.abilities[0];
+    const hit = () => new GameEvent_DealDamage(source, owner, 1);
+    slate.SOURCES = [source];
+    expect(gameEventManager.checkEvent(hit())).toBe(true);
+    expect(gameEventManager.effects.getEventCheckReferences()).not.toContain(creature);
+    gameEventManager.addEvent(hit());
+    expect(owner.life).toBe(19);
+
+    slate.TO = [creature];
+    expect(gameEventManager.effects.getEventCheckReferences()).toContain(creature);
+    gameEventManager.addEvent(hit());
+    expect(creature.damageTaken).toBe(1);
+    slate.TO = [controller];
+    gameEventManager.addEvent(hit());
+    expect(controller.life).toBe(19);
+    slate.SOURCES = [];
+    gameEventManager.addEvent(hit());
+    expect(owner.life).toBe(18);
+
+    slate.SOURCES = [source];
+    moveTestCard(permanent, owner.hand);
+    gameEventManager.addEvent(hit());
+    expect(owner.life).toBe(17);
+    expect(controller.life).toBe(19);
+});
 
 test.each([
     { direction: "creature to creature", from: () => creature, to: () => source },

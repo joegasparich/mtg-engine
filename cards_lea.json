@@ -1038,5 +1038,30 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Veteran Bodyguard",
+        "image_url": "https://cards.scryfall.io/large/front/1/6/16479793-16ed-48a3-a30f-64bef2074393.jpg?1783919569",
+        "oracle_text": "As long as this creature is untapped, all damage that would be dealt to you by unblocked creatures is dealt to this creature instead.",
+        "type": "Creature",
+        "subtypes": ["Human"],
+        "cost": "{3}{W}{W}",
+        "power": 2,
+        "toughness": 5,
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectContinuously": {
+                        "target": "THIS", "targetValidator": { "tapped": false }, "saveAs": "UNTAPPED_BODYGUARD"
+                    },
+                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                        "zone": "battlefield", "targetValidator": { "unblocked": true }, "saveAs": "UNBLOCKED_ATTACKERS"
+                    },
+                    "AbilityPart_Effect_RedirectDamage": {
+                        "continuous": true, "from": "THIS.controller", "to": "UNTAPPED_BODYGUARD", "sourcesFrom": "UNBLOCKED_ATTACKERS"
+                    }
+                }
+            }
+        ]
     }
 ]

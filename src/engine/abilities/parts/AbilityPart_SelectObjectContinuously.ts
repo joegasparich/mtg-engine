@@ -1,13 +1,17 @@
 import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import type { Ability } from "@engine/abilities/Ability";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
+import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
+import { CardObject } from "@engine/GameObject";
 import { Battlefield } from "@engine/Zone";
 import { defineComputedProperty } from "@utility/objectUtility";
+import type { TargetValidator } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
 export class AbilityPart_SelectObjectContinuously extends AbilityPart {
     target: GrammarKey;
+    targetValidator?: TargetValidator;
     saveAs: string;
     private clearSelection?: () => void;
 
@@ -20,6 +24,8 @@ export class AbilityPart_SelectObjectContinuously extends AbilityPart {
         // 611.3a: Reevaluate the selection whenever the static effect reads it.
         this.clearSelection = defineComputedProperty(slate, this.saveAs, () => {
             const target = resolveAbilityGrammar(this.target, ability);
+            if (this.targetValidator && !(target instanceof CardObject && matchesTargetValidator(target, this)))
+                return [];
             return target ? [target] : [];
         });
     }

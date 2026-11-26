@@ -3,6 +3,7 @@ import type Card from "@engine/Card";
 import { Ability,makeAbility } from "@engine/abilities";
 import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
 import type { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
+import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
 import { GameEvent_CheckAttachment,GameEvent_CheckBasicLandType } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
@@ -75,6 +76,9 @@ export class CardObject extends GameObject {
     get type() { return this.baseType; }
 
     set type(type: CardType) {
+        // 506.4: A creature that stops being a creature leaves combat immediately.
+        if (this instanceof Permanent && this.baseType === CardType.Creature && type !== CardType.Creature)
+            CombatManager.removeFromCombat(this);
         this.baseType = type;
         this.refreshBaseAbilities();
         if (this.zone instanceof Battlefield)
@@ -301,6 +305,9 @@ export class Permanent extends CardObject {
 
     override set controller(player: Player) {
         if (this.currentController !== player) {
+            // 506.4: Changing controllers ends a permanent's participation in combat.
+            if (this.zone instanceof Battlefield)
+                CombatManager.removeFromCombat(this);
             this.currentController = player;
             this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
         }
