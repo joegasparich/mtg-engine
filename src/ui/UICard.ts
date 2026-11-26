@@ -15,10 +15,12 @@ import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
 import { loadImageFromExternalUrl } from "@utility/imageUtility";
 import { autobind } from "@utility/typeUtility";
 import { GlowFilter } from "pixi-filters";
-import { CardType } from "~/defs";
+import { type CardDef,CardType } from "~/defs";
 
 export const CARD_WIDTH = 125;
 export const CARD_HEIGHT = 175;
+const COPY_PREVIEW_GAP = 12;
+const PREVIEW_MARGIN = 8;
 const ATTACK_ANGLE = 10;
 const DRAG_THRESHOLD = 6;
 
@@ -30,6 +32,9 @@ export default class UICard extends PIXI.Container {
 
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
+    private face?: Readonly<CardDef>;
+    private copyIcon?: PIXI.Graphics;
+    private originalFace?: PIXI.Sprite;
     private powerToughness?: UICardPowerToughness;
     private typeLine?: UICardTypeLine;
     private focusOutline?: PIXI.Graphics;
@@ -83,12 +88,7 @@ export default class UICard extends PIXI.Container {
         // Filter only the glow. The card face renders directly at canvas resolution.
         this.artwork.addChild(this.halo, this.art);
         this.addChild(this.artwork);
-        loadImageFromExternalUrl(this.card.def.image_url).then(texture => {
-            if (texture && !this.destroyed) {
-                this.art.texture = texture;
-                this.halo.texture = texture;
-            }
-        });
+        this.setObject(object);
 
         // The artwork can move independently of the card's interactive footprint.
         this.hitArea = new PIXI.Rectangle(-CARD_WIDTH / 2, -CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT);
@@ -101,6 +101,47 @@ export default class UICard extends PIXI.Container {
         this.on('pointerup', this.onMouseUp);
         this.on('pointerupoutside', this.onMouseUpOutside);
         this.onRender = this.render;
+    }
+
+    setObject(object: CardObject) {
+        this.object = object;
+        const face = object.def;
+        if (this.face !== face) {
+            this.face = face;
+            this.powerToughness?.destroy({ children: true });
+            this.typeLine?.destroy({ children: true });
+            this.powerToughness = undefined;
+            this.typeLine = undefined;
+            this.art.texture = this.halo.texture = PIXI.Texture.EMPTY;
+            loadImageFromExternalUrl(face.image_url).then(texture => {
+                if (texture && !this.destroyed && this.face === face)
+                    this.art.texture = this.halo.texture = texture;
+            });
+        }
+
+        if (!(object instanceof Permanent && object.isCopy)) {
+            this.copyIcon?.destroy();
+            this.originalFace?.destroy();
+            this.copyIcon = undefined;
+            this.originalFace = undefined;
+            return;
+        }
+        if (this.copyIcon)
+            return;
+
+        // Two overlapping card outlines remain legible at the battlefield's resting scale.
+        this.copyIcon = this.artwork.addChild(new PIXI.Graphics()
+            .circle(0, 0, 11).fill(0x17384a).stroke({ color: 0x9de5e5, width: 1 })
+            .roundRect(-5, -6, 7, 9, 1).stroke({ color: 0x9de5e5, width: 1.4 })
+            .roundRect(-2, -3, 7, 9, 1).fill(0x17384a).stroke({ color: 0xffffff, width: 1.4 }));
+        const original = this.originalFace = this.artwork.addChild(new PIXI.Sprite());
+        original.anchor.set(0.5);
+        original.visible = false;
+        original.eventMode = "none";
+        loadImageFromExternalUrl(object.card.def.image_url).then(texture => {
+            if (texture && !original.destroyed)
+                original.texture = texture;
+        });
     }
 
     private setHovered(hovered: boolean) {
@@ -137,15 +178,16 @@ export default class UICard extends PIXI.Container {
         // 120.6 and 302.7: Marked damage is tracked separately from the creature's actual toughness.
         const remainingToughness = toughness - object.damageTaken;
         const damaged = object.damageTaken > 0;
-        const printedCapsule = object.def.types.includes(CardType.Creature);
-        const show = !printedCapsule || damaged || power !== object.def.power || remainingToughness !== object.def.toughness;
+        const printed = object.def;
+        const printedCapsule = printed.types.includes(CardType.Creature);
+        const show = !printedCapsule || damaged || power !== printed.power || remainingToughness !== printed.toughness;
         if (this.powerToughness)
             this.powerToughness.visible = show;
         if (!show)
             return;
 
         this.powerToughness ??= this.artwork.addChildAt(
-            new UICardPowerToughness(object.def, CARD_WIDTH, CARD_HEIGHT),
+            new UICardPowerToughness(printed, CARD_WIDTH, CARD_HEIGHT),
             2,
         );
         this.powerToughness.setStats(power, remainingToughness, base, damaged);
@@ -157,7 +199,7 @@ export default class UICard extends PIXI.Container {
         if (art.texture === PIXI.Texture.EMPTY)
             return;
 
-        const { def } = object;
+        const def = object.def;
         const printedSubtypes = def.subtypes ?? [];
         const show = types.length !== def.types.length || types.some(type => !def.types.includes(type))
             || subtypes.length !== printedSubtypes.length
@@ -191,13 +233,27 @@ export default class UICard extends PIXI.Container {
         const lifted = preview && this.object.zone instanceof Hand;
 
         this.motion += (1 - this.motion) * ease;
-        const size = (preview ? 1.5 : 1) * this.motion;
+        const copyPreview = preview && !!this.originalFace;
+        const previewScale = copyPreview
+            ? Math.min(1.5, (pixi.screen.width - 2 * PREVIEW_MARGIN - COPY_PREVIEW_GAP) / (2 * CARD_WIDTH),
+                (pixi.screen.height - 2 * PREVIEW_MARGIN) / CARD_HEIGHT)
+            : 1.5;
+        const size = (preview ? previewScale : 1) * this.motion;
         this.art.width += (CARD_WIDTH * size - this.art.width) * ease;
         this.art.height += (CARD_HEIGHT * size - this.art.height) * ease;
 
         const sin = Math.sin(this.rotation);
         const cos = Math.cos(this.rotation);
-        if (group?.permanent === this && group.children.length > 1) {
+        if (copyPreview) {
+            // Show both faces upright in screen coordinates, including on the opposing battlefield.
+            const center = this.getGlobalPosition();
+            const half = this.art.width / 2;
+            center.x = Math.max(PREVIEW_MARGIN + half, Math.min(center.x, pixi.screen.width - PREVIEW_MARGIN - COPY_PREVIEW_GAP - 3 * half));
+            center.y = Math.max(PREVIEW_MARGIN + this.art.height / 2, Math.min(center.y, pixi.screen.height - PREVIEW_MARGIN - this.art.height / 2));
+            this.toLocal(center, undefined, this.artwork.position);
+            const transform = this.getGlobalTransform();
+            this.artwork.rotation = -Math.atan2(transform.b, transform.a);
+        } else if (group?.permanent === this && group.children.length > 1) {
             // Keep the expanded face clear of the Aura title strips, even on a tapped or tilted host.
             const extraWidth = Math.max(0, this.art.width - CARD_WIDTH);
             const extraHeight = Math.max(0, this.art.height - CARD_HEIGHT);
@@ -209,7 +265,18 @@ export default class UICard extends PIXI.Container {
             this.artwork.x += (lift * sin - this.artwork.x) * ease;
             this.artwork.y += (lift * cos - this.artwork.y) * ease;
         }
-        this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
+        if (!copyPreview)
+            this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
+        if (this.copyIcon) {
+            this.copyIcon.scale.set(this.art.width / CARD_WIDTH);
+            this.copyIcon.position.set(-this.art.width / 2 + 6 * this.copyIcon.scale.x, -this.art.height / 2 + 7 * this.copyIcon.scale.y);
+            this.originalFace.visible = copyPreview;
+            if (copyPreview) {
+                this.originalFace.width = this.art.width;
+                this.originalFace.height = this.art.height;
+                this.originalFace.x = this.art.width + COPY_PREVIEW_GAP;
+            }
+        }
         const characteristics = this.object.characteristics;
         this.updatePowerToughness(characteristics);
         this.updateTypeLine(characteristics);

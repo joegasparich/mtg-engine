@@ -203,3 +203,37 @@ test("selection from the shared stack supports spells and stack abilities", () =
     expect(selectObjectsFromZone(ability, { zone: ZoneKind.Stack, targetValidator })).toEqual([]);
     expect(selectObjectsFromZone(ability, { zone: ZoneKind.Battlefield, targetValidator })).toEqual([source]);
 });
+
+test("a resolving ability can choose a card from a zone and pass it to another effect", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_ChooseObject: {
+                selection: { zone: ZoneKind.Graveyard, zoneOf: "THIS.controller", targetValidator: { cardType: CardType.Creature } },
+                prompt: "Choose a creature card to return.", saveAs: "CHOSEN", outSignal: "RETURN",
+            },
+            AbilityPart_Effect_ChangeZones: { inSignal: "RETURN", target: "CHOSEN", destination: ZoneKind.Hand },
+        } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.graveyard);
+    const forest = addTestCard(cardData[FOREST], player, player.graveyard);
+    addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.graveyard);
+
+    ability.fireSignal("default");
+    const choice = game.pendingResolutionChoice;
+    expect(choice.options).toEqual([bears]);
+    choice.submit(opponent, [bears]);
+    choice.submit(player, [forest]);
+    expect(game.pendingResolutionChoice).toBe(choice);
+    choice.submit(player, [bears]);
+    expect(ability.slate.CHOSEN).toEqual([bears]);
+    expect(player.hand.objects.map(object => object.card)).toEqual([bears.card]);
+
+    ability.fireSignal("default");
+    expect(game.hasPendingPlayerInput).toBe(false);
+    expect(ability.slate.CHOSEN).toEqual([]);
+});

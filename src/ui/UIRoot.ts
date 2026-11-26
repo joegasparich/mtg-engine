@@ -557,7 +557,7 @@ export default class UIRoot extends PIXI.Container {
                     source.animateExit(view);
                 source.removeCard(view);
             }
-            view.object = newObject;
+            view.setObject(newObject);
             destination?.addCard(view, origin);
         } else if (destination) {
             view = new UICard(newObject);

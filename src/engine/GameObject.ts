@@ -12,7 +12,7 @@ import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { Battlefield,Zone } from "@engine/Zone";
-import { type AbilityDef,type CardColour,cardColours,CardType,Keyword } from "~/defs";
+import { type AbilityDef,type CardColour,type CardDef,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 
@@ -37,7 +37,7 @@ export abstract class GameObject {
 export class CardObject extends GameObject {
     get controller(): Player | undefined { return undefined; }
     get owner() { return this.card.owner; }
-    get def() { return this.card.def; }
+    get def(): Readonly<CardDef> { return this.card.def; }
     get logName() { return `${this.name} (${this.id})`; }
     get resolvedDamageSource(): Permanent | undefined { return undefined; }
 
@@ -45,8 +45,12 @@ export class CardObject extends GameObject {
     private baseTypes: readonly CardType[];
     private baseSubtypes: readonly string[];
     cost?: ManaCost;
-    readonly variableManaSymbols: number;
-    colours: ReadonlySet<CardColour>;
+    get variableManaSymbols() { return ManaUtility.countVariableSymbols(this.def.cost); }
+    private baseColours: ReadonlySet<CardColour>;
+    private colourOverride?: ReadonlySet<CardColour>;
+    get colours() { return this.colourOverride ?? this.baseColours; }
+    set colours(colours: ReadonlySet<CardColour>) { this.colourOverride = colours; }
+    get changedColours() { return this.colourOverride; }
     private basePower: number;
     private baseToughness: number;
     private baseAbilities: readonly Ability[];
@@ -57,20 +61,21 @@ export class CardObject extends GameObject {
 
     constructor(readonly card: Card, chosenMode?: number) {
         super();
-        const def = card.def;
+        this.applyDefinition(card.def);
+        if (chosenMode !== undefined)
+            this.baseAbilities = [...this.baseAbilities, ...this.getSpellModeAbilities(chosenMode)];
+    }
+
+    protected applyDefinition(def: Readonly<CardDef>) {
         this.name = def.name;
         this.baseTypes = [...def.types];
         this.baseSubtypes = [...(def.subtypes ?? [])];
         this.power = def.power;
         this.toughness = def.toughness;
-        if (def.cost)
-            this.cost = [...ManaUtility.parseManaString<ManaCost>(def.cost)];
-        this.variableManaSymbols = ManaUtility.countVariableSymbols(def.cost);
+        this.cost = def.cost ? [...ManaUtility.parseManaString<ManaCost>(def.cost)] : undefined;
         // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
-        this.colours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
+        this.baseColours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
         this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
-        if (chosenMode !== undefined)
-            this.baseAbilities = [...this.baseAbilities, ...this.getSpellModeAbilities(chosenMode)];
     }
 
     get characteristics(): Readonly<CardCharacteristics> {
@@ -306,6 +311,19 @@ export class CardObject extends GameObject {
 
 
 export class Permanent extends CardObject {
+    private copiedDefinition?: Readonly<CardDef>;
+    override get def() { return this.copiedDefinition ?? super.def; }
+    get isCopy() { return this.copiedDefinition !== undefined; }
+
+    enterAsCopyOf(original: Permanent) {
+        if (this.zone || this.retired)
+            throw new Error("Only a permanent preparing to enter can enter as a copy");
+        // 613.2a, 707.2–3: Capture the layer-one definition, including earlier copies.
+        // Fresh ability instances bind their source, slate and listeners to this permanent.
+        this.copiedDefinition = original.def;
+        this.applyDefinition(this.copiedDefinition);
+    }
+
     private attachment?: Permanent;
     private currentController: Player;
     private controlledSinceTurn: number;

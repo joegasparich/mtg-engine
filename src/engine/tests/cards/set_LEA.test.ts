@@ -3274,3 +3274,143 @@ describe("Animate Artifact", () => {
         expect(CombatManager.attackingCreatures.has(artifact)).toBe(false);
     });
 });
+
+describe("Clone", () => {
+    const clone = cardData.find(card => card.name === "Clone");
+    let player: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        player = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    function cast(name: string, targets: (CardObject | Player)[] = []) {
+        const card = addTestCard(cardData.find(def => def.name === name), player, player.hand);
+        expect(game.stack.spellCast(player, card, targets)).toBe(true);
+        return card.card;
+    }
+
+    function choose(original: Permanent) {
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        expect(game.pendingResolutionChoice.options).toContain(original);
+        game.pendingResolutionChoice.submit(player, [original]);
+    }
+
+    function copy(original: Permanent) {
+        const physical = cast("Clone");
+        passPriorityRound();
+        choose(original);
+        return player.battlefield.objects.find(permanent => permanent.card === physical);
+    }
+
+    test("pays {3}{U}, needs no casting target, and goes to the graveyard at zero toughness", () => {
+        const card = addTestCard(clone, player, player.hand);
+        player.manaPool[ManaColour.Colourless] = 3;
+        expect(playerActionManager.getCardActions(card, player)).toHaveLength(0);
+        player.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, player)[0].perform(player);
+        expect(game.pendingTargeter).toBeFalsy();
+        expect(game.pendingOptionalChoice).toBeNull();
+        expect(player.manaPool.every(amount => !amount)).toBe(true);
+        passPriorityRound();
+        expect(player.graveyard.objects[0].card).toBe(card.card);
+    });
+
+    test("can decline even with a creature present", () => {
+        addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const physical = cast("Clone");
+        passPriorityRound();
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Decline);
+        expect(player.graveyard.objects[0].card).toBe(physical);
+    });
+
+    test("copies an opposing Serra Angel's printed characteristics and native abilities", () => {
+        const angel = addTestCard(cardData.find(def => def.name === "Serra Angel"), opponent, opponent.battlefield);
+        cast("Holy Strength", [angel]);
+        passPriorityRound();
+        cast("Lance", [angel]);
+        passPriorityRound();
+        angel.tapped = true;
+        angel.damageTaken = 3;
+        expect(angel.hasKeyword(Keyword.FirstStrike)).toBe(true);
+        expect(angel.power).toBe(5);
+
+        const copyAngel = copy(angel);
+        expect(copyAngel).toMatchObject({
+            name: "Serra Angel", cost: angel.cost, colours: new Set(["W"]), subtypes: ["Angel"],
+            power: 4, toughness: 4, damageTaken: 0, tapped: false, owner: player, controller: player,
+            controlledSinceTurnStart: false, isCopy: true,
+        });
+        expect(copyAngel.hasKeyword(Keyword.Flying)).toBe(true);
+        expect(copyAngel.hasKeyword(Keyword.Vigilance)).toBe(true);
+        expect(copyAngel.hasKeyword(Keyword.FirstStrike)).toBe(false);
+        expect(copyAngel.abilities.every(ability => ability.source === copyAngel)).toBe(true);
+        moveTestCard(angel, opponent.graveyard);
+        expect(copyAngel.power).toBe(4);
+    });
+
+    test("chooses from the battlefield at entry, including a creature with protection from blue", () => {
+        const bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const other = addTestCard(cardData[MONS_GOBLIN_RAIDERS], player, player.battlefield);
+        cast("Blue Ward", [bear]);
+        passPriorityRound();
+        cast("Clone");
+        cast("Swords to Plowshares", [other]);
+        passPriorityRound();
+        passPriorityRound();
+        game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
+        expect(game.pendingResolutionChoice.options).toEqual([bear]);
+        game.pendingResolutionChoice.submit(player, [bear]);
+        expect(player.battlefield.objects.at(-1).name).toBe("Grizzly Bears");
+    });
+
+    test("can choose an animated Celestial Prism and activate the copied noncreature artifact", () => {
+        const prism = addTestCard(cardData.find(def => def.name === "Celestial Prism"), opponent, opponent.battlefield);
+        cast("Animate Artifact", [prism]);
+        passPriorityRound();
+        const copied = copy(prism);
+        expect(copied.types).toEqual([CardType.Artifact]);
+        expect(copied.colours.size).toBe(0);
+        player.manaPool[ManaColour.Colourless] = 2;
+        playerActionManager.getCardActions(copied, player)[0].perform(player);
+        game.pendingColourChoice.submit(player, "G");
+        expect(player.manaPool[ManaColour.G]).toBe(1);
+        expect(copied.tapped).toBe(true);
+        expect(prism.tapped).toBe(false);
+    });
+
+    test("Purelace on the original and on the Clone spell apply independently of copy chains", () => {
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        cast("Purelace", [bears]);
+        passPriorityRound();
+        const first = copy(bears);
+        expect(first.colours).toEqual(new Set(["G"]));
+        cast("Clone");
+        cast("Purelace", [game.stack.objects.at(-1) as Spell]);
+        passPriorityRound();
+        passPriorityRound();
+        choose(first);
+        const white = player.battlefield.objects.at(-1);
+        expect(white.colours).toEqual(new Set(["W"]));
+        expect(copy(white).colours).toEqual(new Set(["G"]));
+    });
+
+    test("a copied Personal Incarnation dies for Clone's owner and Resurrection offers a fresh choice", () => {
+        const original = addTestCard(cardData.find(def => def.name === "Personal Incarnation"), opponent, opponent.battlefield);
+        const incarnation = copy(original);
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(incarnation));
+        passPriorityRound();
+        expect(player.life).toBe(10);
+        expect(opponent.life).toBe(20);
+        const grave = player.graveyard.objects[0];
+        expect(grave.name).toBe("Clone");
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        cast("Resurrection", [grave]);
+        passPriorityRound();
+        choose(bears);
+        expect(player.battlefield.objects[0]).toMatchObject({ card: grave.card, name: "Grizzly Bears" });
+    });
+});

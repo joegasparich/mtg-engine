@@ -1,6 +1,7 @@
+import type { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import type { ActionTarget } from "@engine/actions";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { CardObject,Permanent,Spell } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
@@ -32,6 +33,40 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         return this.type === GameEventType.ChangeCardZone ? [] : [GameEventType.ChangeCardZone];
     }
 
+    private entering?: Permanent;
+
+    override get entryPreparation() {
+        const { oldObject, oldZone, newZone } = this;
+        if (!(newZone instanceof Battlefield) || oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
+            return undefined;
+        const player = this.options?.controller ?? oldObject.controller ?? oldObject.owner;
+        return { player, prepare: (resume: () => void) => this.prepareEntry(player, resume) };
+    }
+
+    private prepareEntry(controller: Player, resume: () => void) {
+        const { oldObject } = this;
+        const entering = new Permanent(oldObject.card, controller);
+        // 400.7a: Only an explicit colour change on the resolving spell carries over.
+        if (this.resolvesPermanentSpell && oldObject instanceof Spell && oldObject.changedColours)
+            entering.colours = new Set(oldObject.changedColours);
+
+        // 614.5, 616.1c,f: Each replacement gets one opportunity. Copying can supply new ones.
+        const applied = new Set<AbilityPart>();
+        const next = () => {
+            const [part] = entering.abilities.flatMap(ability => ability.parts)
+                .filter(part => part.replaceEntry && !applied.has(part))
+                .sort((a, b) => a.entryReplacementOrder - b.entryReplacementOrder);
+            if (!part) {
+                this.entering = entering;
+                resume();
+                return;
+            }
+            applied.add(part);
+            part.replaceEntry(entering, next);
+        };
+        next();
+    }
+
     perform(): boolean {
         const { oldObject, oldZone, newZone, options } = this;
         if (oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
@@ -44,11 +79,9 @@ export class GameEvent_ChangeCardZone extends GameEvent {
                 return false;
             this.newObject = new Spell(oldObject.card, controller, options.targets, options.chosenX, options.chosenMode);
         } else if (newZone instanceof Battlefield) {
-            const permanent = new Permanent(oldObject.card, controller);
-            // 400.7a: A permanent spell's colour change carries over as it resolves.
-            if (this.resolvesPermanentSpell && oldObject instanceof Spell)
-                permanent.colours = new Set(oldObject.colours);
-
+            const permanent = this.entering;
+            if (!permanent)
+                return gameEventManager.performImmediate(this);
             const attachment = options?.attachedTo;
             if (attachment && !permanent.canAttachTo(attachment)) {
                 const destination = options.illegalAttachmentDestination;

@@ -126,29 +126,20 @@ export type DamagePreventionAllocationChoice = {
 export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
 export type ResolutionChoice = CardResolutionChoice | ColourChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
 
-function isDamagePreventionChoice(choice: ResolutionChoice): choice is DamagePreventionChoice {
-    return choice.kind === ResolutionChoiceKind.DamagePreventionOrder
-        || choice.kind === ResolutionChoiceKind.DamagePreventionAllocation;
-}
-
 export class GameEvent_RequestResolutionChoice extends GameEvent {
     type = GameEventType.RequestResolutionChoice;
-    override readonly duringDamagePrevention: boolean;
 
     constructor(readonly choice: ResolutionChoice) {
         super();
-        this.duringDamagePrevention = isDamagePreventionChoice(choice);
         this.label = `Player ${choice.player.id} must make a choice for ${choice.sourceName}`;
     }
 }
 
 export class GameEvent_SubmitResolutionChoice extends GameEvent {
     type = GameEventType.SubmitResolutionChoice;
-    override readonly duringDamagePrevention: boolean;
 
     constructor(readonly choice: ResolutionChoice, private readonly accept: () => boolean) {
         super();
-        this.duringDamagePrevention = isDamagePreventionChoice(choice);
         this.label = `Player ${choice.player.id} made a choice for ${choice.sourceName}`;
     }
 

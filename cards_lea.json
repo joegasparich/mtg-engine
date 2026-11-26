@@ -1207,5 +1207,33 @@
                 }
             }
         }]
+    },
+    {
+        "name": "Clone",
+        "image_url": "https://cards.scryfall.io/large/front/b/8/b843b814-e9d7-45c0-a02c-e55ed9ab67cd.jpg?1783919565",
+        "oracle_text": "You may have this creature enter as a copy of any creature on the battlefield.",
+        "types": ["Creature"],
+        "subtypes": ["Shapeshifter"],
+        "cost": "{3}{U}",
+        "power": 0,
+        "toughness": 0,
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_EnterAsCopy": {
+                        "outSignal": "CHOOSE_COPY", "inSignal": "CHOICE_COMPLETE", "copyFrom": "ORIGINAL"
+                    },
+                    "AbilityPart_ChooseObject": {
+                        "inSignal": "CHOOSE_COPY", "outSignal": "CHOICE_COMPLETE", "saveAs": "ORIGINAL",
+                        "selection": { "zone": "battlefield", "targetValidator": { "cardType": "Creature" } },
+                        "prompt": "Choose which creature to copy.",
+                        "optional": {
+                            "prompt": "Have Clone enter as a copy?",
+                            "acceptLabel": "Choose creature", "declineLabel": "Enter without copying"
+                        }
+                    }
+                }
+            }
+        ]
     }
 ]

@@ -1,3 +1,4 @@
+import type Player from "@engine/Player";
 import type { Ability } from "@engine/abilities";
 import type { DamagePreventionChoices } from "@engine/effects/DamagePrevention";
 import { type CheckListener,type CheckRemovalOverride,type CheckSource,type ContinuousEffect,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
@@ -56,9 +57,9 @@ export abstract class GameEvent {
     label: string;
     isAction = true;
     effect?: OneShotEffect;
-    readonly duringDamagePrevention?: boolean;
     callback: () => void;
 
+    get entryPreparation(): { player: Player; prepare(resume: () => void): void } | undefined { return undefined; }
     get additionalPerformedTypes(): readonly GameEventType[] { return []; }
 
     perform(): boolean {
@@ -104,8 +105,8 @@ class GameEventManager {
     private settleState?: () => boolean;
     private waitingForChoice?: () => boolean;
     private advanceWhileIdle?: () => boolean;
-    private damageChoices: DamagePreventionChoices;
-    private damagePending = false;
+    private choices: DamagePreventionChoices;
+    private commitPending = false;
     private currentBatch: GameEvent[] = [];
 
     startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean,
@@ -116,14 +117,14 @@ class GameEventManager {
         this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
         this.currentBatch.length = 0;
-        this.damagePending = false;
+        this.commitPending = false;
         this.eventsResolvedCallback.length = 0;
         this.resolutionSteps.length = 0;
         this.idleCallbacks.length = 0;
         this.settleState = settle;
         this.waitingForChoice = waitingForChoice;
         this.advanceWhileIdle = advanceWhileIdle;
-        this.damageChoices = damageChoices;
+        this.choices = damageChoices;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -228,7 +229,7 @@ class GameEventManager {
     }
 
     performImmediate(event: GameEvent): boolean {
-        if (this.damagePending) {
+        if (this.commitPending) {
             this.addEvent(event);
             return false;
         }
@@ -240,7 +241,7 @@ class GameEventManager {
             const result = this.performEvent(pending);
             if (pending === checkedEvent)
                 performed = result;
-            if (this.damagePending) {
+            if (this.commitPending) {
                 this.currentBatch.unshift(...events.slice(index + 1));
                 break;
             }
@@ -249,23 +250,19 @@ class GameEventManager {
     }
 
     performSimultaneous(events: GameEvent[]): boolean {
-        if (this.damagePending) {
+        if (this.commitPending) {
             const batch = [...events];
             this.onResolved(() => this.performSimultaneous(batch));
             return false;
         }
 
         this.checkForEffects(events);
-        if (events.some(isDamage)) {
-            let performed = false;
-            const prepared = events.flatMap(event => this.prepareEvent(event).events);
-            this.commitPrepared(prepared, (results, _, captured) => { performed = this.notifySimultaneous(results, captured); });
-            return performed;
-        }
-
-        const captured = this.captureGameListeners();
-        const performed = events.flatMap(event => this.prepareEvent(event).events.filter(pending => pending.perform()));
-        return this.notifySimultaneous(performed, captured);
+        const prepared = [...events];
+        // Each replacement sees the whole simultaneous event (including any other uses of a shield).
+        this.effects.checkEvents(prepared, undefined, EventCheckPhase.Commit);
+        let performed = false;
+        this.commitPrepared(prepared, (results, _, captured) => { performed = this.notifySimultaneous(results, captured); });
+        return performed;
     }
 
     private notifySimultaneous(performed: GameEvent[], captured: CapturedListeners): boolean {
@@ -305,9 +302,10 @@ class GameEventManager {
 
         try {
             for (;;) {
-                if (this.damagePending) {
-                    // 510.2: Suspend the whole damage batch while processing its choice events.
-                    const index = this.activeEvents.findIndex(event => event.duringDamagePrevention);
+                if (this.commitPending) {
+                    // 614.12a, 510.2: Only the choice exchange may run while a commit is suspended.
+                    const index = this.activeEvents.findIndex(event => event.type === GameEventType.RequestResolutionChoice
+                        || event.type === GameEventType.SubmitResolutionChoice);
                     if (index < 0)
                         break;
                     const [event] = this.activeEvents.splice(index, 1);
@@ -379,17 +377,41 @@ class GameEventManager {
             notify(performed, checkedPerformed, captured);
         };
 
-        const hits = events.filter(isDamage);
-        if (!hits.length) {
-            commit();
+        const resolveDamage = () => {
+            const hits = events.filter(isDamage);
+            if (!hits.length) {
+                commit();
+                return;
+            }
+
+            this.commitPending = true;
+            this.effects.damagePrevention.resolve(hits, this.choices, (damage, afterDamage) => {
+                this.commitPending = false;
+                commit(damage, afterDamage);
+            });
+        };
+
+        // Prepare every entrant against the same pre-event battlefield (707.5).
+        const entries = events.map(event => event.entryPreparation).filter(entry => entry !== undefined);
+        if (!entries.length) {
+            resolveDamage();
             return;
         }
-
-        this.damagePending = true;
-        this.effects.damagePrevention.resolve(hits, this.damageChoices, (damage, afterDamage) => {
-            this.damagePending = false;
-            commit(damage, afterDamage);
-        });
+        if (entries.length > 1) {
+            // 101.4, 616.1: The active player makes simultaneous choices first.
+            const players = this.choices.turnOrder();
+            entries.sort((a, b) => players.indexOf(a.player) - players.indexOf(b.player));
+        }
+        this.commitPending = true;
+        const next = (index: number) => {
+            if (index < entries.length) {
+                entries[index].prepare(() => next(index + 1));
+                return;
+            }
+            this.commitPending = false;
+            resolveDamage();
+        };
+        next(0);
     }
 
     private getGameListeners(event: GameEvent): Listener[] {
