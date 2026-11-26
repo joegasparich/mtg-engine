@@ -16,7 +16,7 @@ export class AbilityPart_Landwalk extends AbilityPart_ContinuousEffect {
             check: check => check.removeWhere(event => event instanceof GameEvent_DeclareBlocker
                 && event.attacker === this.ability.source
                 && game.players.some(player => player.battlefield.objects.some(land =>
-                    land.controller === event.blocker.controller && land.type === CardType.Land
+                    land.controller === event.blocker.controller && land.hasType(CardType.Land)
                     && land.subtypes.includes(this.landType)))),
         };
     }

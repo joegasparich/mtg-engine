@@ -10,8 +10,8 @@ export function matchesTargetValidator(target: CardObject, config: TargetValidat
     const { baseSubtype, blocking, cardType, cardTypes, cardSubtype, colour, onBattlefield, tapped, unblocked } = config.targetValidator ?? config;
     // 105.2: An object can match any of its current colours.
     return (!onBattlefield || target.zone instanceof Battlefield)
-        && (!cardType || target.type === cardType)
-        && (!cardTypes || cardTypes.includes(target.type))
+        && (!cardType || target.hasType(cardType))
+        && (!cardTypes || cardTypes.some(type => target.hasType(type)))
         && (!colour || target.colours.has(colour))
         && (!baseSubtype || target.hasBaseSubtype(baseSubtype))
         && (!cardSubtype || target.subtypes.includes(cardSubtype))

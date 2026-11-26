@@ -52,8 +52,8 @@ test("unblocked status requires confirmed blocks and ends when an attacker leave
     const [stolen, changed, remaining] = attackers;
     stolen.controller = playerB;
     stolen.controller = playerA;
-    changed.type = CardType.Artifact;
-    changed.type = CardType.Creature;
+    changed.types = [CardType.Artifact];
+    changed.types = [CardType.Creature];
     expect(CombatManager.isUnblocked(stolen)).toBe(false);
     expect(CombatManager.isUnblocked(changed)).toBe(false);
     expect(CombatManager.isUnblocked(remaining)).toBe(true);
@@ -660,4 +660,21 @@ test("collects and validates normal damage splits before dealing all assigned da
     expect([first, second].map(attacker => attacker.damageTaken)).toEqual([4, 4]);
     expect(playerA.graveyard.objects.map(object => object.card)).toEqual(expect.arrayContaining([first.card, second.card]));
     expect(playerB.graveyard.objects.map(object => object.card)).toEqual(expect.arrayContaining([blockers[0].card, blockers[3].card]));
+});
+
+test("attacking and tap costs require continuous control since the turn began", () => {
+    const bears = cardData[GRIZZLY_BEARS];
+    const established = addTestCard(bears, playerA, playerA.battlefield);
+    game.startGame();
+    const fresh = addTestCard(bears, playerA, playerA.battlefield);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    expect(CombatManager.canAttack(fresh)).toBe(false);
+    expect(fresh.canPayTapCost).toBe(false);
+    expect(CombatManager.canAttack(established)).toBe(true);
+    expect(established.canPayTapCost).toBe(true);
+
+    established.controller = playerB;
+    established.controller = playerA;
+    expect(CombatManager.canAttack(established)).toBe(false);
+    expect(established.canPayTapCost).toBe(false);
 });

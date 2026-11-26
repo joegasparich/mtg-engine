@@ -1,7 +1,8 @@
+import type { Ability } from "@engine/abilities";
 import type { CardObject,Permanent } from "@engine/GameObject";
 import type Player from "@engine/Player";
-import type { BasicLandType } from "~/defs";
-import { GameEvent,GameEventType } from "./GameEventManager";
+import type { CardType } from "~/defs";
+import gameEventManager,{ GameEvent,GameEventType } from "./GameEventManager";
 
 export class GameEvent_CheckTarget extends GameEvent {
     type = GameEventType.CheckTarget;
@@ -59,12 +60,53 @@ export class GameEvent_CheckRequiredBlock extends GameEvent {
     }
 }
 
-export class GameEvent_CheckBasicLandType extends GameEvent {
-    type = GameEventType.CheckBasicLandType;
-    label = "";
-    replacement?: BasicLandType;
+export interface CardCharacteristics {
+    types: readonly CardType[];
+    subtypes: readonly string[];
+    basePower: number;
+    baseToughness: number;
+    nativeAbilities: readonly Ability[];
+}
 
-    constructor(readonly land: CardObject) {
+export class GameEvent_CheckCharacteristics extends GameEvent {
+    type = GameEventType.CheckCharacteristics;
+    label = "";
+
+    private static readonly reads = new Map<CardObject, CardCharacteristics>();
+
+    // A live slate selection can read several permanents, including the one being checked.
+    // Reuse their snapshots within this evaluation only, then discard them together.
+    static evaluate(object: CardObject, base: CardCharacteristics): Readonly<CardCharacteristics> {
+        const current = this.reads.get(object);
+        if (current)
+            return current;
+
+        const outermost = !this.reads.size;
+        this.reads.set(object, base);
+        try {
+            gameEventManager.checkEvent(new GameEvent_CheckCharacteristics(object, base));
+            return base;
+        } finally {
+            if (outermost)
+                this.reads.clear();
+        }
+    }
+
+    private constructor(readonly object: CardObject, readonly characteristics: CardCharacteristics) {
         super();
+    }
+}
+
+export class GameEvent_CheckPowerToughness extends GameEvent {
+    type = GameEventType.CheckPowerToughness;
+    label = "";
+    power: number;
+    toughness: number;
+
+    constructor(readonly permanent: Permanent, readonly characteristics: Readonly<CardCharacteristics>) {
+        super();
+        // 613.4b–c: Start the modifier pass with the resolved base power and toughness.
+        this.power = characteristics.basePower;
+        this.toughness = characteristics.baseToughness;
     }
 }

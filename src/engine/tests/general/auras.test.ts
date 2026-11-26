@@ -22,7 +22,7 @@ beforeEach(() => {
         name: "Test Aura",
         image_url: "",
         oracle_text: "Enchant creature",
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         subtypes: [AttachmentSubtype.Aura],
         cost: "{W}",
         power: undefined,
@@ -72,7 +72,7 @@ test("an Aura's changed colour applies during attachment checks on entry", () =>
 test.each(["leaves", "leaves and returns", "stops being a creature"])("an Aura fails to resolve if the target %s", change => {
     expect(game.stack.spellCast(caster, aura, [target])).toBe(true);
     if (change === "stops being a creature") {
-        target.type = CardType.Land;
+        target.types = [CardType.Land];
     } else {
         const handObject = moveTestCard(target, opponent.hand);
         if (change === "leaves and returns")
@@ -116,7 +116,7 @@ test("state checks put an Aura with an illegal attachment into its owner's grave
     expect(game.stack.spellCast(caster, aura, [target])).toBe(true);
     game.stack.resolveAll();
 
-    target.type = CardType.Land;
+    target.types = [CardType.Land];
     game.checkState();
 
     expect(caster.graveyard.objects.map(object => object.card)).toContain(aura.card);
@@ -128,7 +128,7 @@ test("an Aura goes straight to its owner's graveyard if its attachment becomes i
     const beforeEntry = (check: EventCheck) => {
         if (check.events.some(event => event instanceof GameEvent_ChangeCardZone
             && event.oldObject === spell && event.newZone === caster.battlefield))
-            target.type = CardType.Land;
+            target.types = [CardType.Land];
     };
     const moves = vi.fn();
     const onMove = (event: GameEvent_ChangeCardZone) => {

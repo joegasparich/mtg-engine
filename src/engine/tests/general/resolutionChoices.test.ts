@@ -22,7 +22,7 @@ const equalize = {
         phases: [{ action: "sacrifice", cardType: "Land" }, { action: "discard" }],
     },
 };
-const testSpell = { ...forest, type: CardType.Sorcery, abilities: [{ parts: equalize }] };
+const testSpell = { ...forest, types: [CardType.Sorcery], abilities: [{ parts: equalize }] };
 
 function lands(player: Player, count: number) {
     return Array.from({ length: count }, () => addTestCard(forest, player, player.battlefield));
@@ -104,7 +104,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
     const [casterLandInHand] = hand(caster, 1);
     const [activeDiscard, activeKeep] = hand(active, 2);
     const [nextDiscard, nextKeep] = hand(next, 2);
-    const source = addTestCard({ ...testSpell, type: CardType.Instant }, caster, caster.hand);
+    const source = addTestCard({ ...testSpell, types: [CardType.Instant] }, caster, caster.hand);
     const otherSpell = addTestCard({ ...testSpell, abilities: [] }, caster, caster.hand);
     const stale = addTestCard(forest, active, active.hand);
     moveTestCard(stale, active.library);

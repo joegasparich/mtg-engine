@@ -36,7 +36,7 @@ export class AbilityPart_Effect_ChangeZones extends AbilityPart_Effect {
         }
 
         // 400.1, 304.4 and 307.4: The battlefield is shared, and instants and sorceries can't enter it.
-        if (card.zone instanceof Battlefield || card.type === CardType.Instant || card.type === CardType.Sorcery)
+        if (card.zone instanceof Battlefield || card.hasType(CardType.Instant) || card.hasType(CardType.Sorcery))
             return;
 
         // 303.4f: An Aura needs a legal attachment as it enters the battlefield.

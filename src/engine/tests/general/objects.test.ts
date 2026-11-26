@@ -151,7 +151,7 @@ test("an enters trigger resolves with its original controller after its source l
     const opponent = game.addPlayer([FOREST]);
     const source = addTestCard({
         ...cardData[FOREST],
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{
             parts: {
                 AbilityPart_Trigger_Enters: { type: CardType.Creature, outSignal: "DRAW", storeAs: "ENTERED" },
@@ -179,4 +179,20 @@ test("an enters trigger resolves with its original controller after its source l
     expect(trigger.retired).toBe(true);
     expect(player.hand.objects).toHaveLength(1);
     expect(opponent.hand.objects).toHaveLength(0);
+});
+
+test("a permanent with two printed types matches either target restriction across zone changes", () => {
+    const player = game.addPlayer([]);
+    const def = { ...cardData[GRIZZLY_BEARS], types: [CardType.Creature, CardType.Artifact] };
+    const creature = addTestCard(def, player, player.battlefield);
+    const disenchant = addTestCard(cardData.find(card => card.name === "Disenchant"), player, player.hand);
+    expect(creature.hasType(CardType.Creature)).toBe(true);
+    expect(disenchant.spellTargeter.validateTargets([creature])).toBe(true);
+    creature.types = [CardType.Land, CardType.Artifact];
+    expect(creature.hasType(CardType.Creature)).toBe(false);
+    expect(disenchant.spellTargeter.validateTargets([creature])).toBe(true);
+    expect(creature.def.types).toEqual([CardType.Creature, CardType.Artifact]);
+    creature.types = [CardType.Land];
+    expect(disenchant.spellTargeter.validateTargets([creature])).toBe(false);
+    expect(moveTestCard(creature, player.hand).types).toEqual([CardType.Creature, CardType.Artifact]);
 });

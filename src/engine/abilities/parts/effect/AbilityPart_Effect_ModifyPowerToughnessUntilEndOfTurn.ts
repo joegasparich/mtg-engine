@@ -1,7 +1,7 @@
 import { resolveAbilityGrammar,type GrammarKey } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { modifyPowerToughness } from "@engine/effects/PowerToughness";
+import gameEventManager from "@engine/events/GameEventManager";
 import { Permanent } from "@engine/GameObject";
 import { Battlefield } from "@engine/Zone";
 import { AbilityPart_Effect } from "./AbilityPart_Effect";
@@ -18,12 +18,6 @@ export class AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn extends Abili
             return;
 
         // 611.2a, 611.2c, and 514.2: Fix the recipient at resolution and end the effect during cleanup.
-        const end = gameEventManager.effects.startContinuous(this.ability, {
-            kind: ContinuousEffectKind.ModifyPowerToughness,
-            recipients: [recipient],
-            power: this.power,
-            toughness: this.toughness,
-        });
-        gameEventManager.onGamePerformed(GameEventType.Cleanup, end, { once: true });
+        gameEventManager.startContinuousUntilEndOfTurn(this.ability, modifyPowerToughness([recipient], this.power, this.toughness));
     }
 }

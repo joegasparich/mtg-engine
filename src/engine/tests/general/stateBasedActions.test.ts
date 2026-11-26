@@ -39,14 +39,16 @@ test("zero toughness and lethal damage are processed together outside combat", (
 test("a prevented destruction leaves a lethal creature in play without repeating the batch", () => {
     const player = game.addPlayer([]);
     const creature = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
-    const preventDestruction = vi.fn((check: EventCheck) => {
-        check.removeWhere(event => event instanceof GameEvent_DestroyPermanent && event.permanent === creature);
-    });
+    const prevented = vi.fn();
+    const preventDestruction = (check: EventCheck) => {
+        if (check.removeWhere(event => event instanceof GameEvent_DestroyPermanent && event.permanent === creature))
+            prevented();
+    };
     gameEventManager.onCheck(preventDestruction);
     try {
         creature.damageTaken = creature.toughness;
         game.checkState();
-        expect(preventDestruction).toHaveBeenCalledTimes(1);
+        expect(prevented).toHaveBeenCalledTimes(1);
         expect(creature.zone).toBe(player.battlefield);
     } finally {
         gameEventManager.offCheck(preventDestruction);
@@ -90,7 +92,7 @@ test("a host and its Aura are dealt with before a waiting trigger is put on the 
 
     addTestCard({
         ...cardData[FOREST],
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_Trigger_Enters: { type: CardType.Creature, outSignal: "DRAW" },
             AbilityPart_Effect_DrawCards: { inSignal: "DRAW", target: "CONTROLLER", count: 1 },

@@ -63,7 +63,7 @@ test("two queued activations cannot pay with the same tap", () => {
 test("a filtering mana ability can pay its activation cost from the pool and a land", () => {
     startMainPhase();
     const filter = addTestCard({
-        ...cardData[GRIZZLY_BEARS], name: "Test mana filter", type: CardType.Artifact,
+        ...cardData[GRIZZLY_BEARS], name: "Test mana filter", types: [CardType.Artifact],
         abilities: [{ isManaAbility: true, parts: {
             AbilityPart_Activate_Mana: { cost: "{2}" },
             AbilityPart_Activate_Tap: {},

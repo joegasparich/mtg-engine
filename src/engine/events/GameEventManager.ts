@@ -45,7 +45,8 @@ export enum GameEventType {
     AddMana,
     AttachPermanent,
     DrawCards,
-    CheckBasicLandType,
+    CheckCharacteristics,
+    CheckPowerToughness,
     RegeneratePermanent,
     TakeSpecialAction,
 }

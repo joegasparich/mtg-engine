@@ -20,7 +20,7 @@ import { cardData } from "~/index";
 describe("Disenchant", () => {
     const def = cardData.find(card => card.name === "Disenchant");
     const castle = cardData.find(card => card.name === "Castle");
-    const artifact: CardDef = { ...castle, name: "Test artifact", type: CardType.Artifact, abilities: [] };
+    const artifact: CardDef = { ...castle, name: "Test artifact", types: [CardType.Artifact], abilities: [] };
     const plains = cardData.find(card => card.name === "Plains");
     let caster: Player;
     let opponent: Player;
@@ -73,7 +73,7 @@ describe("Guardian Angel", () => {
     const damageSpellDef: CardDef = {
         ...cardData[ANCESTRAL_RECALL],
         name: "Test damage spell",
-        type: CardType.Instant,
+        types: [CardType.Instant],
         cost: "{R}",
         abilities: [{ parts: {
             AbilityPart_Target: {
@@ -601,7 +601,7 @@ test("Circle of Protection: Red prevents one hit from the chosen source to its c
     startMainPhase();
 
     const def = cardData.find(card => card.name === "Circle of Protection: Red");
-    expect(def).toMatchObject({ type: CardType.Enchantment, cost: "{1}{W}" });
+    expect(def).toMatchObject({ types: [CardType.Enchantment], cost: "{1}{W}" });
     const plains = cardData.find(card => card.name === "Plains");
     const castingLands = [addTestCard(plains, caster, caster.battlefield), addTestCard(plains, caster, caster.battlefield)];
     const card = addTestCard(def, caster, caster.hand);
@@ -878,7 +878,8 @@ describe("Animate Wall", () => {
         expect(attached?.attachedTo).toBe(wall);
         expect(wall.hasKeyword(Keyword.Defender)).toBe(true);
 
-        if (controller === opponent)
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        if (controller === caster)
             gameEventManager.addEvent(new GameEvent_GoToNextTurn());
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
         expect(CombatManager.canAttack(otherWall)).toBe(false);
@@ -1370,7 +1371,6 @@ describe("Blaze of Glory", () => {
         Game.init();
         attacker = game.addPlayer([]);
         defender = game.addPlayer([]);
-        startMainPhase();
     });
 
     test("the defender can cast after attackers are declared and must block each legal attacker", () => {
@@ -1382,6 +1382,7 @@ describe("Blaze of Glory", () => {
         const first = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
         const second = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
         const flyer = addCard("Air Elemental", attacker, attacker.battlefield);
+        startMainPhase();
         declareAttackers([first, second, flyer]);
 
         expect(game.currentStepIndex).toBe(StepIndex.DeclareAttackers);
@@ -1429,6 +1430,7 @@ describe("Blaze of Glory", () => {
         const first = addCard("Mons's Goblin Raiders", attacker, attacker.battlefield);
         const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
         const land = addCard("Plains", defender, defender.battlefield);
+        startMainPhase();
         blocker.tapped = true;
         game.infiniteMana = true;
         expect(playerActionManager.getCardActions(blaze, attacker)).toEqual([]);
@@ -1457,6 +1459,7 @@ describe("Blaze of Glory", () => {
     test("loses its target if the creature leaves and returns before resolution", () => {
         const blaze = addCard("Blaze of Glory", attacker, attacker.hand);
         const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
+        startMainPhase();
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.BeginningOfCombat));
         gameEventManager.addEvent(new GameEvent_CastSpell(attacker, blaze, [blocker]));
         const returned = moveTestCard(moveTestCard(blocker, defender.graveyard), defender.battlefield);
@@ -1900,7 +1903,6 @@ describe("Lance", () => {
         Game.init();
         caster = game.addPlayer(BASIC_DECK);
         opponent = game.addPlayer(BASIC_DECK);
-        startMainPhase();
         lance = addTestCard(def, caster, caster.hand);
         plains = addTestCard(plainsDef, caster, caster.battlefield);
     });
@@ -1924,6 +1926,7 @@ describe("Lance", () => {
     }
 
     test("enchants either player's creature and transfers the grant with the Aura", () => {
+        startMainPhase();
         const friendlyCard = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.hand);
         expect(playerActionManager.getCardActions(lance, caster)).toHaveLength(0);
 
@@ -1943,6 +1946,7 @@ describe("Lance", () => {
     test("lets the enchanted creature win combat against an equal blocker", () => {
         const attacker = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
         const blocker = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        startMainPhase();
         castLance(attacker);
 
         gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
@@ -1985,7 +1989,7 @@ describe("Northern Paladin", () => {
     const def = cardData.find(card => card.name === "Northern Paladin");
     const plains = cardData.find(card => card.name === BasicLandType.Plains);
     const blackEnchantment: CardDef = {
-        ...cardData[GRIZZLY_BEARS], type: CardType.Enchantment, cost: "{W}{B}",
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Enchantment], cost: "{W}{B}",
     };
     let caster: Player;
     let opponent: Player;
@@ -2963,7 +2967,7 @@ describe("Black Lotus", () => {
         cast.perform(player);
         passPriorityRound();
         const [artifact] = player.battlefield.objects;
-        expect(artifact).toMatchObject({ card: card.card, type: CardType.Artifact, tapped: false });
+        expect(artifact).toMatchObject({ card: card.card, types: [CardType.Artifact], tapped: false });
         const [activate] = playerActionManager.getCardActions(artifact, player);
         activate.perform(player);
 
@@ -3038,7 +3042,7 @@ describe("Celestial Prism", () => {
         player.manaPool[ManaColour.G] = 1;
         playerActionManager.getCardActions(card, player)[0].perform(player);
         passPriorityRound();
-        expect(player.battlefield.objects[0]).toMatchObject({ card: card.card, type: CardType.Artifact, tapped: false });
+        expect(player.battlefield.objects[0]).toMatchObject({ card: card.card, types: [CardType.Artifact], tapped: false });
         expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
     });
 
@@ -3060,5 +3064,85 @@ describe("Celestial Prism", () => {
 
         player.manaPool[ManaColour.Colourless] = 2;
         expect(playerActionManager.getCardActions(artifact, player)).toHaveLength(0);
+    });
+});
+
+describe("Animate Artifact", () => {
+    const animate = cardData.find(card => card.name === "Animate Artifact");
+    const prism = cardData.find(card => card.name === "Celestial Prism");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+    });
+
+    function enchant(target: Permanent, def = animate) {
+        const card = addTestCard(def, caster, caster.hand);
+        expect(game.stack.spellCast(caster, card, [target])).toBe(true);
+        passPriorityRound();
+        return caster.battlefield.objects.find(permanent => permanent.card === card.card);
+    }
+
+    test("casts for {3}{U} and animates an opponent's artifact without changing control or abilities", () => {
+        startMainPhase();
+        const artifact = addTestCard(prism, opponent, opponent.battlefield);
+        const bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const aura = addTestCard(animate, caster, caster.hand);
+        caster.manaPool[ManaColour.Colourless] = 4;
+        expect(playerActionManager.getCardActions(aura, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.Colourless] = 3;
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(aura, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([bear])).toBe(false);
+        game.pendingTargeter.onTargeted([artifact]);
+        passPriorityRound();
+        expect(caster.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        expect(artifact).toMatchObject({ controller: opponent, power: 3, toughness: 3, types: [CardType.Artifact, CardType.Creature] });
+        expect(artifact.abilities[0].def.isManaAbility).toBe(true);
+        expect(artifact.canPayTapCost).toBe(false);
+
+        const strength = enchant(artifact, cardData.find(card => card.name === "Holy Strength"));
+        expect(artifact).toMatchObject({ power: 4, toughness: 5 });
+        const [animation] = caster.battlefield.objects;
+        moveTestCard(animation, caster.graveyard);
+        expect(artifact.types).toEqual([CardType.Artifact]);
+        expect(artifact.canPayTapCost).toBe(true);
+        expect(caster.graveyard.objects.map(card => card.card)).toContain(strength.card);
+    });
+
+    test("leaves an existing artifact creature's power and toughness alone", () => {
+        startMainPhase();
+        const creature = addTestCard({ ...prism, types: [CardType.Artifact, CardType.Creature], power: 1, toughness: 4 }, caster, caster.battlefield);
+        expect(enchant(creature).attachedTo).toBe(creature);
+        expect(creature).toMatchObject({ power: 1, toughness: 4 });
+    });
+
+    test("a zero-mana artifact becomes 0/0 and goes to the graveyard with its Aura", () => {
+        startMainPhase();
+        const artifact = addTestCard(cardData.find(card => card.name === "Black Lotus"), opponent, opponent.battlefield);
+        enchant(artifact);
+        expect(opponent.graveyard.objects.map(card => card.card)).toContain(artifact.card);
+        expect(caster.graveyard.objects.map(card => card.def)).toContain(animate);
+    });
+
+    test("an established artifact can attack and leaves combat when the last animation ends", () => {
+        const artifact = addTestCard(prism, caster, caster.battlefield);
+        startMainPhase();
+        const first = enchant(artifact);
+        const second = enchant(artifact);
+        const fresh = addTestCard(prism, caster, caster.battlefield);
+        enchant(fresh);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(CombatManager.canAttack(fresh)).toBe(false);
+        new PlayerActions.DeclareAttacker(artifact).perform(caster, [opponent]);
+        expect(CombatManager.attackingCreatures.has(artifact)).toBe(true);
+        moveTestCard(first, caster.graveyard);
+        expect(artifact.power).toBe(3);
+        expect(CombatManager.attackingCreatures.has(artifact)).toBe(true);
+        moveTestCard(second, caster.graveyard);
+        expect(CombatManager.attackingCreatures.has(artifact)).toBe(false);
     });
 });

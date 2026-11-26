@@ -3,7 +3,7 @@
         "name": "Grizzly Bears",
         "image_url": "https://cards.scryfall.io/large/front/b/f/bf11596e-e798-4126-b56c-e23a1ca2a25d.jpg?1783919471",
         "oracle_text": "",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Bear"],
         "cost": "{1}{G}",
         "power": 2,
@@ -13,7 +13,7 @@
         "name": "Mons's Goblin Raiders",
         "image_url": "https://cards.scryfall.io/large/front/3/4/34ac4e28-1677-4f88-9b1a-7a32635f0ab2.jpg?1664925688",
         "oracle_text": "",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Goblin"],
         "cost": "{R}",
         "power": 1,
@@ -23,7 +23,7 @@
         "name": "Air Elemental",
         "image_url": "https://cards.scryfall.io/large/front/2/2/2299d07b-f6d2-4f9c-bc15-24620ccf2a26.jpg?1664924688",
         "oracle_text": "",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Elemental"],
         "cost": "{3}{U}{U}",
         "power": 4,
@@ -38,7 +38,7 @@
         "name": "Ancestral Recall",
         "image_url": "https://cards.scryfall.io/large/front/7/1/71283e4c-efd9-4a96-991c-6bbb169b99e7.jpg?1664924695",
         "oracle_text": "Target player draws three cards.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{U}",
         "abilities": [
             {
@@ -60,7 +60,7 @@
         "name": "Wall of Swords",
         "image_url": "https://cards.scryfall.io/large/front/2/c/2ca96f03-51a2-4c98-8b1a-71db8fd3f3bb.jpg?1783919570",
         "oracle_text": "Defender (This creature can't attack.)\nFlying",
-        "type": "Creature",
+        "types": ["Creature"],
         "cost": "{3}{W}",
         "power": 3,
         "toughness": 5,
@@ -78,7 +78,7 @@
         "name": "Animate Wall",
         "image_url": "https://cards.scryfall.io/large/front/8/1/8102657a-bdb1-49e7-94f2-ab885f9ff35a.jpg?1783919594",
         "oracle_text": "Enchant Wall\nEnchanted Wall can attack as though it didn't have defender.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -99,7 +99,7 @@
         "name": "Armageddon",
         "image_url": "https://cards.scryfall.io/large/front/5/6/565fc4d4-4c17-44d5-a5bc-31bc99018e5d.jpg?1783919592",
         "oracle_text": "Destroy all lands.",
-        "type": "Sorcery",
+        "types": ["Sorcery"],
         "cost": "{3}{W}",
         "abilities": [
             {
@@ -123,7 +123,7 @@
         "name": "Balance",
         "image_url": "https://cards.scryfall.io/large/front/5/0/5086b4dc-8066-4487-bd09-a04432291a54.jpg?1783919592",
         "oracle_text": "Each player chooses a number of lands they control equal to the number of lands controlled by the player who controls the fewest, then sacrifices the rest. Players discard cards and sacrifice creatures the same way.",
-        "type": "Sorcery",
+        "types": ["Sorcery"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -144,7 +144,7 @@
         "name": "Benalish Hero",
         "image_url": "https://cards.scryfall.io/large/front/4/b/4b22eafa-c414-4eed-8dc1-d26b987b341c.jpg?1783919592",
         "oracle_text": "Banding",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Human", "Soldier"],
         "cost": "{W}",
         "power": 1,
@@ -155,7 +155,7 @@
         "name": "Black Ward",
         "image_url": "https://cards.scryfall.io/large/front/7/b/7b298f64-b912-47ae-87f2-ef2a944b8ce2.jpg",
         "oracle_text": "Enchant creature\nEnchanted creature has protection from black. This effect doesn't remove this Aura.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -189,7 +189,7 @@
         "name": "Blaze of Glory",
         "image_url": "https://cards.scryfall.io/large/front/5/f/5f56a2c7-40d3-4c9a-a742-0ad4e574c28c.jpg?1783919592",
         "oracle_text": "Cast this spell only during combat before blockers are declared.\nTarget creature defending player controls can block any number of creatures this turn. It blocks each attacking creature this turn if able.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
             {
@@ -214,7 +214,7 @@
         "name": "Blessing",
         "image_url": "https://cards.scryfall.io/large/front/e/5/e5e1bb26-2d76-42c5-8fda-59cadd150d57.jpg?1783919590",
         "oracle_text": "Enchant creature\n{W}: Enchanted creature gets +1/+1 until end of turn.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}{W}",
         "abilities": [
@@ -242,7 +242,7 @@
         "name": "Blue Ward",
         "image_url": "https://cards.scryfall.io/large/front/9/7/9707fd6f-9c01-4f03-8973-50835a0ffcf2.jpg?1783919589",
         "oracle_text": "Enchant creature\nEnchanted creature has protection from blue. This effect doesn't remove this Aura.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -276,7 +276,7 @@
         "name": "Castle",
         "image_url": "https://cards.scryfall.io/large/front/8/f/8f86a635-f2fb-4525-bd6d-d84bb73e1d1e.jpg?1783919590",
         "oracle_text": "Untapped creatures you control get +0/+2.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{3}{W}",
         "abilities": [
             {
@@ -299,7 +299,7 @@
         "name": "Green Ward",
         "image_url": "https://cards.scryfall.io/large/front/4/e/4e265847-739d-47aa-8d99-24aff4d78e64.jpg?1783919582",
         "oracle_text": "Enchant creature\nEnchanted creature has protection from green. This effect doesn't remove this Aura.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -333,7 +333,7 @@
         "name": "Red Ward",
         "image_url": "https://cards.scryfall.io/large/front/3/6/36df52ab-62bd-4a48-8c34-856e20a517c3.jpg?1783919574",
         "oracle_text": "Enchant creature\nEnchanted creature has protection from red. This effect doesn't remove this Aura.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -367,7 +367,7 @@
         "name": "White Ward",
         "image_url": "https://cards.scryfall.io/large/front/d/d/dda1b5c6-ba71-4573-b4a8-872df961cc90.jpg?1783919567",
         "oracle_text": "Enchant creature\nEnchanted creature has protection from white. This effect doesn't remove this Aura.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -401,7 +401,7 @@
         "name": "Circle of Protection: Blue",
         "image_url": "https://cards.scryfall.io/large/front/4/d/4dd460dc-8d50-4a8e-bb34-aa421a72fcdc.jpg?1783919589",
         "oracle_text": "{1}: The next time a blue source of your choice would deal damage to you this turn, prevent that damage.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -418,7 +418,7 @@
         "name": "Circle of Protection: Green",
         "image_url": "https://cards.scryfall.io/large/front/7/6/76d13076-dce5-4c13-84f1-0421cea5dcda.jpg?1783919586",
         "oracle_text": "{1}: The next time a green source of your choice would deal damage to you this turn, prevent that damage.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -435,7 +435,7 @@
         "name": "Circle of Protection: Red",
         "image_url": "https://cards.scryfall.io/large/front/0/a/0a13c4d2-1791-4d4a-bd90-aa2b969cc717.jpg?1783919586",
         "oracle_text": "{1}: The next time a red source of your choice would deal damage to you this turn, prevent that damage.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -452,7 +452,7 @@
         "name": "Circle of Protection: White",
         "image_url": "https://cards.scryfall.io/large/front/e/1/e166bee4-8623-4c38-b687-3040b016e57f.jpg?1783919585",
         "oracle_text": "{1}: The next time a white source of your choice would deal damage to you this turn, prevent that damage.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -469,7 +469,7 @@
         "name": "Consecrate Land",
         "image_url": "https://cards.scryfall.io/large/front/f/b/fb0deecb-776d-4707-a228-337646077e77.jpg?1783919585",
         "oracle_text": "Enchant land\nEnchanted land has indestructible and can't be enchanted by other Auras.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -492,7 +492,7 @@
         "name": "Conversion",
         "image_url": "https://cards.scryfall.io/large/front/5/6/5695021b-7ee6-4149-8591-0021d5662720.jpg?1783919584",
         "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nAll Mountains are Plains.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{2}{W}{W}",
         "abilities": [
             {
@@ -518,7 +518,7 @@
         "name": "Crusade",
         "image_url": "https://cards.scryfall.io/large/front/b/9/b99452c0-5d1c-4a73-90b6-0ec3ac0af893.jpg",
         "oracle_text": "White creatures get +1/+1.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{W}{W}",
         "abilities": [
             {
@@ -541,7 +541,7 @@
         "name": "Death Ward",
         "image_url": "https://cards.scryfall.io/large/front/5/7/577da5a4-4030-484d-b1d1-77326611f0a4.jpg?1783919584",
         "oracle_text": "Regenerate target creature.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
             {
@@ -563,7 +563,7 @@
         "name": "Disenchant",
         "image_url": "https://cards.scryfall.io/large/front/3/2/32e297a1-914f-48bb-9ff9-1fca9603a203.jpg?1783919584",
         "oracle_text": "Destroy target artifact or enchantment.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -585,7 +585,7 @@
         "name": "Guardian Angel",
         "image_url": "https://cards.scryfall.io/large/front/e/7/e74b0d4c-2a22-46ff-a852-d44306c5a731.jpg?1783919582",
         "oracle_text": "Prevent the next X damage that would be dealt to any target this turn. Until end of turn, you may pay {1} any time you could cast an instant. If you do, prevent the next 1 damage that would be dealt to that permanent or player this turn.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{X}{W}",
         "abilities": [
             {
@@ -607,7 +607,7 @@
         "name": "Healing Salve",
         "image_url": "https://cards.scryfall.io/large/front/d/9/d9df8d11-85e6-4428-b114-6e2d4f1d3a8e.jpg?1783919580",
         "oracle_text": "Choose one —\n• Target player gains 3 life.\n• Prevent the next 3 damage that would be dealt to any target this turn.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [],
         "spellModes": [
@@ -639,7 +639,7 @@
         "name": "Farmstead",
         "image_url": "https://cards.scryfall.io/large/front/0/b/0b4a1194-ce5d-4491-9700-1a1abc6ee8e4.jpg?1783919584",
         "oracle_text": "Enchant land\nEnchanted land has \"At the beginning of your upkeep, you may pay {W}{W}. If you do, you gain 1 life.\"",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}{W}{W}",
         "abilities": [
@@ -667,7 +667,7 @@
         "name": "Holy Armor",
         "image_url": "https://cards.scryfall.io/large/front/9/5/952fc556-ab93-4889-9232-30c4988cc16b.jpg?1783919579",
         "oracle_text": "Enchant creature\nEnchanted creature gets +0/+2.\n{W}: Enchanted creature gets +0/+1 until end of turn.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -700,7 +700,7 @@
         "name": "Holy Strength",
         "image_url": "https://cards.scryfall.io/large/front/4/7/476eebd9-a5cb-426a-8481-0c193febbe3a.jpg?1783919581",
         "oracle_text": "Enchant creature\nEnchanted creature gets +1/+2.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -723,7 +723,7 @@
         "name": "Island Sanctuary",
         "image_url": "https://cards.scryfall.io/large/front/3/c/3c25c773-c64a-4197-9d25-c4c3ffb8be0c.jpg?1783919580",
         "oracle_text": "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
@@ -735,7 +735,7 @@
         "name": "Karma",
         "image_url": "https://cards.scryfall.io/large/front/1/6/16bb2840-a763-4695-99de-de448cd65adf.jpg?1783919579",
         "oracle_text": "At the beginning of each player's upkeep, this enchantment deals damage to that player equal to the number of Swamps they control.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "cost": "{2}{W}{W}",
         "abilities": [
             {
@@ -762,7 +762,7 @@
         "name": "Lord of Atlantis",
         "image_url": "https://cards.scryfall.io/large/front/8/f/8f005191-0e0e-4ba3-acde-9c279ca589f6.jpg?1783919555",
         "oracle_text": "Other Merfolk get +1/+1 and have islandwalk. (They can't be blocked as long as defending player controls an Island.)",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Merfolk"],
         "cost": "{U}{U}",
         "power": 2,
@@ -789,7 +789,7 @@
         "name": "Lance",
         "image_url": "https://cards.scryfall.io/large/front/3/a/3a6199d9-1253-473b-afbb-bc498f648631.jpg?1783919578",
         "oracle_text": "Enchant creature\nEnchanted creature has first strike.",
-        "type": "Enchantment",
+        "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
         "abilities": [
@@ -815,7 +815,7 @@
         "name": "Mesa Pegasus",
         "image_url": "https://cards.scryfall.io/large/front/d/3/d39ab50b-bb03-47e9-8ffe-4136aa6f7ef9.jpg?1783919576",
         "oracle_text": "Flying; banding",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Pegasus"],
         "cost": "{1}{W}",
         "power": 1,
@@ -826,7 +826,7 @@
         "name": "Northern Paladin",
         "image_url": "https://cards.scryfall.io/large/front/c/3/c39387b9-3638-49d6-9056-e370464a9214.jpg?1783919576",
         "oracle_text": "{W}{W}, {T}: Destroy target black permanent.",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Human", "Knight"],
         "cost": "{2}{W}{W}",
         "power": 3,
@@ -851,7 +851,7 @@
         "name": "Pearled Unicorn",
         "image_url": "https://cards.scryfall.io/large/front/4/2/42d3de03-9c3d-42f6-af34-1e15afb10e4f.jpg?1783919575",
         "oracle_text": "",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Unicorn"],
         "cost": "{2}{W}",
         "power": 2,
@@ -861,7 +861,7 @@
         "name": "Personal Incarnation",
         "image_url": "https://cards.scryfall.io/large/front/3/e/3e6d10d7-66ac-427e-b91f-af6198e5ae48.jpg?1783919574",
         "oracle_text": "{0}: The next 1 damage that would be dealt to this creature this turn is dealt to its owner instead. Only this creature's owner may activate this ability.\nWhen this creature dies, its owner loses half their life, rounded up.",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Avatar", "Incarnation"],
         "cost": "{3}{W}{W}{W}",
         "power": 6,
@@ -887,7 +887,7 @@
         "name": "Purelace",
         "image_url": "https://cards.scryfall.io/large/front/f/f/ffa2615c-de01-4afd-a260-0ff628ccc4a5.jpg?1783919576",
         "oracle_text": "Target spell or permanent becomes white. (Mana symbols on that permanent remain unchanged.)",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
             {
@@ -902,7 +902,7 @@
         "name": "Resurrection",
         "image_url": "https://cards.scryfall.io/large/front/f/6/f682509c-470e-4cee-9e48-2aaed4feeaba.jpg?1783919574",
         "oracle_text": "Return target creature card from your graveyard to the battlefield.",
-        "type": "Sorcery",
+        "types": ["Sorcery"],
         "cost": "{2}{W}{W}",
         "abilities": [
             {
@@ -926,7 +926,7 @@
         "name": "Reverse Damage",
         "image_url": "https://cards.scryfall.io/large/front/0/7/07d5b8f7-d4ae-42ad-87bf-a64dd74f9687.jpg?1783919574",
         "oracle_text": "The next time a source of your choice would deal damage to you this turn, prevent that damage. You gain life equal to the damage prevented this way.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{1}{W}{W}",
         "abilities": [
             {
@@ -946,7 +946,7 @@
         "name": "Righteousness",
         "image_url": "https://cards.scryfall.io/large/front/5/6/566b46e8-e036-48de-b0aa-f9597f113b26.jpg?1783919572",
         "oracle_text": "Target blocking creature gets +7/+7 until end of turn.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
             {
@@ -970,7 +970,7 @@
         "name": "Samite Healer",
         "image_url": "https://cards.scryfall.io/large/front/b/e/bea8c66e-5ffa-480d-b7db-acd3bf87ebbb.jpg?1783919571",
         "oracle_text": "{T}: Prevent the next 1 damage that would be dealt to any target this turn.",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Human", "Cleric"],
         "cost": "{1}{W}",
         "power": 1,
@@ -994,7 +994,7 @@
         "name": "Savannah Lions",
         "image_url": "https://cards.scryfall.io/large/front/d/1/d136d1fc-c413-4deb-952c-b10aa1c72abe.jpg?1783919570",
         "oracle_text": "",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Cat"],
         "cost": "{W}",
         "power": 2,
@@ -1004,7 +1004,7 @@
         "name": "Serra Angel",
         "image_url": "https://cards.scryfall.io/large/front/1/4/14c86103-ea57-47ef-8249-01b15e1469bc.jpg?1783919571",
         "oracle_text": "Flying\nVigilance (Attacking doesn't cause this creature to tap.)",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Angel"],
         "cost": "{3}{W}{W}",
         "power": 4,
@@ -1018,7 +1018,7 @@
         "name": "Swords to Plowshares",
         "image_url": "https://cards.scryfall.io/large/front/6/1/61f917dc-2685-4ce9-9be0-1d69e467337d.jpg?1783919570",
         "oracle_text": "Exile target creature. Its controller gains life equal to its power.",
-        "type": "Instant",
+        "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
             {
@@ -1043,7 +1043,7 @@
         "name": "Veteran Bodyguard",
         "image_url": "https://cards.scryfall.io/large/front/1/6/16479793-16ed-48a3-a30f-64bef2074393.jpg?1783919569",
         "oracle_text": "As long as this creature is untapped, all damage that would be dealt to you by unblocked creatures is dealt to this creature instead.",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Human"],
         "cost": "{3}{W}{W}",
         "power": 2,
@@ -1068,7 +1068,7 @@
         "name": "White Knight",
         "image_url": "https://cards.scryfall.io/large/front/3/2/32683d26-4b59-4460-b507-f3ab21daf151.jpg?1783919568",
         "oracle_text": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from black (This creature can't be blocked, targeted, dealt damage, or enchanted by anything black.)",
-        "type": "Creature",
+        "types": ["Creature"],
         "subtypes": ["Human", "Knight"],
         "cost": "{W}{W}",
         "power": 2,
@@ -1082,7 +1082,7 @@
         "name": "Wrath of God",
         "image_url": "https://cards.scryfall.io/large/front/1/4/14de01ae-a52e-4530-9fe3-9888a8480fc8.jpg?1783919567",
         "oracle_text": "Destroy all creatures. They can't be regenerated.",
-        "type": "Sorcery",
+        "types": ["Sorcery"],
         "cost": "{2}{W}{W}",
         "abilities": [
             {
@@ -1103,7 +1103,7 @@
         "name": "Black Lotus",
         "image_url": "https://cards.scryfall.io/large/front/3/a/3a10650e-58f7-4a99-a77d-3f42d61ecf93.jpg?1783919447",
         "oracle_text": "{T}, Sacrifice this artifact: Add three mana of any one color.",
-        "type": "Artifact",
+        "types": ["Artifact"],
         "cost": "{0}",
         "abilities": [
             {
@@ -1123,10 +1123,22 @@
         ]
     },
     {
+        "name": "Animate Artifact",
+        "image_url": "https://cards.scryfall.io/large/front/7/c/7c9e107b-2331-4e44-b414-db10227eb6d1.jpg?1783919566",
+        "oracle_text": "Enchant artifact\nAs long as enchanted artifact isn't a creature, it's an artifact creature with power and toughness each equal to its mana value.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{3}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Artifact" } } } },
+            { "parts": { "AbilityPart_AnimateArtifact": {} } }
+        ]
+    },
+    {
         "name": "Celestial Prism",
         "image_url": "https://cards.scryfall.io/large/front/1/f/1f3c5029-6a06-4048-8ad6-f193f7feddf4.jpg?1783919447",
         "oracle_text": "{2}, {T}: Add one mana of any color.",
-        "type": "Artifact",
+        "types": ["Artifact"],
         "cost": "{3}",
         "abilities": [
             {

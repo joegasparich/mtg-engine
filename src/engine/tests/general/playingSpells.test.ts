@@ -34,7 +34,7 @@ test("shows each mode, rejects unavailable choices, and can cancel before choosi
     } } };
     const targetPlayer = { parts: { AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] } } };
     const def: CardDef = {
-        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{G}", abilities: [],
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Instant], cost: "{G}", abilities: [],
         spellModes: [{ text: "Choose a creature", abilities: [targetCreature] },
             { text: "Choose a player", abilities: [targetPlayer] }],
     };
@@ -72,7 +72,7 @@ test("announces the mode before X and preserves each spell's mode until it resol
     const other = game.addPlayer([]);
     startMainPhase();
     const def: CardDef = {
-        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{G}", abilities: [],
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Instant], cost: "{X}{G}", abilities: [],
         spellModes: [
             { text: "Gain life", abilities: [{ parts: {
                 AbilityPart_Effect_GainLife: { inSignal: "SPELL_RESOLVE", target: "THIS.controller", amount: 1 },
@@ -117,7 +117,7 @@ test("announces a safe affordable X, with cancellation before mana is paid", () 
     const other = game.addPlayer([]);
     startMainPhase();
     const spell = addTestCard({
-        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{X}{1}{U}", abilities: [],
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Instant], cost: "{X}{X}{1}{U}", abilities: [],
     }, player, player.hand);
     player.manaPool[ManaColour.R] = 5;
     const action = new PlayerActions.PlayCard(spell);
@@ -158,7 +158,7 @@ test("cancelling targets after announcing X leaves the spell and mana available"
     const other = game.addPlayer([]);
     startMainPhase();
     const spell = addTestCard({
-        ...cardData[GRIZZLY_BEARS], type: CardType.Instant, cost: "{X}{G}",
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Instant], cost: "{X}{G}",
         abilities: [{ parts: { AbilityPart_Target: { saveAs: "PLAYER", validTargets: [TargetTypeKeys.Player] } } }],
     }, player, player.hand);
     const forest = addTestCard(cardData[FOREST], player, player.battlefield);
@@ -177,7 +177,7 @@ test("target card types accept any listed type and still enforce other target fi
     const creature = cardData[GRIZZLY_BEARS];
     const target = addTestCard(creature, player, player.battlefield);
     const spell = addTestCard({
-        ...creature, type: CardType.Instant, abilities: [{ parts: {
+        ...creature, types: [CardType.Instant], abilities: [{ parts: {
             AbilityPart_Target: {
                 saveAs: "TARGET", validTargets: [TargetTypeKeys.Permanent],
                 targetValidator: { cardTypes: [CardType.Creature, CardType.Artifact], tapped: true },
@@ -189,9 +189,9 @@ test("target card types accept any listed type and still enforce other target fi
     expect(spellTargeter.validateTargets([target])).toBe(false);
     target.tapped = true;
     expect(spellTargeter.validateTargets([target])).toBe(true);
-    target.type = CardType.Artifact;
+    target.types = [CardType.Artifact];
     expect(spellTargeter.validateTargets([target])).toBe(true);
-    target.type = CardType.Enchantment;
+    target.types = [CardType.Enchantment];
     expect(spellTargeter.validateTargets([target])).toBe(false);
 });
 
@@ -203,7 +203,7 @@ test.each([
     startMainPhase();
     const creature = cardData[GRIZZLY_BEARS];
     const source = addTestCard({
-        ...creature, type: CardType.Instant, cost: "{G}", abilities: [{ parts: {
+        ...creature, types: [CardType.Instant], cost: "{G}", abilities: [{ parts: {
             AbilityPart_Target: { saveAs: "TARGET", validTargets: [key] },
         } }],
     }, player, player.hand);

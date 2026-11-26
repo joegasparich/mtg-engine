@@ -35,7 +35,7 @@ export class Stack extends Zone<Spell | StackAbility> {
 
     spellCast(caster: Player, handObject: CardObject, targets: readonly ActionTarget[] = [], chosenX = 0,
         chosenMode?: number): boolean {
-        if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.type === CardType.Land)
+        if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.hasType(CardType.Land))
             return false;
 
         // 107.3a and 601.2b–c: Announce the mode, X, and targets for this particular spell.
@@ -128,33 +128,24 @@ export class Stack extends Zone<Spell | StackAbility> {
             return;
         }
 
-        switch (spell.type) {
-            case CardType.Creature:
-            case CardType.Enchantment:
-            case CardType.Artifact: {
-                if (this.resolveSpellEffects(spell)) {
-                    this.completeResolution = () => {
-                        if (spell.zone !== this)
-                            return;
+        const permanentSpell = spell.isPermanent;
+        if (!permanentSpell && !spell.hasType(CardType.Instant) && !spell.hasType(CardType.Sorcery))
+            return;
 
-                        const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
-                        const event = resolver?.resolvePermanentSpell(spell)
-                            ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
-                        if (event instanceof GameEvent_ChangeCardZone)
-                            event.resolvesPermanentSpell = true;
-                        // 608.3b–c: Validate and commit permanent entry in the same resolution.
-                        gameEventManager.performImmediate(event);
-                    };
+        if (this.resolveSpellEffects(spell) && permanentSpell) {
+            this.completeResolution = () => {
+                if (spell.zone !== this)
                     return;
-                }
-                break;
-            }
-            case CardType.Sorcery:
-            case CardType.Instant:
-                this.resolveSpellEffects(spell);
-                break;
-            default:
-                return;
+
+                const resolver = spell.abilities.flatMap(ability => ability.parts).find(part => part.resolvePermanentSpell);
+                const event = resolver?.resolvePermanentSpell(spell)
+                    ?? new GameEvent_ChangeCardZone(spell, spell.controller.battlefield);
+                if (event instanceof GameEvent_ChangeCardZone)
+                    event.resolvesPermanentSpell = true;
+                // 608.3b–c: Validate and commit permanent entry in the same resolution.
+                gameEventManager.performImmediate(event);
+            };
+            return;
         }
         // 608.2n: Move the spell after the last instruction and its follow-ups.
         this.completeResolution = () => {

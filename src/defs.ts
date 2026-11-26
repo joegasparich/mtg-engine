@@ -4,7 +4,7 @@ export interface CardDef {
     name: string,
     image_url: string,
     oracle_text: string,
-    type: CardType,
+    types: readonly CardType[],
     subtypes?: string[],
     cost: string, // {3}{G}{G}
     power: number,

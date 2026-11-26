@@ -1,7 +1,7 @@
 import { PlayerActions } from "@engine/actions";
 import { DamagePreventionKind,DamageRedirectionKind } from "@engine/effects/DamagePrevention";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
-import { GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToStep,ResolutionChoiceKind } from "@engine/events";
+import { GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,ResolutionChoiceKind } from "@engine/events";
 import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { type CardObject,type Permanent,Spell } from "@engine/GameObject";
@@ -352,7 +352,7 @@ test("a vetoed event and a removal override leave the shield available", () => {
 test("the Circle can leave before resolution and its shield can stop a spell's damage", () => {
     const damageSpell = addTestCard({
         ...redCreature,
-        type: CardType.Instant,
+        types: [CardType.Instant],
         abilities: [{ parts: {
             AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "THIS.controller", amount: 3 },
         } }],
@@ -482,6 +482,8 @@ test("source selection uses the resolution state and rejects choices that become
 test("a Circle protects its controller from the chosen unblocked attacker in combat", () => {
     const chosen = addTestCard(redCreature, protectedPlayer, protectedPlayer.battlefield);
     const other = addTestCard(redCreature, protectedPlayer, protectedPlayer.battlefield);
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     circle = addTestCard(redCircle, opponent, opponent.battlefield);
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
     for (const attacker of [chosen, other])
@@ -504,6 +506,8 @@ test("a Circle protects its controller from the chosen unblocked attacker in com
 test("combat waits for prevention allocation before dealing damage and granting priority", () => {
     const first = addTestCard(redCreature, protectedPlayer, protectedPlayer.battlefield);
     const second = addTestCard(cardData[GRIZZLY_BEARS], protectedPlayer, protectedPlayer.battlefield);
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
     shield(opponent, 1);
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
     for (const attacker of [first, second])

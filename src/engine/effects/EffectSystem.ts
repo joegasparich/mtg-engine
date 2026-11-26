@@ -35,21 +35,15 @@ export enum ContinuousEffectKind {
     EventCheck,
     CheckOverride,
     AbilityGrant,
-    ModifyPowerToughness,
     DamageEffect,
 }
 
-type Recipients = readonly Permanent[] | (() => readonly Permanent[]);
+export type Recipients = readonly Permanent[] | (() => readonly Permanent[]);
 
-function getRecipients(recipients: Recipients): readonly Permanent[] {
+export function getRecipients(recipients: Recipients): readonly Permanent[] {
     return typeof recipients === "function" ? recipients() : recipients;
 }
 
-type PowerToughnessModifier = { power: number; toughness: number };
-type PowerToughnessEffect = PowerToughnessModifier & {
-    kind: ContinuousEffectKind.ModifyPowerToughness;
-    recipients: Recipients;
-};
 type AbilityGrantEffect = {
     kind: ContinuousEffectKind.AbilityGrant;
     grant: AbilityDef;
@@ -60,8 +54,7 @@ export type ContinuousEffect =
     | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
     | AbilityGrantEffect
-    | { kind: ContinuousEffectKind.DamageEffect; rule: DamageEffect }
-    | PowerToughnessEffect;
+    | { kind: ContinuousEffectKind.DamageEffect; rule: DamageEffect };
 
 // 609.1 and 610.1: A resolving instruction produces events and can continue after a player choice.
 export class OneShotEffect {
@@ -93,7 +86,6 @@ export class EffectSystem {
     private readonly eventChecks = new Map<CheckListener, EventCheckOptions & { source?: CheckSource }>();
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
-    private readonly powerToughnessEffects = new Set<PowerToughnessEffect>();
     private readonly updateAbilityGrants = new Set<() => void>();
 
     constructor(private readonly events: EventDispatcher) {}
@@ -122,16 +114,6 @@ export class EffectSystem {
             update();
     }
 
-    getModifiedPowerToughness(recipient: CardObject, stat: keyof PowerToughnessModifier, base: number): number {
-        // 613.4c: Add each applicable power or toughness modifier to the underlying characteristic.
-        let value = base;
-        for (const effect of this.powerToughnessEffects) {
-            if (getRecipients(effect.recipients).some(permanent => permanent === recipient))
-                value += effect[stat];
-        }
-        return value;
-    }
-
     getEventCheckReferences(): CardObject[] {
         return [
             ...[...this.eventChecks.values()].flatMap(check => check.references?.() ?? []),
@@ -152,12 +134,6 @@ export class EffectSystem {
                     { object: ability.source, keyword: ability.def.keyword, ability });
             case ContinuousEffectKind.AbilityGrant:
                 return this.applyAbilityGrant(ability, effect);
-            case ContinuousEffectKind.ModifyPowerToughness: {
-                const { recipients } = effect;
-                const modifier = { ...effect, recipients: typeof recipients === "function" ? recipients : [...recipients] };
-                this.powerToughnessEffects.add(modifier);
-                return () => { this.powerToughnessEffects.delete(modifier); };
-            }
         }
     }
 

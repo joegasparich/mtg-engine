@@ -35,10 +35,11 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 | `EventCheck` | Registers a `check` callback. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
 | `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
 | `AbilityGrant` | Grants an ability to a fixed list or a live selection of permanents. Each recipient keeps its ability instance while it qualifies. A continuous grant part can save those instances to its slate for another part to read. [Ability grants](src/engine/effects/EffectSystem.ts) |
-| `ModifyPowerToughness` | Adds power and toughness whenever those stats are read. It uses the same `recipients` input as `AbilityGrant`. [Power and toughness](src/engine/effects/EffectSystem.ts) |
 | `DamageEffect` | Registers a damage prevention or redirection rule. The affected player or permanent's controller chooses the order of competing rules and allocates limited effects among simultaneous sources. [Damage resolver](src/engine/effects/DamagePrevention.ts) |
 
 ### Event check phases
+
+A permanent’s power and toughness are calculated together. `GameEvent_CheckCharacteristics` applies type changes and sets base stats. A subsequent `GameEvent_CheckPowerToughness` lets modifiers add to those values in layer 7c. Static abilities read their current recipients, while resolving effects capture their recipients at resolution. [Power and toughness](src/engine/effects/PowerToughness.ts)
 
 | Phase | When it runs | What it is used for |
 | --- | --- | --- |

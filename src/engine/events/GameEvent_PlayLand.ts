@@ -15,7 +15,7 @@ export class GameEvent_PlayLand extends GameEvent {
     }
 
     perform(): boolean {
-        if (this.handObject.type !== CardType.Land || this.player !== this.handObject.owner || !this.handObject.canPlay())
+        if (!this.handObject.hasType(CardType.Land) || this.player !== this.handObject.owner || !this.handObject.canPlay())
             return false;
 
         game.landPlayedThisTurn = true;

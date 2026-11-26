@@ -1,12 +1,27 @@
-import { Container,Rectangle,Sprite,Text,Texture } from "pixi.js";
+import { Container,Graphics,Text } from "pixi.js";
+import { type CardDef,cardColours,CardType } from "~/defs";
+
+// Median sRGB samples from the paper, raised rim and inset edge of 30A creature capsules.
+const capsuleColours = {
+    W: { face: 0xe6e0ca, rim: 0xf5f3e6, inset: 0x504b44 },
+    U: { face: 0x9bc0ce, rim: 0xc5dbe6, inset: 0x36444a },
+    B: { face: 0xb4ada7, rim: 0xdbd5cf, inset: 0x433b3b },
+    R: { face: 0xeac4b0, rim: 0xf5dbc9, inset: 0x533e34 },
+    G: { face: 0xb7c8ba, rim: 0xd2dfd6, inset: 0x424740 },
+    [CardType.Artifact]: { face: 0xb9c5c7, rim: 0xc9d6d6, inset: 0x3d4144 },
+} as const;
 
 // Positions in the printed card face, expressed relative to Scryfall's 672 × 936 image.
-const CAPSULE_X = 578 / 672;
-const CAPSULE_Y = 860 / 936;
-const PATCH_WIDTH = 72 / 672;
-const PATCH_HEIGHT = 34 / 936;
-const BLANK_STRIP_Y = 842 / 936;
-const BLANK_STRIP_HEIGHT = 3 / 936;
+// The top and bottom are flat. Only the last ~8 pixels at each end bow outward.
+function capsule(graphics: Graphics, inset: number, offsetY = 0) {
+    const x = 49 - inset;
+    const y = 26 - inset;
+    return graphics.moveTo(-x, offsetY - y).lineTo(x, offsetY - y)
+        .bezierCurveTo(x + 9, offsetY - y / 2, x + 9, offsetY + y / 2, x, offsetY + y)
+        .lineTo(-x, offsetY + y)
+        .bezierCurveTo(-x - 9, offsetY + y / 2, -x - 9, offsetY - y / 2, -x, offsetY - y)
+        .closePath();
+}
 
 enum StatColour {
     Neutral = 0x201a16,
@@ -29,29 +44,23 @@ export class UICardPowerToughness extends Container {
     private readonly toughnessText: Text;
     private readonly maxTextWidth: number;
 
-    constructor(texture: Texture, cardWidth: number, cardHeight: number) {
+    constructor(printed: CardDef, cardWidth: number, cardHeight: number) {
         super();
         this.eventMode = "none";
-        const { frame, source } = texture;
+        const frameColour = printed.types.includes(CardType.Artifact)
+            ? CardType.Artifact : cardColours.find(colour => printed.cost?.includes(`{${colour}}`)) ?? CardType.Artifact;
+        const colours = capsuleColours[frameColour];
+        const x = (578 / 672 - 0.5) * cardWidth;
+        const y = (858 / 936 - 0.5) * cardHeight;
+        const badge = new Graphics();
+        capsule(badge, -1, 2).fill({ color: 0x121a1d, alpha: 0.85 });
+        capsule(badge, 0).fill(colours.rim);
+        capsule(badge, 3, 0).fill(colours.inset);
+        capsule(badge, 5, 2).fill(colours.face);
+        badge.position.set(x, y);
+        badge.scale.set(cardWidth / 672, cardHeight / 936);
 
-        // Stretch a clean strip directly above the ink to preserve the card's own capsule color.
-        const paperTexture = new Texture({
-            source,
-            frame: new Rectangle(
-                frame.x + frame.width * (CAPSULE_X - PATCH_WIDTH / 2),
-                frame.y + frame.height * BLANK_STRIP_Y,
-                frame.width * PATCH_WIDTH,
-                frame.height * BLANK_STRIP_HEIGHT,
-            ),
-        });
-        const x = (CAPSULE_X - 0.5) * cardWidth;
-        const y = (CAPSULE_Y - 0.5) * cardHeight;
-        const paper = new Sprite({ texture: paperTexture, anchor: 0.5 });
-        paper.position.set(x, y);
-        paper.width = PATCH_WIDTH * cardWidth;
-        paper.height = PATCH_HEIGHT * cardHeight;
-
-        this.maxTextWidth = paper.width - 1;
+        this.maxTextWidth = cardWidth * 86 / 672;
         const textOptions = {
             anchor: { x: 0, y: 0.5 },
             resolution: 3,
@@ -60,14 +69,14 @@ export class UICardPowerToughness extends Container {
         this.powerText = new Text(textOptions);
         this.separator = new Text({ ...textOptions, text: "/", tint: StatColour.Neutral });
         this.toughnessText = new Text(textOptions);
-        this.numbers.position.set(x, y);
+        this.numbers.position.set(x, y + 2 * cardHeight / 936);
         this.numbers.addChild(this.powerText, this.separator, this.toughnessText);
-        this.addChild(paper, this.numbers);
+        this.addChild(badge, this.numbers);
     }
 
-    setStats(power: number, remainingToughness: number, base: { power: number; toughness: number }, damaged: boolean) {
-        this.powerText.tint = statColour(power, base.power);
-        this.toughnessText.tint = damaged ? StatColour.Lower : statColour(remainingToughness, base.toughness);
+    setStats(power: number, remainingToughness: number, base: { basePower: number; baseToughness: number }, damaged: boolean) {
+        this.powerText.tint = statColour(power, base.basePower);
+        this.toughnessText.tint = damaged ? StatColour.Lower : statColour(remainingToughness, base.baseToughness);
 
         const powerText = String(power);
         const toughnessText = String(remainingToughness);

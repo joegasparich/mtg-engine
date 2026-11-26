@@ -38,7 +38,7 @@ test("a filtered destruction effect checks its whole batch and uses each permane
         name: "Destroy all Walls",
         image_url: "",
         oracle_text: "Destroy all Walls.",
-        type: CardType.Sorcery,
+        types: [CardType.Sorcery],
         cost: "{1}",
         power: 0,
         toughness: 0,

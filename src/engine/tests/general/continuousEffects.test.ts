@@ -1,6 +1,7 @@
 import { makeAbility } from "@engine/abilities";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import { modifyPowerToughness } from "@engine/effects/PowerToughness";
 import type { GameEvent_ChangeCardZone } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -93,7 +94,7 @@ test("a continuous zone selection filters by current colour alongside card type"
     const bearsDef = cardData[GRIZZLY_BEARS];
     const source = addTestCard({
         ...bearsDef,
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_SelectObjectsFromZoneContinuously: {
                 saveAs: "GREEN_CREATURES",
@@ -122,7 +123,7 @@ test("setting an object's colour updates colour-dependent ability grants", () =>
     const bearsDef = cardData[GRIZZLY_BEARS];
     const source = addTestCard({
         ...bearsDef,
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_SelectObjectsFromZoneContinuously: {
                 saveAs: "BLUE_CREATURES",
@@ -184,7 +185,7 @@ test("a continuous grant follows battlefield membership and card types before en
     });
     const source = addTestCard({
         ...bearsDef,
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_SelectObjectsFromZoneContinuously: {
                 saveAs: "CREATURES",
@@ -210,11 +211,11 @@ test("a continuous grant follows battlefield membership and card types before en
     expect(slate.GRANTED_FLIGHT).toHaveLength(2);
     expect(slate.GRANTED_FLIGHT[0]).toBe(granted);
     expect(slate.GRANTED_FLIGHT[1]).toBe(other.abilities[0]);
-    bears.type = CardType.Artifact;
+    bears.types = [CardType.Artifact];
     expect(bears.hasKeyword(Keyword.Flying)).toBe(false);
     expect(slate.GRANTED_FLIGHT).toHaveLength(1);
     expect(slate.GRANTED_FLIGHT[0]).toBe(other.abilities[0]);
-    bears.type = CardType.Creature;
+    bears.types = [CardType.Creature];
     expect(bears.hasKeyword(Keyword.Flying)).toBe(true);
     expect(moveTestCard(other, player.graveyard).hasKeyword(Keyword.Flying)).toBe(false);
 
@@ -237,12 +238,7 @@ test("ability grants and stat modifiers accept the same fixed list of recipients
         recipients,
         grant: { keyword: Keyword.Flying, parts: {} },
     });
-    const endModifier = gameEventManager.effects.startContinuous(ability, {
-        kind: ContinuousEffectKind.ModifyPowerToughness,
-        recipients,
-        power: 1,
-        toughness: 2,
-    });
+    const endModifier = gameEventManager.effects.startContinuous(ability, modifyPowerToughness(recipients, 1, 2));
 
     recipients[1] = other;
     for (const creature of [first, second]) {
@@ -293,7 +289,7 @@ test("setting a basic land type suppresses native abilities and leaves grants ac
     const grant = land.grantAbility({ keyword: Keyword.Banding, parts: {} }, grantSource);
     const source = addTestCard({
         ...cardData[GRIZZLY_BEARS],
-        type: CardType.Enchantment,
+        types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_SelectObjectsFromZoneContinuously: {
                 saveAs: "MOUNTAINS",
@@ -320,4 +316,64 @@ test("setting a basic land type suppresses native abilities and leaves grants ac
     addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
     expect(game.stack.objects).toHaveLength(1);
     expect(game.stack.objects[0]).toMatchObject({ source: land });
+});
+
+test.each([true, false])("animation and basic land type changes compose and expire independently (Conversion first: %s)", conversionFirst => {
+    Game.init();
+    const player = game.addPlayer([]);
+    startMainPhase();
+    const prism = cardData.find(card => card.name === "Celestial Prism");
+    const land = addTestCard({
+        ...prism, types: [CardType.Artifact, CardType.Land], subtypes: ["Equipment", BasicLandType.Mountain],
+    }, player, player.battlefield);
+    const originalAbilities = land.abilities;
+    const conversion = cardData.find(card => card.name === "Conversion");
+    const aura = addTestCard(cardData.find(card => card.name === "Animate Artifact"), player, player.hand);
+    const addConversion = () => addTestCard(conversion, player, player.battlefield);
+    let converter = conversionFirst ? addConversion() : undefined;
+    expect(game.stack.spellCast(player, aura, [land])).toBe(true);
+    game.stack.resolveAll();
+    const animation = player.battlefield.objects.find(object => object.card === aura.card);
+    converter ??= addConversion();
+
+    expect(land.types).toEqual([CardType.Artifact, CardType.Land, CardType.Creature]);
+    expect(land).toMatchObject({ subtypes: ["Equipment", BasicLandType.Plains], power: 3, toughness: 3 });
+    expect(land.abilities).toHaveLength(1);
+    expect(land.abilities[0].getPotentialMana()[ManaColour.W]).toBe(1);
+
+    if (conversionFirst) {
+        moveTestCard(converter, player.graveyard);
+        expect(land).toMatchObject({ power: 3, toughness: 3, subtypes: ["Equipment", BasicLandType.Mountain] });
+        expect(land.abilities).toEqual(originalAbilities);
+        moveTestCard(animation, player.graveyard);
+    } else {
+        moveTestCard(animation, player.graveyard);
+        expect(land.hasType(CardType.Creature)).toBe(false);
+        expect(land.subtypes).toEqual(["Equipment", BasicLandType.Plains]);
+        moveTestCard(converter, player.graveyard);
+    }
+    expect(land.types).toEqual(land.def.types);
+    expect(land.subtypes).toEqual(land.def.subtypes);
+    expect(land.abilities).toEqual(originalAbilities);
+});
+
+test.each([true, false])("Crusade boosts an animated white artifact after its base P/T is set (Crusade first: %s)", crusadeFirst => {
+    Game.init();
+    const player = game.addPlayer([]);
+    startMainPhase();
+    const prism = cardData.find(card => card.name === "Celestial Prism");
+    const artifact = addTestCard({ ...prism, cost: "{2}{W}" }, player, player.battlefield);
+    const crusadeDef = cardData.find(card => card.name === "Crusade");
+    const addCrusade = () => addTestCard(crusadeDef, player, player.battlefield);
+    let crusade = crusadeFirst ? addCrusade() : undefined;
+
+    const aura = addTestCard(cardData.find(card => card.name === "Animate Artifact"), player, player.hand);
+    expect(game.stack.spellCast(player, aura, [artifact])).toBe(true);
+    game.stack.resolveAll();
+    crusade ??= addCrusade();
+
+    expect(artifact.characteristics).toMatchObject({ basePower: 3, baseToughness: 3 });
+    expect(artifact.getPowerToughness()).toEqual({ power: 4, toughness: 4 });
+    moveTestCard(crusade, player.graveyard);
+    expect(artifact).toMatchObject({ power: 3, toughness: 3 });
 });

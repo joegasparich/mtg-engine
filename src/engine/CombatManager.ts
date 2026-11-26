@@ -222,10 +222,11 @@ export class CombatManager {
         if (!(attacker.zone instanceof Battlefield))
             return false;
 
-        if (attacker.type != CardType.Creature)
+        if (!attacker.hasType(CardType.Creature))
             return false;
 
-        if (attacker.tapped)
+        // 302.6: Count continuous control of the permanent, including time before it was a creature.
+        if (attacker.tapped || !attacker.controlledSinceTurnStart)
             return false;
 
         // 508.1c: Check restrictions on declaring this creature as an attacker.
@@ -239,7 +240,7 @@ export class CombatManager {
         if (!(blocker.zone instanceof Battlefield))
             return false;
 
-        if (blocker.type != CardType.Creature)
+        if (!blocker.hasType(CardType.Creature))
             return false;
 
         if (blocker.tapped)

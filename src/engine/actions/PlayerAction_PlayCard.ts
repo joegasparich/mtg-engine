@@ -16,7 +16,7 @@ export class PlayerAction_PlayCard extends PlayerAction {
     perform(player: Player) {
         if (!player || !this.canPlay(player)) return;
 
-        if (this.object.type === CardType.Land) {
+        if (this.object.hasType(CardType.Land)) {
             gameEventManager.addEvent(new GameEvent_PlayLand(player, this.object));
             return;
         }

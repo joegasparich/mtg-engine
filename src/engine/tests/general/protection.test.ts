@@ -35,7 +35,7 @@ test("black spells cannot choose protected targets and targets are rechecked on 
     const removal: CardDef = {
         ...creature,
         name: "Test targeted destruction",
-        type: CardType.Sorcery,
+        types: [CardType.Sorcery],
         abilities: [{ parts: {
             AbilityPart_Target: {
                 saveAs: "CHOSEN", validTargets: [TargetTypeKeys.Permanent],
@@ -63,7 +63,7 @@ test("a black spell that destroys creatures without targeting still affects a pr
     const target = addCreature(opponent, { abilities: [protection] });
     const spell = addTestCard({
         ...creature,
-        type: CardType.Sorcery,
+        types: [CardType.Sorcery],
         cost: "{B}",
         abilities: [{ parts: {
             AbilityPart_SelectObjectsFromZone: {
@@ -81,7 +81,7 @@ test("a black spell that destroys creatures without targeting still affects a pr
 
 test("protection removes matching Auras and prevents new ones", () => {
     const target = addCreature(player);
-    const aura: CardDef = { ...creature, type: CardType.Enchantment, subtypes: [AttachmentSubtype.Aura], cost: "{B}", abilities: [enchantCreature] };
+    const aura: CardDef = { ...creature, types: [CardType.Enchantment], subtypes: [AttachmentSubtype.Aura], cost: "{B}", abilities: [enchantCreature] };
     const blackAura = addTestCard(aura, opponent, opponent.hand);
     const whiteAura = addTestCard({ ...aura, cost: "{W}" }, opponent, opponent.hand);
     expect(game.stack.spellCast(opponent, blackAura, [target])).toBe(true);

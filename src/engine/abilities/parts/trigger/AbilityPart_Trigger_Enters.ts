@@ -21,7 +21,7 @@ class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
         // 603.6a: An enters trigger checks the permanent that entered the battlefield.
         this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.ChangeCardZone,
             (event: GameEvent_ChangeCardZone) => this.onTrigger(this.storeAs ? { [this.storeAs]: [event.newObject] } : {}), {
-                matches: ({ newObject }) => newObject instanceof Permanent && newObject.type === this.type,
+                matches: ({ newObject }) => newObject instanceof Permanent && newObject.hasType(this.type),
             });
     }
 

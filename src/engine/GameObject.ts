@@ -5,14 +5,14 @@ import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
 import type { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
-import { GameEvent_CheckAttachment,GameEvent_CheckBasicLandType } from "@engine/events/GameEvent_CardInteractionChecks";
+import { type CardCharacteristics,GameEvent_CheckAttachment,GameEvent_CheckCharacteristics,GameEvent_CheckPowerToughness } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { Battlefield,Zone } from "@engine/Zone";
-import { type AbilityDef,type BasicLandType,type CardColour,cardColours,CardType,Keyword } from "~/defs";
+import { type AbilityDef,type CardColour,cardColours,CardType,Keyword } from "~/defs";
 
 let idCounter = 0;
 
@@ -42,7 +42,7 @@ export class CardObject extends GameObject {
     get resolvedDamageSource(): Permanent | undefined { return undefined; }
 
     name: string;
-    private baseType: CardType;
+    private baseTypes: readonly CardType[];
     private baseSubtypes: readonly string[];
     cost?: ManaCost;
     readonly variableManaSymbols: number;
@@ -59,7 +59,7 @@ export class CardObject extends GameObject {
         super();
         const def = card.def;
         this.name = def.name;
-        this.baseType = def.type;
+        this.baseTypes = [...def.types];
         this.baseSubtypes = [...(def.subtypes ?? [])];
         this.power = def.power;
         this.toughness = def.toughness;
@@ -73,21 +73,38 @@ export class CardObject extends GameObject {
             this.baseAbilities = [...this.baseAbilities, ...this.getSpellModeAbilities(chosenMode)];
     }
 
-    get type() { return this.baseType; }
+    get characteristics(): Readonly<CardCharacteristics> {
+        const base = {
+            types: this.baseTypes,
+            subtypes: this.baseSubtypes,
+            basePower: this.basePower,
+            baseToughness: this.baseToughness,
+            nativeAbilities: this.baseAbilities,
+        };
+        return this.zone instanceof Battlefield ? GameEvent_CheckCharacteristics.evaluate(this, base) : base;
+    }
 
-    set type(type: CardType) {
+    get types(): readonly CardType[] {
+        return this.characteristics.types;
+    }
+
+    set types(types: readonly CardType[]) {
         // 506.4: A creature that stops being a creature leaves combat immediately.
-        if (this instanceof Permanent && this.baseType === CardType.Creature && type !== CardType.Creature)
+        const wasCreature = this.hasType(CardType.Creature);
+        this.baseTypes = [...types];
+        if (this instanceof Permanent && wasCreature && !this.hasType(CardType.Creature))
             CombatManager.removeFromCombat(this);
-        this.baseType = type;
         this.refreshBaseAbilities();
         if (this.zone instanceof Battlefield)
             gameEventManager.effects.refreshAbilityGrants();
     }
 
+    hasType(type: CardType): boolean {
+        return this.types.includes(type);
+    }
+
     get subtypes(): readonly string[] {
-        const replacement = this.basicLandTypeOverride;
-        return replacement ? [replacement] : this.baseSubtypes;
+        return this.characteristics.subtypes;
     }
 
     set subtypes(subtypes: readonly string[]) {
@@ -101,23 +118,23 @@ export class CardObject extends GameObject {
         return this.baseSubtypes.includes(subtype);
     }
 
-    private get basicLandTypeOverride(): BasicLandType | undefined {
-        if (this.type !== CardType.Land || !(this.zone instanceof Battlefield))
-            return;
+    getPowerToughness(base = this.characteristics): { power: number; toughness: number } {
+        if (!(this instanceof Permanent))
+            return { power: base.basePower, toughness: base.baseToughness };
 
-        const check = new GameEvent_CheckBasicLandType(this);
+        const check = new GameEvent_CheckPowerToughness(this, base);
         gameEventManager.checkEvent(check);
-        return check.replacement;
+        return { power: check.power, toughness: check.toughness };
     }
 
     get power(): number {
-        return gameEventManager.effects.getModifiedPowerToughness(this, "power", this.basePower);
+        return this.getPowerToughness().power;
     }
 
     set power(power: number) { this.basePower = power; }
 
     get toughness(): number {
-        return gameEventManager.effects.getModifiedPowerToughness(this, "toughness", this.baseToughness);
+        return this.getPowerToughness().toughness;
     }
 
     set toughness(toughness: number) { this.baseToughness = toughness; }
@@ -134,14 +151,14 @@ export class CardObject extends GameObject {
     }
 
     private get effectiveBaseAbilities(): readonly Ability[] {
-        if (this.type !== CardType.Land)
-            return this.baseAbilities;
+        const base = this.characteristics;
+        if (!base.types.includes(CardType.Land))
+            return base.nativeAbilities;
 
         // 305.6–7: Land subtypes give intrinsic mana abilities. Setting a basic land type replaces
         // the old subtypes and rules-text abilities, while externally granted abilities still apply.
-        const replacement = this.basicLandTypeOverride;
-        const abilities = replacement ? [] : [...this.baseAbilities];
-        for (const subtype of new Set(replacement ? [replacement] : this.baseSubtypes)) {
+        const abilities = [...base.nativeAbilities];
+        for (const subtype of new Set(base.subtypes)) {
             const def = getBasicLandMana(subtype);
             if (!def)
                 continue;
@@ -218,11 +235,11 @@ export class CardObject extends GameObject {
             return false;
 
         // 117.1a and 116.2a: Other spells and land plays use main-phase timing.
-        if (this.type !== CardType.Instant && (this.owner !== game.currentTurnPlayer() || game.stack.objects.length
+        if (!this.hasType(CardType.Instant) && (this.owner !== game.currentTurnPlayer() || game.stack.objects.length
             || (game.currentStepIndex !== StepIndex.Main && game.currentStepIndex !== StepIndex.SecondMain)))
             return false;
 
-        if (this.type === CardType.Land)
+        if (this.hasType(CardType.Land))
             return !game.landPlayedThisTurn;
 
         return this.abilities.every(ability => ability.parts.every(part => part.canCast?.() ?? true))
@@ -313,10 +330,14 @@ export class Permanent extends CardObject {
         }
     }
 
+    get controlledSinceTurnStart() {
+        return this.controlledSinceTurn < this.controller.lastTurnStartedAt;
+    }
+
     get canPayTapCost() {
         // 302.6: Creatures must have been controlled since the start of their controller's most recent turn.
         return this.zone instanceof Battlefield && !this.tapped
-            && (this.type !== CardType.Creature || this.controlledSinceTurn < this.controller.lastTurnStartedAt);
+            && (!this.hasType(CardType.Creature) || this.controlledSinceTurnStart);
     }
 
     get attachedTo() { return this.attachment; }
@@ -356,13 +377,21 @@ export class Permanent extends CardObject {
 
     checkState(actions: GameEvent[]) {
         super.checkState(actions);
-        if (this.type !== CardType.Creature || !(this.zone instanceof Battlefield))
+        if (!(this.zone instanceof Battlefield))
             return;
+        const base = this.characteristics;
+        if (!base.types.includes(CardType.Creature)) {
+            // 506.4: Losing an animation effect also removes an attacker or blocker from combat.
+            if (CombatManager.attackingCreatures.has(this) || CombatManager.blockingCreatures.has(this) || CombatManager.isBlocking(this))
+                CombatManager.removeFromCombat(this);
+            return;
+        }
 
         // 704.5f–g: Zero toughness puts a creature into the graveyard. Lethal damage destroys it.
-        if (this.toughness <= 0)
+        const { toughness } = this.getPowerToughness(base);
+        if (toughness <= 0)
             actions.push(new GameEvent_ChangeCardZone(this, this.owner.graveyard));
-        else if (this.toughness > 0 && this.damageTaken >= this.toughness)
+        else if (toughness > 0 && this.damageTaken >= toughness)
             actions.push(new GameEvent_DestroyPermanent(this));
     }
 
@@ -393,6 +422,11 @@ export class Spell extends CardObject {
     }
 
     override get controller() { return this.spellController; }
+
+    get isPermanent(): boolean {
+        // 110.4b: Permanent spells enter the battlefield as part of resolution.
+        return this.hasType(CardType.Artifact) || this.hasType(CardType.Creature) || this.hasType(CardType.Enchantment);
+    }
 }
 
 export class StackAbility extends GameObject {

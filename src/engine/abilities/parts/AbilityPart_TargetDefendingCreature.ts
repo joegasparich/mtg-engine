@@ -12,7 +12,7 @@ export class AbilityPart_TargetDefendingCreature extends AbilityPart_Target {
 
     protected override canTarget(target: ActionTarget): boolean {
         // 506.2: The defending player is identified before attackers are declared.
-        return target instanceof Permanent && target.type === CardType.Creature
+        return target instanceof Permanent && target.hasType(CardType.Creature)
             && target.controller === CombatManager.defendingPlayer && super.canTarget(target);
     }
 }

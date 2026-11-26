@@ -55,10 +55,10 @@ export class UICardTypeLine extends Container {
         this.addChild(paper, this.lineText);
     }
 
-    setTypes(type: CardType, subtypes: readonly string[], printed: Pick<CardDef, "name" | "type" | "subtypes">) {
+    setTypes(types: readonly CardType[], subtypes: readonly string[], printed: CardDef) {
         // The five basic land images include the Basic supertype in their printed type lines.
-        const basic = printed.type === CardType.Land && basicLandNames.has(printed.name) ? "Basic " : "";
-        const typeText = basic + typeLabel(type, type !== printed.type);
+        const basic = printed.types.includes(CardType.Land) && basicLandNames.has(printed.name) ? "Basic " : "";
+        const typeText = basic + types.map(type => typeLabel(type, !printed.types.includes(type))).join(" ");
         const subtypeText = subtypes.map(subtype => typeLabel(subtype, !printed.subtypes?.includes(subtype))).join(" ");
         const line = subtypeText ? `${typeText} — ${subtypeText}` : typeText;
         if (line === this.lineText.text)

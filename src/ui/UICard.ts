@@ -2,6 +2,7 @@ import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
 import playerActionManager,{ getTargetTypeKey,TargetType,TargetTypesMap } from "@engine/actions/PlayerActionManager";
+import type { CardCharacteristics } from "@engine/events/GameEvent_CardInteractionChecks";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
@@ -122,42 +123,44 @@ export default class UICard extends PIXI.Container {
             uiRoot.cardOverlay.detach(this.artwork);
     }
 
-    private updatePowerToughness() {
+    private updatePowerToughness(base: Readonly<CardCharacteristics>) {
         const { object, art } = this;
         if (!(object instanceof Permanent) || !(object.zone instanceof Battlefield)
-            || object.type !== CardType.Creature || object.def.type !== CardType.Creature
+            || !base.types.includes(CardType.Creature)
             || art.texture === PIXI.Texture.EMPTY) {
             if (this.powerToughness)
                 this.powerToughness.visible = false;
             return;
         }
 
-        const power = object.power;
+        const { power, toughness } = object.getPowerToughness(base);
         // 120.6 and 302.7: Marked damage is tracked separately from the creature's actual toughness.
-        const remainingToughness = object.toughness - object.damageTaken;
+        const remainingToughness = toughness - object.damageTaken;
         const damaged = object.damageTaken > 0;
-        const show = damaged || power !== object.def.power || remainingToughness !== object.def.toughness;
+        const printedCapsule = object.def.types.includes(CardType.Creature);
+        const show = !printedCapsule || damaged || power !== object.def.power || remainingToughness !== object.def.toughness;
         if (this.powerToughness)
             this.powerToughness.visible = show;
         if (!show)
             return;
 
         this.powerToughness ??= this.artwork.addChildAt(
-            new UICardPowerToughness(art.texture, CARD_WIDTH, CARD_HEIGHT),
+            new UICardPowerToughness(object.def, CARD_WIDTH, CARD_HEIGHT),
             2,
         );
-        this.powerToughness.setStats(power, remainingToughness, object.def, damaged);
+        this.powerToughness.setStats(power, remainingToughness, base, damaged);
         this.powerToughness.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
-    private updateTypeLine() {
+    private updateTypeLine({ types, subtypes }: Readonly<CardCharacteristics>) {
         const { object, art } = this;
         if (art.texture === PIXI.Texture.EMPTY)
             return;
 
-        const { def, type, subtypes } = object;
+        const { def } = object;
         const printedSubtypes = def.subtypes ?? [];
-        const show = type !== def.type || subtypes.length !== printedSubtypes.length
+        const show = types.length !== def.types.length || types.some(type => !def.types.includes(type))
+            || subtypes.length !== printedSubtypes.length
             || subtypes.some(subtype => !printedSubtypes.includes(subtype));
         if (this.typeLine)
             this.typeLine.visible = show;
@@ -165,7 +168,7 @@ export default class UICard extends PIXI.Container {
             return;
 
         this.typeLine ??= this.artwork.addChildAt(new UICardTypeLine(art.texture, CARD_WIDTH, CARD_HEIGHT), 2);
-        this.typeLine.setTypes(type, subtypes, def);
+        this.typeLine.setTypes(types, subtypes, def);
         this.typeLine.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
@@ -207,8 +210,9 @@ export default class UICard extends PIXI.Container {
             this.artwork.y += (lift * cos - this.artwork.y) * ease;
         }
         this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
-        this.updatePowerToughness();
-        this.updateTypeLine();
+        const characteristics = this.object.characteristics;
+        this.updatePowerToughness(characteristics);
+        this.updateTypeLine(characteristics);
 
         const selection = uiRoot.cardSelection;
         const state = selection?.stateFor(this.object);

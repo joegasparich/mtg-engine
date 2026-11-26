@@ -107,7 +107,7 @@ class PlayerActionManager {
             return [];
 
         if (object.zone === actor.hand && object.owner === actor) {
-            if (object.canPlay() && (object.type === CardType.Land || ManaUtility.canPay(object.cost, actor.manaPool) || this.canAutoPay(object, actor)))
+            if (object.canPlay() && (object.hasType(CardType.Land) || ManaUtility.canPay(object.cost, actor.manaPool) || this.canAutoPay(object, actor)))
                 cardActions.push(new PlayerActions.PlayCard(object));
         }
 

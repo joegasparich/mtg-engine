@@ -9,7 +9,7 @@ export type DamageRecipient = Permanent | Player;
 
 export function canReceiveDamage(recipient: unknown): recipient is DamageRecipient {
     return recipient instanceof Player ? game.players.includes(recipient)
-        : recipient instanceof Permanent && recipient.zone instanceof Battlefield && recipient.type === CardType.Creature;
+        : recipient instanceof Permanent && recipient.zone instanceof Battlefield && recipient.hasType(CardType.Creature);
 }
 
 export class GameEvent_DealDamage extends GameEvent {

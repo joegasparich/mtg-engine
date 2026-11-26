@@ -165,7 +165,7 @@ test("a configured stack target can choose a spell other than itself", () => {
     const target = addTestCard(creature, opponent, opponent.hand);
     const source = addTestCard({
         ...creature,
-        type: CardType.Instant,
+        types: [CardType.Instant],
         abilities: [{ parts: { AbilityPart_Target: { zone: ZoneKind.Stack, saveAs: "CHOSEN" } } }],
     }, player, player.hand);
 
