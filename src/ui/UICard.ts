@@ -10,6 +10,7 @@ import { Battlefield,Hand } from "@engine/Zone";
 import { showCustomContextMenu } from "@ui/contextMenu";
 import type { BattlefieldCardGroup } from "@ui/UIBattlefield";
 import { UICardPowerToughness } from "@ui/UICardPowerToughness";
+import { UICardTypeLine } from "@ui/UICardTypeLine";
 import { pixi,uiRoot,UITargeter } from "@ui/UIRoot";
 import { loadImageFromExternalUrl } from "@utility/imageUtility";
 import { autobind } from "@utility/typeUtility";
@@ -30,6 +31,7 @@ export default class UICard extends PIXI.Container {
     private readonly artwork = new PIXI.Container();
     private readonly halo = new PIXI.Sprite();
     private powerToughness?: UICardPowerToughness;
+    private typeLine?: UICardTypeLine;
     private focusOutline?: PIXI.Graphics;
     private glowFilter?: GlowFilter;
 
@@ -149,6 +151,25 @@ export default class UICard extends PIXI.Container {
         this.powerToughness.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
+    private updateTypeLine() {
+        const { object, art } = this;
+        if (art.texture === PIXI.Texture.EMPTY)
+            return;
+
+        const { def, type, subtypes } = object;
+        const printedSubtypes = def.subtypes ?? [];
+        const show = type !== def.type || subtypes.length !== printedSubtypes.length
+            || subtypes.some(subtype => !printedSubtypes.includes(subtype));
+        if (this.typeLine)
+            this.typeLine.visible = show;
+        if (!show)
+            return;
+
+        this.typeLine ??= this.artwork.addChildAt(new UICardTypeLine(art.texture, CARD_WIDTH, CARD_HEIGHT), 2);
+        this.typeLine.setTypes(type, subtypes, def);
+        this.typeLine.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
+    }
+
     @autobind
     private render() {
         const ease = 0.18;
@@ -188,6 +209,7 @@ export default class UICard extends PIXI.Container {
         }
         this.artwork.angle += ((lifted ? -this.angle : 0) - this.artwork.angle) * ease;
         this.updatePowerToughness();
+        this.updateTypeLine();
 
         const selection = uiRoot.cardSelection;
         const state = selection?.stateFor(this.object);
