@@ -1098,5 +1098,51 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Black Lotus",
+        "image_url": "https://cards.scryfall.io/large/front/3/a/3a10650e-58f7-4a99-a77d-3f42d61ecf93.jpg?1783919447",
+        "oracle_text": "{T}, Sacrifice this artifact: Add three mana of any one color.",
+        "type": "Artifact",
+        "cost": "{0}",
+        "abilities": [
+            {
+                "activateString": "{T}, Sacrifice Black Lotus: Add three mana of any one color",
+                "isManaAbility": true,
+                "parts": {
+                    "AbilityPart_Activate_Tap": {},
+                    "AbilityPart_Activate_Sacrifice": {},
+                    "AbilityPart_Effect_ChooseColour": {
+                        "chooser": "THIS.controller", "saveAs": "COLOUR", "outSignal": "COLOUR_CHOSEN"
+                    },
+                    "AbilityPart_Effect_AddMana": {
+                        "inSignal": "COLOUR_CHOSEN", "target": "THIS.controller", "colourFrom": "COLOUR", "amount": 3
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Celestial Prism",
+        "image_url": "https://cards.scryfall.io/large/front/1/f/1f3c5029-6a06-4048-8ad6-f193f7feddf4.jpg?1783919447",
+        "oracle_text": "{2}, {T}: Add one mana of any color.",
+        "type": "Artifact",
+        "cost": "{3}",
+        "abilities": [
+            {
+                "activateString": "{2}, {T}: Add one mana of any color",
+                "isManaAbility": true,
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{2}" },
+                    "AbilityPart_Activate_Tap": {},
+                    "AbilityPart_Effect_ChooseColour": {
+                        "chooser": "THIS.controller", "saveAs": "COLOUR", "outSignal": "COLOUR_CHOSEN"
+                    },
+                    "AbilityPart_Effect_AddMana": {
+                        "inSignal": "COLOUR_CHOSEN", "target": "THIS.controller", "colourFrom": "COLOUR"
+                    }
+                }
+            }
+        ]
     }
 ]

@@ -179,6 +179,13 @@ button:focus-visible { outline: 2px solid #e3c58a; outline-offset: 3px; }
 }
 
 .player-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.mana-pool {
+    order: 1;
+    max-width: 26ch;
+    padding-top: 6px;
+    border-top: 1px solid #54726d;
+    line-height: 1.4;
+}
 .card-pile-button { padding: 4px 8px; font-size: inherit; pointer-events: auto; }
 
 .combat-panel {

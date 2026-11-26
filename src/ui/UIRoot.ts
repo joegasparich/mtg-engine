@@ -15,6 +15,7 @@ import { Step } from "@engine/Step";
 import { removeCustomContextMenu } from "@ui/contextMenu";
 import DOMButton from "@ui/dom/DOMButton";
 import DOMLabel from "@ui/dom/DOMLabel";
+import { formatManaPool } from "@ui/manaPool";
 import { drawArrow } from "@ui/drawUtility";
 import UICard from "@ui/UICard";
 import uiEventManager,{ UIEvent_CardClicked,UIEventType } from "@ui/UIEventManager";
@@ -189,6 +190,7 @@ export default class UIRoot extends PIXI.Container {
     private readonly selectionStatus = document.createElement('p');
     private readonly lifeTotalsPanel = document.createElement('aside');
     private readonly lifeTotals = new Map<Player, HTMLElement>();
+    private readonly manaPool = document.createElement('div');
     private readonly cardPiles = new UICardPiles(() => this.syncSpecialActions());
     private readonly specialActionControls = document.createElement('div');
     private visibleSpecialActions: readonly SpecialAction[] = [];
@@ -218,7 +220,10 @@ export default class UIRoot extends PIXI.Container {
 
         this.lifeTotalsPanel.className = 'life-totals';
         this.lifeTotalsPanel.setAttribute('aria-label', 'Player status');
+        this.manaPool.className = 'mana-pool';
+        this.manaPool.setAttribute('role', 'status');
         this.lifeTotalsPanel.append(this.cardPiles.addPile(game.exile, 'Exile'));
+        this.lifeTotalsPanel.append(this.manaPool);
         document.body.append(this.lifeTotalsPanel);
         gameEventManager.onPerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
             if (event.recipient instanceof Player)
@@ -306,7 +311,10 @@ export default class UIRoot extends PIXI.Container {
         this.specialActionControls.className = 'turn-control special-action-controls';
         this.specialActionControls.setAttribute('aria-label', 'Special actions');
         document.body.append(this.specialActionControls);
-        gameEventManager.onPerformed(GameEventType.All, () => this.syncSpecialActions());
+        gameEventManager.onPerformed(GameEventType.All, () => {
+            this.syncSpecialActions();
+            this.updateManaPool();
+        });
 
         const syncTurnControls = () => {
             const hidden = game.declarationPlayer || game.pendingCombatDamageChoice;
@@ -514,6 +522,15 @@ export default class UIRoot extends PIXI.Container {
         const text = `Player ${player.id} · ${player.life} life`;
         if (label && label.textContent !== text)
             label.textContent = text;
+    }
+
+    private updateManaPool() {
+        const source = game.pendingTargeter?.source;
+        const player = this.resolutionChoice?.player ?? game.pendingCombatDamageChoice?.player
+            ?? source?.controller ?? source?.owner ?? game.activePlayer() ?? game.currentTurnPlayer();
+        const text = player ? `Player ${player.id}’s mana pool · ${formatManaPool(player.manaPool)}` : '';
+        if (this.manaPool.textContent !== text)
+            this.manaPool.textContent = text;
     }
 
     @autobind

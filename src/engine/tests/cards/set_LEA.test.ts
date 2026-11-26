@@ -14,7 +14,7 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { BasicLandType,type CardDef,CardType,Keyword } from "~/defs";
+import { BasicLandType,type CardColour,type CardDef,cardColours,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
 describe("Disenchant", () => {
@@ -2942,5 +2942,123 @@ describe("Wrath of God", () => {
         } finally {
             gameEventManager.offCheck(returnToHand);
         }
+    });
+});
+
+describe("Black Lotus", () => {
+    const lotus = cardData.find(card => card.name === "Black Lotus");
+    let player: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        player = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    test.each(cardColours)("casts for zero and can immediately tap and sacrifice for three %s mana", colour => {
+        const card = addTestCard(lotus, player, player.hand);
+        const [cast] = playerActionManager.getCardActions(card, player);
+        cast.perform(player);
+        passPriorityRound();
+        const [artifact] = player.battlefield.objects;
+        expect(artifact).toMatchObject({ card: card.card, type: CardType.Artifact, tapped: false });
+        const [activate] = playerActionManager.getCardActions(artifact, player);
+        activate.perform(player);
+
+        expect(artifact.tapped).toBe(true);
+        expect(player.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+        expect(game.stack.objects).toHaveLength(0);
+        const choice = game.pendingColourChoice;
+        expect(choice.player).toBe(player);
+        choice.submit(opponent, colour);
+        choice.submit(player, "C" as CardColour);
+        expect(game.pendingColourChoice).toBe(choice);
+        expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+
+        choice.submit(player, colour);
+        choice.submit(player, colour);
+        expect(game.pendingColourChoice).toBeNull();
+        expect(player.manaPool[ManaColour[colour]]).toBe(3);
+        expect(player.manaPool.reduce((total, amount) => total + amount, 0)).toBe(3);
+    });
+
+    test("the controller chooses and spends the mana while the sacrificed card goes to its owner", () => {
+        const artifact = addTestCard(lotus, opponent, player.battlefield);
+        artifact.controller = player;
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+        expect(playerActionManager.getCardActions(bears, player)).toHaveLength(0);
+        artifact.tapped = true;
+        expect(playerActionManager.getCardActions(artifact, player)).toHaveLength(0);
+        artifact.tapped = false;
+        playerActionManager.getCardActions(artifact, player)[0].perform(player);
+        expect(game.pendingColourChoice.player).toBe(player);
+        game.pendingColourChoice.submit(player, "G");
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([artifact.card]);
+        expect(opponent.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        playerActionManager.getCardActions(bears, player)[0].perform(player);
+        expect(player.manaPool[ManaColour.G]).toBe(1);
+        passPriorityRound();
+        expect(player.battlefield.objects.map(object => object.card)).toEqual([bears.card]);
+    });
+
+    test("a prohibited sacrifice leaves Lotus untapped and produces no mana", () => {
+        const artifact = addTestCard(lotus, player, player.battlefield);
+        const preventSacrifice = (check: EventCheck) => check.removeWhere(event =>
+            event instanceof GameEvent_SacrificePermanent && event.permanent === artifact);
+        gameEventManager.onCheck(preventSacrifice);
+        try {
+            expect(playerActionManager.getCardActions(artifact, player)).toHaveLength(0);
+            gameEventManager.addEvent(new GameEvent_ActivateAbility(player, artifact, artifact.abilities[0]));
+            expect(artifact.tapped).toBe(false);
+            expect(artifact.zone).toBe(player.battlefield);
+            expect(game.pendingColourChoice).toBeNull();
+            expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        } finally {
+            gameEventManager.offCheck(preventSacrifice);
+        }
+    });
+});
+
+describe("Celestial Prism", () => {
+    const prism = cardData.find(card => card.name === "Celestial Prism");
+    let player: Player;
+
+    beforeEach(() => {
+        Game.init();
+        player = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    test("casts for three generic mana", () => {
+        const card = addTestCard(prism, player, player.hand);
+        player.manaPool[ManaColour.Colourless] = 2;
+        expect(playerActionManager.getCardActions(card, player)).toHaveLength(0);
+        player.manaPool[ManaColour.G] = 1;
+        playerActionManager.getCardActions(card, player)[0].perform(player);
+        passPriorityRound();
+        expect(player.battlefield.objects[0]).toMatchObject({ card: card.card, type: CardType.Artifact, tapped: false });
+        expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+    });
+
+    test.each(cardColours)("pays two and taps to add one %s mana", colour => {
+        const artifact = addTestCard(prism, player, player.battlefield);
+        player.manaPool[ManaColour.U] = 1;
+        expect(playerActionManager.getCardActions(artifact, player)).toHaveLength(0);
+        player.manaPool[ManaColour.R] = 1;
+        playerActionManager.getCardActions(artifact, player)[0].perform(player);
+
+        expect(artifact.tapped).toBe(true);
+        expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        expect(game.stack.objects).toHaveLength(0);
+        expect(game.pendingColourChoice.player).toBe(player);
+        game.pendingColourChoice.submit(player, colour);
+        expect(player.manaPool[ManaColour[colour]]).toBe(1);
+        expect(player.manaPool.reduce((sum, amount) => sum + amount, 0)).toBe(1);
+        expect(artifact.zone).toBe(player.battlefield);
+
+        player.manaPool[ManaColour.Colourless] = 2;
+        expect(playerActionManager.getCardActions(artifact, player)).toHaveLength(0);
     });
 });

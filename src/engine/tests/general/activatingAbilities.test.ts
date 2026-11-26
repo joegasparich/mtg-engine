@@ -7,7 +7,7 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
-import { AbilityActivator } from "~/defs";
+import { AbilityActivator,CardType } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -58,6 +58,26 @@ test("two queued activations cannot pay with the same tap", () => {
 
     expect(forest.tapped).toBe(true);
     expect(player.manaPool[ManaColour.G]).toBe(1);
+});
+
+test("a filtering mana ability can pay its activation cost from the pool and a land", () => {
+    startMainPhase();
+    const filter = addTestCard({
+        ...cardData[GRIZZLY_BEARS], name: "Test mana filter", type: CardType.Artifact,
+        abilities: [{ isManaAbility: true, parts: {
+            AbilityPart_Activate_Mana: { cost: "{2}" },
+            AbilityPart_Activate_Tap: {},
+            AbilityPart_Effect_AddMana: { target: "THIS.controller", mana: "{R}" },
+        } }],
+    }, player, player.battlefield);
+    const land = addTestCard(cardData[FOREST], player, player.battlefield);
+    expect(playerActionManager.getCardActions(filter, player)).toHaveLength(0);
+    player.manaPool[ManaColour.U] = 1;
+    playerActionManager.getCardActions(filter, player)[0].perform(player);
+    expect(land.tapped).toBe(true);
+    expect(filter.tapped).toBe(true);
+    expect(player.manaPool).toEqual([0, 0, 0, 1, 0, 0]);
+    expect(game.stack.objects).toHaveLength(0);
 });
 
 test("two queued activations cannot pay with the same mana", () => {
@@ -200,4 +220,23 @@ test("temporary power and toughness modifiers add to changed base stats and expi
 
     gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
     expect(creature).toMatchObject({ power: 4, toughness: 3 });
+});
+
+test("sacrificing the source pays an activation cost before its nonmana ability goes on the stack", () => {
+    startMainPhase();
+    const creature = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_Activate_Sacrifice: {},
+            AbilityPart_Effect_GainLife: { target: "CONTROLLER", amount: 2 },
+        } }],
+    }, player, player.battlefield);
+    const [activate] = playerActionManager.getCardActions(creature, player);
+    activate.perform(player);
+    activate.perform(player);
+    expect(player.graveyard.objects.map(object => object.card)).toEqual([creature.card]);
+    expect(game.stack.objects).toHaveLength(1);
+    expect(player.life).toBe(20);
+    passPriorityRound();
+    expect(player.life).toBe(22);
 });

@@ -4,7 +4,6 @@ import { GameEvent_Advance } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import UIRoot,{ initRenderer, uiRoot } from "@ui/UIRoot";
-import { randInt } from "@utility/randomUtility";
 import { CardDef } from "~/defs";
 import { cardData } from "~/index";
 
@@ -15,13 +14,22 @@ declare global {
     }
 }
 
-const PLAINS = 0;
-const MOUNTAIN = 3;
-const FOREST = 4;
-const BEARS = 5;
-const GOBLINS = 6;
-const ELEMENTAL = 7;
-const RECALL = 8;
+const playtestDeck = Object.entries({
+    "Celestial Prism": 8,
+    "Black Lotus": 4,
+    Plains: 8,
+    Island: 8,
+    Forest: 8,
+    "Pearled Unicorn": 6,
+    "Air Elemental": 6,
+    "Ancestral Recall": 6,
+    "Grizzly Bears": 6,
+}).flatMap(([name, copies]) => {
+    const index = cardData.findIndex(card => card.name === name);
+    if (index < 0)
+        throw new Error(`Unknown playtest card: ${name}`);
+    return Array<number>(copies).fill(index);
+});
 
 export async function startGame() {
     await initRenderer();
@@ -36,10 +44,8 @@ export async function startGame() {
             gameEventManager.addEvent(new GameEvent_Advance());
     });
 
-    const playerOne = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    const playerTwo = game.addPlayer(Array.from({ length: 60 }).map(() => randInt(0, cardData.length)));
-    // const playerOne = game.addPlayer([ISLAND, ISLAND, ISLAND, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, ELEMENTAL, ELEMENTAL, ELEMENTAL, ELEMENTAL, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
-    // const playerTwo = game.addPlayer([ISLAND, ISLAND, ISLAND, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, GOBLINS, ELEMENTAL, ELEMENTAL, ELEMENTAL, ELEMENTAL, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS, GOBLINS]);
+    const playerOne = game.addPlayer(playtestDeck);
+    const playerTwo = game.addPlayer(playtestDeck);
 
     uiRoot.onPlayerAdded(playerOne);
     uiRoot.onPlayerAdded(playerTwo);

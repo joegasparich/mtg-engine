@@ -5,6 +5,7 @@
 # Implementing Cards
 - We are implementing Limited Edition Alpha cards, but use artwork from the 30th anniversary set since the text is accurate https://scryfall.com/sets/30a
 - Implement the smallest possible feature set for each card, but do so in a way that prepares for future game rules/systems
+- After each new card(s) implementation, recreate the deck for each player to facilitate testing that card(s)
 
 ## Follow existing patterns
 Request permission when modifying the engines or doing something that does not follow one of these rules.

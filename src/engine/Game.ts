@@ -59,6 +59,9 @@ export default class Game {
     get pendingManaPaymentChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaPayment ? this.resolutionChoice : null;
     }
+    get pendingColourChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.Colour ? this.resolutionChoice : null;
+    }
     get pendingOptionalChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.Optional ? this.resolutionChoice : null;
     }

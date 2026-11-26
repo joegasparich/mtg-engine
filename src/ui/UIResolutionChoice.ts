@@ -3,6 +3,9 @@ import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAlloca
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
+import { type CardColour,cardColours } from "~/defs";
+
+const colourNames: Record<CardColour, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
 
 export class UIResolutionChoice {
     private readonly panel = document.createElement("section");
@@ -12,6 +15,8 @@ export class UIResolutionChoice {
     private readonly optionsList?: HTMLUListElement;
     private firstInput?: HTMLInputElement;
     private handoff?: HTMLDialogElement;
+
+    get player() { return this.choice.player; }
 
     constructor(private readonly root: UIRoot, private readonly choice: ResolutionChoice) {
         const heading = document.createElement("h2");
@@ -69,19 +74,22 @@ export class UIResolutionChoice {
             this.panel.append(prompt, list, cancel);
             return;
         }
-        if (choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
+        if (choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
             const prompt = document.createElement("p");
-            prompt.textContent = "Choose a damage effect to apply next.";
+            prompt.textContent = choice.kind === ResolutionChoiceKind.Colour ? "Choose a colour." : "Choose a damage effect to apply next.";
             const list = this.optionsList = document.createElement("ul");
             list.className = "resolution-card-options";
-            choice.options.forEach((description, index) => {
+            const options = choice.kind === ResolutionChoiceKind.Colour
+                ? cardColours.map(colour => ({ label: colourNames[colour], select: () => choice.submit(choice.player, colour) }))
+                : choice.options.map((label, index) => ({ label, select: () => choice.submit(choice.player, index) }));
+            for (const { label, select } of options) {
                 const item = document.createElement("li");
                 const option = document.createElement("button");
-                option.textContent = description;
-                option.addEventListener("click", () => choice.submit(choice.player, index));
+                option.textContent = label;
+                option.addEventListener("click", select);
                 item.append(option);
                 list.append(item);
-            });
+            }
             this.panel.append(prompt, list);
             return;
         }

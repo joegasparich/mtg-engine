@@ -1,6 +1,7 @@
 import type { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import type { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
+import type { CardColour } from "~/defs";
 import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 import { GameEvent,GameEventType } from "./GameEventManager";
 
@@ -42,7 +43,15 @@ export enum ResolutionChoiceKind {
     DamagePreventionOrder,
     DamagePreventionAllocation,
     Optional,
+    Colour,
 }
+
+export type ColourChoice = {
+    readonly kind: ResolutionChoiceKind.Colour;
+    readonly player: Player;
+    readonly sourceName: string;
+    submit(player: Player, colour: CardColour): void;
+};
 
 export type CardResolutionChoice = CardChoice & {
     readonly kind: ResolutionChoiceKind.Card;
@@ -115,7 +124,7 @@ export type DamagePreventionAllocationChoice = {
 };
 
 export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
-export type ResolutionChoice = CardResolutionChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
+export type ResolutionChoice = CardResolutionChoice | ColourChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
 
 function isDamagePreventionChoice(choice: ResolutionChoice): choice is DamagePreventionChoice {
     return choice.kind === ResolutionChoiceKind.DamagePreventionOrder
