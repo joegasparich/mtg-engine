@@ -88,11 +88,11 @@ export class PlayerAction_PlayCard extends PlayerAction {
                 return;
 
             // 601.2c, 601.2h
-            playerActionManager.startTargeting(this.object, target.validTargets, target.count,
+            playerActionManager.startTargeting(this.object, target.targetTypes, target.count,
                 targets => target.validateTargets(targets), targets => {
                     if (this.canPlay(player, mode))
                         this.castSpell(player, x, targets, mode);
-                });
+                }, target.zone);
             return;
         }
 

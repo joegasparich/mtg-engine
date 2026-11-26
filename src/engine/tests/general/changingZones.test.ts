@@ -2,7 +2,8 @@ import { GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_DrawCards } fro
 import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
-import { addTestCard,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS } from "@engine/tests/testData";
+import { ZoneKind } from "@engine/Zone";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -85,4 +86,42 @@ test("should go to graveyard when destroyed", () => {
     expect(player.graveyard.objects.length).toBe(1);
     expect(player.graveyard.objects[0].card).toBe(bears.card);
     expect(bears.retired).toBe(true);
+});
+
+test.each([ZoneKind.Hand, ZoneKind.Library, ZoneKind.Graveyard] as const)("a zone change effect moves a permanent to its owner's %s", destination => {
+    const opponent = game.addPlayer([]);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    bears.controller = player;
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: { AbilityPart_Effect_ChangeZones: { target: "CHOSEN", destination } } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    ability.slate.CHOSEN = [bears];
+
+    ability.fireSignal("default");
+
+    expect(bears.retired).toBe(true);
+    expect(player[destination].objects).toEqual([]);
+    expect(opponent[destination].objects).toEqual([expect.objectContaining({ card: bears.card })]);
+});
+
+test("a battlefield zone change effect can put a land onto the battlefield from a hand", () => {
+    const opponent = game.addPlayer([]);
+    const forest = addTestCard(cardData[FOREST], opponent, opponent.hand);
+    const instant = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_Effect_ChangeZones: { target: "CHOSEN", destination: ZoneKind.Battlefield },
+        } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    ability.slate.CHOSEN = [instant];
+    ability.fireSignal("default");
+    ability.slate.CHOSEN = [forest];
+    ability.fireSignal("default");
+
+    expect(opponent.hand.objects).toEqual([instant]);
+    expect(player.battlefield.objects).toEqual([source, expect.objectContaining({ card: forest.card, controller: player })]);
 });

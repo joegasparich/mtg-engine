@@ -893,5 +893,29 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Resurrection",
+        "image_url": "https://cards.scryfall.io/large/front/f/6/f682509c-470e-4cee-9e48-2aaed4feeaba.jpg?1783919574",
+        "oracle_text": "Return target creature card from your graveyard to the battlefield.",
+        "type": "Sorcery",
+        "cost": "{2}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "saveAs": "TARGET_CREATURE",
+                        "zone": "graveyard",
+                        "zoneOf": "THIS.controller",
+                        "targetValidator": { "cardType": "Creature" }
+                    },
+                    "AbilityPart_Effect_ChangeZones": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "target": "TARGET_CREATURE",
+                        "destination": "battlefield"
+                    }
+                }
+            }
+        ]
     }
 ]

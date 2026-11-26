@@ -1,7 +1,7 @@
 import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,type Spell,StackAbility } from "@engine/GameObject";
-import type { Zone } from "@engine/Zone";
+import { type Zone,ZoneKind } from "@engine/Zone";
 import { CombatManager } from "@engine/CombatManager";
 import { CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_Advance,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapCard,GameEvent_UntapCard,ManaPaymentDecision,OptionalDecision } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
@@ -2387,5 +2387,69 @@ describe("Purelace", () => {
         expect(target.colours).toEqual(new Set(["G"]));
         expect(returned.colours).toEqual(new Set(["G"]));
         expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
+    });
+});
+
+describe("Resurrection", () => {
+    const def = cardData.find(card => card.name === "Resurrection");
+    const creature = cardData[GRIZZLY_BEARS];
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    test("costs {2}{W}{W} and returns only the chosen creature card from the caster's graveyard", () => {
+        const target = addTestCard(creature, caster, caster.graveyard);
+        const otherCreature = addTestCard(creature, caster, caster.graveyard);
+        const land = addTestCard(cardData[FOREST], caster, caster.graveyard);
+        const opposingCreature = addTestCard(creature, opponent, opponent.graveyard);
+        const creatureInHand = addTestCard(creature, caster, caster.hand);
+        caster.manaPool[ManaColour.W] = 1;
+        caster.manaPool[ManaColour.G] = 3;
+        expect(playerActionManager.getCardActions(card, caster)).toEqual([]);
+
+        caster.manaPool[ManaColour.W] = 2;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        const request = game.pendingTargeter;
+        expect(request.zone).toBe(ZoneKind.Graveyard);
+        expect(request.validateTargets([land])).toBe(false);
+        expect(request.validateTargets([opposingCreature])).toBe(false);
+        expect(request.validateTargets([creatureInHand])).toBe(false);
+        request.onTargeted([target]);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(caster.manaPool[ManaColour.G]).toBe(1);
+        expect(target.zone).toBe(caster.graveyard);
+
+        passPriorityRound();
+        expect(caster.battlefield.objects).toEqual([expect.objectContaining({ card: target.card, controller: caster, tapped: false })]);
+        expect(target.retired).toBe(true);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([otherCreature.card, land.card, card.card]);
+        expect(opposingCreature.zone).toBe(opponent.graveyard);
+    });
+
+    test("cannot be cast without a creature card in the caster's graveyard", () => {
+        caster.manaPool[ManaColour.W] = 4;
+        addTestCard(cardData[FOREST], caster, caster.graveyard);
+        addTestCard(creature, opponent, opponent.graveyard);
+        expect(playerActionManager.getCardActions(card, caster)).toEqual([]);
+    });
+
+    test("fails when the target leaves and returns to the graveyard before resolution", () => {
+        const target = addTestCard(creature, caster, caster.graveyard);
+        expect(game.stack.spellCast(caster, card, [target])).toBe(true);
+        const returned = moveTestCard(moveTestCard(target, caster.hand), caster.graveyard);
+
+        passPriorityRound();
+        expect(caster.battlefield.objects).toEqual([]);
+        expect(caster.graveyard.objects[0]).toBe(returned);
+        expect(caster.graveyard.objects[1].card).toBe(card.card);
     });
 });

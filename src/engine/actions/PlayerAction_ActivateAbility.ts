@@ -29,8 +29,8 @@ export class PlayerAction_ActivateAbility extends PlayerAction<Permanent> {
         const targeter = this.ability.targeter;
         if (targeter) {
             // 602.2b and 601.2c: Choose targets before paying activation costs.
-            playerActionManager.startTargeting(this.object, targeter.validTargets, targeter.count,
-                targets => targeter.validateTargets(targets), activate);
+            playerActionManager.startTargeting(this.object, targeter.targetTypes, targeter.count,
+                targets => targeter.validateTargets(targets), activate, targeter.zone);
         } else {
             activate();
         }

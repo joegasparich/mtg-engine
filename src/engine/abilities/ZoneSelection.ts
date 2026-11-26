@@ -32,7 +32,7 @@ export function getBattlefieldPermanentsFromSlate(ability: Ability, key: Grammar
     return objects.filter((object): object is Permanent => object instanceof Permanent && object.zone instanceof Battlefield);
 }
 
-function getSelectionZones(ability: Ability, { zone, zoneOf }: ZoneSelection): readonly Zone[] {
+export function getSelectionZones(ability: Ability, { zone, zoneOf }: ZoneSelection): readonly Zone[] {
     // 400.1: The stack is shared. The engine stores the shared battlefield in player partitions.
     if (zone === ZoneKind.Stack)
         return [game.stack];

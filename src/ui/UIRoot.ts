@@ -10,7 +10,7 @@ import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { game,type SpecialAction } from "@engine/Game";
 import Player from "@engine/Player";
-import { Battlefield, Zone } from "@engine/Zone";
+import { Battlefield, Zone, ZoneKind } from "@engine/Zone";
 import { Step } from "@engine/Step";
 import { removeCustomContextMenu } from "@ui/contextMenu";
 import DOMButton from "@ui/dom/DOMButton";
@@ -19,6 +19,7 @@ import { drawArrow } from "@ui/drawUtility";
 import UICard from "@ui/UICard";
 import uiEventManager,{ UIEvent_CardClicked,UIEventType } from "@ui/UIEventManager";
 import { UICombat } from "@ui/UICombat";
+import { UIGraveyards } from "@ui/UIGraveyards";
 import { UIPlayer } from "@ui/UIPlayer";
 import { UIResolutionChoice } from "@ui/UIResolutionChoice";
 import { UIStack } from "@ui/UIStack";
@@ -188,6 +189,7 @@ export default class UIRoot extends PIXI.Container {
     private readonly selectionStatus = document.createElement('p');
     private readonly lifeTotalsPanel = document.createElement('aside');
     private readonly lifeTotals = new Map<Player, HTMLElement>();
+    private readonly graveyards = new UIGraveyards(() => this.syncSpecialActions());
     private readonly specialActionControls = document.createElement('div');
     private visibleSpecialActions: readonly SpecialAction[] = [];
 
@@ -215,8 +217,7 @@ export default class UIRoot extends PIXI.Container {
         this.setupCardSelectionKeyboard();
 
         this.lifeTotalsPanel.className = 'life-totals';
-        this.lifeTotalsPanel.setAttribute('aria-label', 'Life totals');
-        this.lifeTotalsPanel.setAttribute('aria-live', 'polite');
+        this.lifeTotalsPanel.setAttribute('aria-label', 'Player status');
         document.body.append(this.lifeTotalsPanel);
         gameEventManager.onPerformed(GameEventType.DealDamage, (event: GameEvent_DealDamage) => {
             if (event.recipient instanceof Player)
@@ -249,6 +250,14 @@ export default class UIRoot extends PIXI.Container {
         gameEventManager.onPerformed(GameEventType.StartTargeting, (event: GameEvent_StartTargeting) => {
             removeCustomContextMenu();
             const request = event.targeter;
+            if (request.zone === ZoneKind.Graveyard) {
+                if (!this.graveyards.openForTargeting(request)) {
+                    request.onCancelled();
+                    this.syncSpecialActions();
+                }
+                return;
+            }
+
             if (request.targetType === TargetType.Player && request.count === 1) {
                 this.showPlayerTargetDialog(request);
                 return;
@@ -489,9 +498,13 @@ export default class UIRoot extends PIXI.Container {
         this.playerToUIPlayer.set(player, uiPlayer);
         this.uiPlayerToPlayer.set(uiPlayer, player);
         const lifeTotal = document.createElement('span');
+        lifeTotal.setAttribute('aria-live', 'polite');
         this.lifeTotals.set(player, lifeTotal);
         this.updateLifeTotal(player);
-        this.lifeTotalsPanel.append(lifeTotal);
+        const status = document.createElement('div');
+        status.className = 'player-status';
+        status.append(lifeTotal, this.graveyards.addPlayer(player));
+        this.lifeTotalsPanel.append(status);
         this.layoutBoard();
     }
 
@@ -536,6 +549,8 @@ export default class UIRoot extends PIXI.Container {
         // Preserve the hand drag coordinates through the intermediate stack object.
         if (view && event.newZone !== game.stack)
             view.battlefieldDrop = undefined;
+
+        this.graveyards.onCardChangedZone(event);
     }
 
     getCardView(object?: CardObject): UICard | undefined {

@@ -1,8 +1,10 @@
 import { selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { PlayerAction_ActivateAbility,TargetType,TargetTypeKeys } from "@engine/actions";
+import { GameEvent_CheckTarget } from "@engine/events/GameEvent_CardInteractionChecks";
+import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
-import { StackAbility } from "@engine/GameObject";
-import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
+import { type Spell,StackAbility } from "@engine/GameObject";
+import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard,startMainPhase } from "@engine/tests/testData";
 import { ZoneKind } from "@engine/Zone";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
@@ -97,6 +99,84 @@ test("a live graveyard selection sees cards from every player enter and leave", 
 
     moveTestCard(ownCard, player.library);
     expect(slate.GRAVEYARD_CARDS).toEqual([opposingCard]);
+});
+
+test("an unscoped graveyard target can return a card from another player's graveyard", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const creature = cardData[GRIZZLY_BEARS];
+    const opposingCard = addTestCard(creature, opponent, opponent.graveyard);
+    const source = addTestCard({
+        ...cardData.find(card => card.name === "Resurrection"),
+        abilities: [{ parts: {
+            AbilityPart_Target: { zone: ZoneKind.Graveyard, saveAs: "CHOSEN", targetValidator: { cardType: CardType.Creature } },
+            AbilityPart_Effect_ChangeZones: { inSignal: "SPELL_RESOLVE", target: "CHOSEN", destination: ZoneKind.Battlefield },
+        } }],
+    }, player, player.hand);
+
+    expect(source.spellTargeter.hasLegalTargets()).toBe(true);
+    const forbidTarget = (check: EventCheck) => check.removeWhere(event =>
+        event instanceof GameEvent_CheckTarget && event.target === opposingCard);
+    gameEventManager.onCheck(forbidTarget);
+    try {
+        expect(source.spellTargeter.hasLegalTargets()).toBe(false);
+        expect(game.stack.spellCast(player, source, [opposingCard])).toBe(false);
+    } finally {
+        gameEventManager.offCheck(forbidTarget);
+    }
+
+    expect(game.stack.spellCast(player, source, [opposingCard])).toBe(true);
+    game.stack.resolveAll();
+    expect(opponent.graveyard.objects).toEqual([]);
+    expect(player.battlefield.objects).toEqual([expect.objectContaining({ card: opposingCard.card, controller: player, owner: opponent })]);
+});
+
+test("a configured battlefield target scopes the activation request to the chosen player's zone", () => {
+    Game.init();
+    const player = game.addPlayer(BASIC_DECK);
+    const opponent = game.addPlayer(BASIC_DECK);
+    startMainPhase();
+    const creature = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({
+        ...creature,
+        abilities: [{ parts: {
+            AbilityPart_Activate_Mana: { cost: "{0}" },
+            AbilityPart_Target: { zone: ZoneKind.Battlefield, zoneOf: "THIS.controller", saveAs: "CHOSEN" },
+        } }],
+    }, player, player.battlefield);
+    const opposingPermanent = addTestCard(creature, opponent, opponent.battlefield);
+    const cardInGraveyard = addTestCard(creature, player, player.graveyard);
+
+    new PlayerAction_ActivateAbility(source, source.abilities[0]).perform(player);
+
+    const request = game.pendingTargeter;
+    expect(request).toMatchObject({ zone: ZoneKind.Battlefield, targetType: TargetType.Permanent });
+    expect(request.validateTargets([source])).toBe(true);
+    expect(request.validateTargets([opposingPermanent])).toBe(false);
+    expect(request.validateTargets([cardInGraveyard])).toBe(false);
+});
+
+test("a configured stack target can choose a spell other than itself", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const creature = cardData[GRIZZLY_BEARS];
+    const target = addTestCard(creature, opponent, opponent.hand);
+    const source = addTestCard({
+        ...creature,
+        type: CardType.Instant,
+        abilities: [{ parts: { AbilityPart_Target: { zone: ZoneKind.Stack, saveAs: "CHOSEN" } } }],
+    }, player, player.hand);
+
+    expect(source.spellTargeter.targetTypes).toEqual([TargetTypeKeys.Spell]);
+    expect(source.spellTargeter.hasLegalTargets()).toBe(false);
+    expect(game.stack.spellCast(opponent, target)).toBe(true);
+    const [targetSpell] = game.stack.objects;
+    expect(source.spellTargeter.hasLegalTargets()).toBe(true);
+    expect(game.stack.spellCast(player, source, [targetSpell])).toBe(true);
+    const spell = game.stack.objects.at(-1) as Spell;
+    expect(spell.spellTargeter.validateTargets([spell])).toBe(false);
 });
 
 test("selection from the shared stack supports spells and stack abilities", () => {

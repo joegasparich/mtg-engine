@@ -1,5 +1,6 @@
 import { PlayerActions } from "@engine/actions/index";
 import { PlayerAction } from "@engine/actions/PlayerAction";
+import type { TargetZone } from "@engine/abilities/parts/AbilityPart_Target";
 import { CardObject,GameObject,Permanent,Spell } from "@engine/GameObject";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ActivateAbility } from "@engine/events";
@@ -35,6 +36,7 @@ export type ActionTarget = GameObject | Player;
 export type Targeter = {
     source: CardObject;
     targetType: TargetType;
+    zone?: TargetZone;
     count: number;
     validateTargets: (targets: ActionTarget[]) => boolean;
     onTargeted: (targets: ActionTarget[]) => void;
@@ -279,9 +281,9 @@ class PlayerActionManager {
         return remaining;
     }
 
-    public startTargeting(source: CardObject, targetTypes: TargetTypeKeys[], count: number,
+    public startTargeting(source: CardObject, targetTypes: readonly TargetTypeKeys[], count: number,
                    validateTargets: (targets: ActionTarget[]) => boolean,
-                   onTargeted: (targets: ActionTarget[]) => void) {
+                   onTargeted: (targets: ActionTarget[]) => void, zone?: TargetZone) {
         if (game.hasPendingPlayerInput)
             return;
 
@@ -290,6 +292,7 @@ class PlayerActionManager {
         const targeter: Targeter = {
             source,
             targetType,
+            zone,
             count,
             validateTargets,
             onTargeted: targets => {
