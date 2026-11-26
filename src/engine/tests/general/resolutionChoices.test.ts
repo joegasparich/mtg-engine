@@ -215,9 +215,6 @@ test("defers state-based actions and waiting triggers until the paused spell fin
 test("a stack ability can also wait for a required choice", () => {
     const player = game.addPlayer([]);
     const opponent = game.addPlayer([]);
-    startMainPhase();
-    const [discarded, kept] = hand(player, 2);
-    hand(opponent, 1);
     const source = addTestCard({
         ...bears,
         abilities: [{ parts: {
@@ -225,6 +222,9 @@ test("a stack ability can also wait for a required choice", () => {
             AbilityPart_Effect_EqualizeCards: { phases: [{ action: "discard" }] },
         } }],
     }, player, player.battlefield);
+    startMainPhase();
+    const [discarded, kept] = hand(player, 2);
+    hand(opponent, 1);
 
     gameEventManager.addEvent(new GameEvent_ActivateAbility(player, source, source.abilities[0]));
     expect(game.stack.objects).toEqual([expect.any(StackAbility)]);

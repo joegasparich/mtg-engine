@@ -253,7 +253,7 @@ export default class Game {
         this.currentStepIndex = 0;
         this.landPlayedThisTurn = false;
 
-        gameEventManager.addEvent(new GameEvent_TurnStart(this.currentTurnPlayer()));
+        this.startTurn();
 
         this.startStep(this.currentStepIndex);
         this.autoAdvance = this.options.allowAutoSkip;
@@ -404,12 +404,19 @@ export default class Game {
             this.currentStepIndex = 0;
             this.landPlayedThisTurn = false;
 
-            gameEventManager.addEvent(new GameEvent_TurnStart(this.currentTurnPlayer()));
+            this.startTurn();
         }
 
         this.startStep(this.currentStepIndex);
         return true;
     }
+
+    private startTurn() {
+        const player = this.currentTurnPlayer();
+        player.lastTurnStartedAt = this.turnNumber;
+        gameEventManager.addEvent(new GameEvent_TurnStart(player));
+    }
+
     skipToNextTurn(): boolean {
         return this.goToStep(StepIndex.Untap, this.options.allowAutoSkip);
     }

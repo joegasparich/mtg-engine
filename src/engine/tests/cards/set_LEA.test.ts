@@ -1958,6 +1958,124 @@ describe("Lance", () => {
     });
 });
 
+test("Mesa Pegasus can band with Pearled Unicorn and is blocked when the Unicorn is blocked", () => {
+    Game.init();
+    const attacker = game.addPlayer(BASIC_DECK);
+    const defender = game.addPlayer(BASIC_DECK);
+    const pegasus = addTestCard(cardData.find(card => card.name === "Mesa Pegasus"), attacker, attacker.battlefield);
+    const unicorn = addTestCard(cardData.find(card => card.name === "Pearled Unicorn"), attacker, attacker.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], defender, defender.battlefield);
+
+    game.startGame({ allowAutoSkip: false });
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    for (const creature of [pegasus, unicorn])
+        new PlayerActions.DeclareAttacker(creature).perform(attacker, [defender]);
+    expect(CombatManager.setAttackingBands(attacker, [[pegasus, unicorn]])).toBe(true);
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    const block = new PlayerActions.DeclareBlocker(blocker);
+    block.perform(defender, [pegasus]);
+    expect(CombatManager.isBlocked(pegasus)).toBe(false);
+    block.perform(defender, [unicorn]);
+    expect([...CombatManager.blockRelationships()]).toEqual([[blocker, pegasus], [blocker, unicorn]]);
+});
+
+describe("Northern Paladin", () => {
+    const def = cardData.find(card => card.name === "Northern Paladin");
+    const plains = cardData.find(card => card.name === BasicLandType.Plains);
+    const blackEnchantment: CardDef = {
+        ...cardData[GRIZZLY_BEARS], type: CardType.Enchantment, cost: "{W}{B}",
+    };
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+    });
+
+    test("casts for {2}{W}{W} and can pay {W}{W} and tap on its controller's next turn", () => {
+        startMainPhase();
+        const card = addTestCard(def, caster, caster.hand);
+        const target = addTestCard(blackEnchantment, opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 1;
+        caster.manaPool[ManaColour.G] = 3;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.W] = 2;
+        caster.manaPool[ManaColour.G] = 2;
+
+        new PlayerActions.PlayCard(card).perform(caster);
+        expect(game.pendingTargeter).toBeNull();
+        expect(caster.manaPool.every(amount => amount === 0)).toBe(true);
+        passPriorityRound();
+        const paladin = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(paladin).toMatchObject({ power: 3, toughness: 3, tapped: false });
+        const lands = Array.from({ length: 2 }, () => addTestCard(plains, caster, caster.battlefield));
+        expect(playerActionManager.getCardActions(paladin, caster)).toHaveLength(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+        gameEventManager.addEvent(new GameEvent_Advance(opponent));
+        expect(game.priorityPlayer).toBe(caster);
+        expect(playerActionManager.getCardActions(paladin, caster)).toHaveLength(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Main));
+        const [activate] = playerActionManager.getCardActions(paladin, caster);
+        activate.perform(caster);
+        expect(paladin.tapped || lands.some(land => land.tapped)).toBe(false);
+        game.pendingTargeter.onTargeted([target]);
+        expect(paladin.tapped && lands.every(land => land.tapped)).toBe(true);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(game.stack.objects).toEqual([expect.any(StackAbility)]);
+        expect(target.zone).toBe(opponent.battlefield);
+        passPriorityRound();
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([target.card]);
+    });
+
+    test("requires a black permanent and allows cancelling without paying either cost", () => {
+        const paladin = addTestCard(def, caster, caster.battlefield);
+        const nonblack = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const blackCardInHand = addTestCard(blackEnchantment, opponent, opponent.hand);
+        startMainPhase();
+        caster.manaPool[ManaColour.W] = 2;
+        expect(playerActionManager.getCardActions(paladin, caster)).toHaveLength(0);
+
+        const friendlyTarget = addTestCard(blackEnchantment, caster, caster.battlefield);
+        const [activate] = playerActionManager.getCardActions(paladin, caster);
+        activate.perform(caster);
+        const request = game.pendingTargeter;
+        expect(request.validateTargets([nonblack])).toBe(false);
+        expect(request.validateTargets([blackCardInHand])).toBe(false);
+        expect(request.validateTargets([friendlyTarget])).toBe(true);
+        request.onCancelled();
+        expect(paladin.tapped).toBe(false);
+        expect(caster.manaPool[ManaColour.W]).toBe(2);
+        expect(game.stack.objects).toHaveLength(0);
+
+        activate.perform(caster);
+        game.pendingTargeter.onTargeted([friendlyTarget]);
+        moveTestCard(paladin, caster.graveyard);
+        passPriorityRound();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([paladin.card, friendlyTarget.card]);
+    });
+
+    test("rechecks the target's colour on resolution", () => {
+        const paladin = addTestCard(def, caster, caster.battlefield);
+        const target = addTestCard(blackEnchantment, opponent, opponent.battlefield);
+        startMainPhase();
+        caster.manaPool[ManaColour.W] = 2;
+        new PlayerActions.ActivateAbility(paladin, paladin.abilities[0]).perform(caster);
+        game.pendingTargeter.onTargeted([target]);
+        target.colours = new Set(["W"]);
+
+        passPriorityRound();
+        expect(target.zone).toBe(opponent.battlefield);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+});
+
 describe("Lord of Atlantis", () => {
     const def = cardData.find(card => card.name === "Lord of Atlantis");
     const merfolk: CardDef = {

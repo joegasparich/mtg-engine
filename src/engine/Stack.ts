@@ -59,8 +59,8 @@ export class Stack extends Zone<Spell | StackAbility> {
         return !!move.newObject;
     }
 
-    abilityActivated(caster: Player, ability: Ability) {
-        this.onEnter(new StackAbility(caster, ability.source, ability, ability.activationSignal));
+    abilityActivated(caster: Player, ability: Ability, targets: readonly ActionTarget[]) {
+        this.onEnter(new StackAbility(caster, ability.source, ability, ability.activationSignal, {}, targets));
     }
 
     abilityTriggered(controller: Player, ability: Ability, signal: string, inputs: Ability["slate"]) {

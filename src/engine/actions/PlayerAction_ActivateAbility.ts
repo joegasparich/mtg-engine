@@ -1,5 +1,6 @@
 import { Ability } from "@engine/abilities";
 import { PlayerAction } from "@engine/actions/PlayerAction";
+import playerActionManager,{ type ActionTarget } from "@engine/actions/PlayerActionManager";
 import { Permanent } from "@engine/GameObject";
 import { GameEvent_ActivateAbility } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
@@ -23,6 +24,16 @@ export class PlayerAction_ActivateAbility extends PlayerAction<Permanent> {
             || !this.object.abilities.includes(this.ability) || !this.object.canActivate(this.ability))
             return;
 
-        gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.object, this.ability));
+        const activate = (targets: readonly ActionTarget[] = []) => {
+            gameEventManager.addEvent(new GameEvent_ActivateAbility(player, this.object, this.ability, targets));
+        };
+        const targeter = this.ability.targeter;
+        if (targeter) {
+            // 602.2b and 601.2c: Choose targets before paying activation costs.
+            playerActionManager.startTargeting(this.object, targeter.validTargets, targeter.count,
+                targets => targeter.validateTargets(targets), activate);
+        } else {
+            activate();
+        }
     }
 }

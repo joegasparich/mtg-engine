@@ -1,7 +1,7 @@
 import { PlayerActions } from "@engine/actions";
-import playerActionManager from "@engine/actions/PlayerActionManager";
-import { GameEvent_ActivateAbility,GameEvent_GoToStep } from "@engine/events";
-import gameEventManager,{ type GameEvent,GameEventType } from "@engine/events/GameEventManager";
+import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
+import { GameEvent_ActivateAbility,GameEvent_GoToStep,GameEvent_TapCard } from "@engine/events";
+import gameEventManager,{ type EventCheck,type GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
@@ -79,6 +79,76 @@ test("two queued activations cannot pay with the same mana", () => {
     expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
     expect(game.stack.objects).toHaveLength(1);
     expect(playerActionManager.getCardActions(creature, player)).toHaveLength(0);
+});
+
+test("an activation with mana and tap costs reserves its source and only spends mana if it taps", () => {
+    startMainPhase();
+    const source = addTestCard({
+        ...cardData[FOREST],
+        abilities: [{ parts: {
+            AbilityPart_Activate_Mana: { cost: "{G}" },
+            AbilityPart_Activate_Tap: {},
+        } }],
+    }, player, player.battlefield);
+    const [ability] = source.abilities;
+    const activate = () => gameEventManager.addEvent(new GameEvent_ActivateAbility(player, source, ability));
+
+    activate();
+    expect(source.tapped).toBe(false);
+    expect(player.manaPool[ManaColour.G]).toBe(0);
+    expect(game.stack.objects).toHaveLength(0);
+
+    const forest = addTestCard(cardData[FOREST], player, player.battlefield);
+    const blockTapAfterManaIsProduced = (check: EventCheck) => {
+        if (forest.tapped)
+            check.removeWhere(event => event instanceof GameEvent_TapCard && event.permanent === source);
+    };
+    gameEventManager.onCheck(blockTapAfterManaIsProduced);
+    try {
+        activate();
+        expect(forest.tapped).toBe(true);
+        expect(source.tapped).toBe(false);
+        expect(player.manaPool[ManaColour.G]).toBe(1);
+        expect(game.stack.objects).toHaveLength(0);
+    } finally {
+        gameEventManager.offCheck(blockTapAfterManaIsProduced);
+    }
+
+    activate();
+    expect(source.tapped).toBe(true);
+    expect(player.manaPool[ManaColour.G]).toBe(0);
+    expect(game.stack.objects).toHaveLength(1);
+});
+
+test("targeted activations require a choice and each stack occurrence keeps its own target", () => {
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_Activate_Mana: { cost: "{R}" },
+            AbilityPart_Target: { saveAs: "RECIPIENT", validTargets: [TargetTypeKeys.Player] },
+            AbilityPart_Effect_DealDamage: { source: "THIS", target: "RECIPIENT", amount: 1 },
+        } }],
+    }, player, player.battlefield);
+    player.manaPool[ManaColour.R] = 2;
+    const [ability] = source.abilities;
+
+    gameEventManager.addEvent(new GameEvent_ActivateAbility(player, source, ability));
+    expect(player.manaPool[ManaColour.R]).toBe(2);
+    expect(game.stack.objects).toHaveLength(0);
+
+    for (const target of [player, opponent]) {
+        new PlayerActions.ActivateAbility(source, ability).perform(player);
+        game.pendingTargeter.onTargeted([target]);
+    }
+    expect(player.manaPool[ManaColour.R]).toBe(0);
+    expect(game.stack.objects).toHaveLength(2);
+    passPriorityRound();
+    expect(opponent.life).toBe(19);
+    expect(player.life).toBe(20);
+    passPriorityRound();
+    expect(player.life).toBe(19);
 });
 
 test("temporary power and toughness modifiers add to changed base stats and expire at cleanup", () => {

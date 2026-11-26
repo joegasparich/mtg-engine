@@ -1,4 +1,5 @@
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
+import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
@@ -6,6 +7,7 @@ import type Player from "@engine/Player";
 import { AbilityDef } from "~/defs";
 import { SlateVar } from ".";
 import { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
+import { AbilityPart_Activate_Mana } from "./parts/activate/AbilityPart_Activate_Mana";
 import { AbilityPart_Activate_Tap } from "./parts/activate/AbilityPart_Activate_Tap";
 import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_AddMana";
 
@@ -16,7 +18,7 @@ import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_Ad
 // Effect parts send resolving instructions or continuous effects to the effect system
 // Trigger parts are only used by triggered abilities, and are responsible for setting up listeners and firing their signal via onTrigger
 // Activate parts are only used by activated abilities, and are activated via the UI, which is accessed through public methods in this class
-// Target parts fire a game event to tell the UI to create a targeter, and fire a signal when they receive their target
+// Target parts validate choices and store them in the slate when the spell or ability resolves
 
 // This class assumes that once its parts are set up it won't change
 // For caching purposes
@@ -59,26 +61,40 @@ export class Ability {
 
     get controller(): Player | undefined { return this.slate.CONTROLLER?.[0]; }
 
-    private _activatable?: boolean;
-    get activatable() { return this._activatable ??= this.parts.some(p => p instanceof AbilityPart_Activate); }
-
-    private _isFreeTap?: boolean;
-    get isFreeTap(): boolean { return this._isFreeTap ??= this.parts.some(p => p instanceof AbilityPart_Activate_Tap); }
-
-    canActivate(): boolean {
-        return this.parts.find(p => p instanceof AbilityPart_Activate).canActivate();
+    private _activationParts?: AbilityPart_Activate[];
+    private get activationParts() {
+        return this._activationParts ??= this.parts.filter(part => part instanceof AbilityPart_Activate);
     }
 
-    payActivationCost() {
-        return this.parts.find(p => p instanceof AbilityPart_Activate).payCost();
+    get activatable() { return this.activationParts.length > 0; }
+    get isFreeTap() { return this.activationParts.length === 1 && this.activationParts[0] instanceof AbilityPart_Activate_Tap; }
+    get targeter() { return this.parts.find(part => part instanceof AbilityPart_Target); }
+
+    private get reservedManaSource() {
+        return this.activationParts.some(part => part instanceof AbilityPart_Activate_Tap) ? this.source : undefined;
+    }
+
+    canActivate(): boolean {
+        const reservedManaSource = this.reservedManaSource;
+        return this.activatable
+            && this.activationParts.every(part => part instanceof AbilityPart_Activate_Mana
+                ? part.canActivate(reservedManaSource) : part.canActivate())
+            && (this.targeter?.hasLegalTargets() ?? true);
+    }
+
+    payActivationCost(): boolean {
+        const mana = this.activationParts.find(part => part instanceof AbilityPart_Activate_Mana);
+        const payOtherCosts = () => this.activationParts.every(part => part === mana || part.payCost());
+        // 602.2b and 601.2g–h: Produce mana before paying costs and spend it only if the other costs are paid.
+        return mana ? mana.payCost(payOtherCosts, this.reservedManaSource) : payOtherCosts();
     }
 
     get activationSignal() {
-        return this.parts.find(p => p instanceof AbilityPart_Activate).outSignal;
+        return this.activationParts[0].outSignal;
     }
 
     resolveActivation() {
-        return this.parts.find(p => p instanceof AbilityPart_Activate).resolve();
+        return this.activationParts[0].resolve();
     }
 
     getPotentialMana(): ManaAmount {

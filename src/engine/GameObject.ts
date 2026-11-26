@@ -2,7 +2,7 @@ import type { ActionTarget } from "@engine/actions";
 import type Card from "@engine/Card";
 import { Ability,makeAbility } from "@engine/abilities";
 import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
-import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
+import type { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
 import { GameEvent_CheckAttachment,GameEvent_CheckBasicLandType } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
@@ -34,7 +34,7 @@ export abstract class GameObject {
 }
 
 export class CardObject extends GameObject {
-    readonly controller?: Player;
+    get controller(): Player | undefined { return undefined; }
     get owner() { return this.card.owner; }
     get def() { return this.card.def; }
     get logName() { return `${this.name} (${this.id})`; }
@@ -242,9 +242,13 @@ export class CardObject extends GameObject {
         // 700.2c: Only the chosen mode contributes its targets.
         const abilities = mode === undefined ? this.abilities : [...this.abilities, ...this.getSpellModeAbilities(mode)];
         for (const ability of abilities) {
-            const target = ability.parts.find(part => part instanceof AbilityPart_Target);
-            if (target)
-                return target;
+            // 115.1c: Choose an activated ability's targets only when activating it.
+            if (ability.activatable)
+                continue;
+
+            const targeter = ability.targeter;
+            if (targeter)
+                return targeter;
         }
     }
 
@@ -282,12 +286,30 @@ export class CardObject extends GameObject {
 
 export class Permanent extends CardObject {
     private attachment?: Permanent;
+    private currentController: Player;
+    private controlledSinceTurn: number;
     tapped = false;
     damageTaken = 0;
 
-    constructor(card: Card, override controller: Player, attachedTo?: Permanent) {
+    constructor(card: Card, controller: Player, attachedTo?: Permanent) {
         super(card);
+        this.controller = controller;
         this.attachment = attachedTo;
+    }
+
+    override get controller() { return this.currentController; }
+
+    override set controller(player: Player) {
+        if (this.currentController !== player) {
+            this.currentController = player;
+            this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
+        }
+    }
+
+    get canPayTapCost() {
+        // 302.6: Creatures must have been controlled since the start of their controller's most recent turn.
+        return this.zone instanceof Battlefield && !this.tapped
+            && (this.type !== CardType.Creature || this.controlledSinceTurn < this.controller.lastTurnStartedAt);
     }
 
     get attachedTo() { return this.attachment; }
@@ -354,7 +376,7 @@ export class Spell extends CardObject {
     resolvedPermanent?: Permanent;
     override get resolvedDamageSource() { return this.resolvedPermanent; }
 
-    constructor(card: Card, override readonly controller: Player, targets: readonly ActionTarget[],
+    constructor(card: Card, private readonly spellController: Player, targets: readonly ActionTarget[],
         readonly chosenX = 0, readonly chosenMode?: number) {
         super(card, chosenMode);
         this.targets = [...targets];
@@ -362,14 +384,18 @@ export class Spell extends CardObject {
         if (this.variableManaSymbols)
             this.cost = ManaUtility.withX(this.cost, this.variableManaSymbols, chosenX);
     }
+
+    override get controller() { return this.spellController; }
 }
 
 export class StackAbility extends GameObject {
     readonly ability: Ability;
+    private readonly targets: readonly ActionTarget[];
 
     constructor(readonly controller: Player, readonly source: CardObject, ability: Ability,
-        private readonly signal: string, inputs: Ability["slate"] = {}) {
+        private readonly signal: string, inputs: Ability["slate"] = {}, targets: readonly ActionTarget[] = []) {
         super();
+        this.targets = [...targets];
         // 113.7a: Each occurrence resolves independently of its source and other occurrences.
         this.ability = makeAbility(ability.def, source, ability.grantedBy);
         for (const [key, value] of Object.entries({ ...ability.slate, ...inputs }))
@@ -378,7 +404,15 @@ export class StackAbility extends GameObject {
     }
 
     resolve() {
-        if (this.zone)
-            this.ability.fireSignal(this.signal);
+        if (!this.zone)
+            return;
+
+        // 608.2b: Recheck targeting restrictions against the current game state.
+        const targeter = this.ability.targeter;
+        if (targeter && !targeter.validateTargets(this.targets))
+            return;
+
+        targeter?.applyTargets(this.targets);
+        this.ability.fireSignal(this.signal);
     }
 }

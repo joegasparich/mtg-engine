@@ -1,7 +1,7 @@
 import { CardObject,Permanent } from "@engine/GameObject";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
-import { Ability,AbilityPart_Activate } from ".";
+import { Ability } from ".";
 
 export { Ability } from "./Ability";
 export { AbilityPart } from "./parts/AbilityPart";
@@ -46,8 +46,6 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
     if (def.keyword)
         ability.def = keywordData[def.keyword];
 
-    let hasActivatePart = false;
-
     for (const [className, config] of expandParts(ability.def.parts)) {
         const ctor = AbilityParts[className];
         if (!ctor)
@@ -55,13 +53,6 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
 
         const part = new ctor();
         Object.assign(part, config);
-
-        if (part instanceof AbilityPart_Activate) {
-            if (hasActivatePart)
-                throw new Error(`Ability on ${source.def.name} has multiple activate parts`);
-
-            hasActivatePart = true;
-        }
 
         ability.addPart(part);
     }

@@ -1,4 +1,5 @@
 import playerActionManager from "@engine/actions/PlayerActionManager";
+import type { CardObject } from "@engine/GameObject";
 import { ManaCost,ManaUtility } from "@engine/mana";
 import { RegisterAbilityPart } from "../../registry";
 import { AbilityPart_Activate } from "./AbilityPart_Activate";
@@ -11,14 +12,16 @@ export class AbilityPart_Activate_Mana extends AbilityPart_Activate {
         return this.ability.controller ?? this.ability.source.controller;
     }
 
-    canActivate(): boolean {
+    canActivate(reservedManaSource?: CardObject): boolean {
         const player = this.payingPlayer;
-        return !!player && playerActionManager.canAutoPayManaCost(ManaUtility.parseManaString<ManaCost>(this.cost), player);
+        return !!player && playerActionManager.canAutoPayManaCost(
+            ManaUtility.parseManaString<ManaCost>(this.cost), player, reservedManaSource);
     }
 
-    payCost(): boolean {
+    payCost(payOtherCosts?: () => boolean, reservedManaSource?: CardObject): boolean {
         const player = this.payingPlayer;
         // 602.2b and 116.2c: Pay the cost before carrying out the action.
-        return !!player && playerActionManager.payManaCost(ManaUtility.parseManaString<ManaCost>(this.cost), player);
+        return !!player && playerActionManager.payManaCost(
+            ManaUtility.parseManaString<ManaCost>(this.cost), player, payOtherCosts, reservedManaSource);
     }
 }

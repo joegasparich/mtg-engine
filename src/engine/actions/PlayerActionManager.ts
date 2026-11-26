@@ -120,12 +120,12 @@ class PlayerActionManager {
         return this.canAutoPayManaCost(object.cost, actor);
     }
 
-    public canAutoPayManaCost(cost: Readonly<ManaCost>, actor: Player) {
+    public canAutoPayManaCost(cost: Readonly<ManaCost>, actor: Player, reservedManaSource?: CardObject) {
         if (game.infiniteMana)
             return true;
 
         const availableMana: ManaAmount = [...actor.manaPool];
-        ManaUtility.addMana(availableMana, actor.getPotentialMana());
+        ManaUtility.addMana(availableMana, actor.getPotentialMana(reservedManaSource));
         return ManaUtility.canPay(cost, availableMana);
     }
 
@@ -140,18 +140,19 @@ class PlayerActionManager {
         return Math.floor((total - fixed) / object.variableManaSymbols);
     }
 
-    public payManaCost(cost: Readonly<ManaCost>, actor: Player): boolean {
+    public payManaCost(cost: Readonly<ManaCost>, actor: Player,
+        payOtherCosts?: () => boolean, reservedManaSource?: CardObject): boolean {
         if (game.infiniteMana)
-            return true;
+            return payOtherCosts?.() ?? true;
 
         if (!ManaUtility.canPay(cost, actor.manaPool)) {
-            if (!this.canAutoPayManaCost(cost, actor))
+            if (!this.canAutoPayManaCost(cost, actor, reservedManaSource))
                 return false;
 
             const previousPayer = this.manaPaymentPlayer;
             this.manaPaymentPlayer = actor;
             try {
-                this.tapManaSources(cost, actor);
+                this.tapManaSources(cost, actor, reservedManaSource);
             } finally {
                 this.manaPaymentPlayer = previousPayer;
             }
@@ -159,7 +160,7 @@ class PlayerActionManager {
                 return false;
         }
 
-        return ManaUtility.pay(cost, actor.manaPool);
+        return (payOtherCosts?.() ?? true) && ManaUtility.pay(cost, actor.manaPool);
     }
 
     public isPayingManaCost(actor: Player): boolean {
@@ -172,9 +173,12 @@ class PlayerActionManager {
             throw new Error(`Failed to auto pay for card ${object.def.name}, remaining cost: ${remaining}`);
     }
 
-    private tapManaSources(cost: Readonly<ManaCost>, actor: Player) {
+    private tapManaSources(cost: Readonly<ManaCost>, actor: Player, reservedManaSource?: CardObject) {
         const remaining = [...cost];
         const poolCopy = [...actor.manaPool]; // We don't want to actually pay until we have tapped all our lands etc.
+        const sources = reservedManaSource
+            ? actor.battlefield.objects.filter(permanent => permanent !== reservedManaSource)
+            : actor.battlefield.objects;
 
         // First pay specific colours directly from what we have in the pool
         for (let i = 0; i < 6; i++) {
@@ -198,7 +202,7 @@ class PlayerActionManager {
             if (remaining[i] == 0)
                 continue;
 
-            for (const permanent of actor.battlefield.objects) {
+            for (const permanent of sources) {
                 for (const ability of permanent.abilities) {
                     if (!ability.def.isManaAbility)
                         continue;
@@ -227,7 +231,7 @@ class PlayerActionManager {
 
         // Finally, look for cards with mana abilities to pay the generic
         if (remaining[6] > 0) {
-            for (const permanent of actor.battlefield.objects) {
+            for (const permanent of sources) {
                 for (const ability of permanent.abilities) {
                     if (!ability.def.isManaAbility)
                         continue;

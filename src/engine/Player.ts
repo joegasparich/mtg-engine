@@ -9,6 +9,7 @@ export default class Player {
 
     life = 20;
     manaPool: ManaAmount = [0, 0, 0, 0, 0, 0];
+    lastTurnStartedAt = -1;
 
     library: Library = new Library();
     hand: Hand = new Hand();
@@ -30,11 +31,12 @@ export default class Player {
             this.library.onEnter(new CardObject(new Card(cardData[index], this)));
     }
 
-    getPotentialMana(): Readonly<ManaAmount> {
+    getPotentialMana(reservedManaSource?: CardObject): Readonly<ManaAmount> {
         const potentialMana: ManaAmount = [0, 0, 0, 0, 0, 0];
 
         for (const permanent of this.battlefield.objects) {
-            ManaUtility.addMana(potentialMana, permanent.getPotentialMana(this));
+            if (permanent !== reservedManaSource)
+                ManaUtility.addMana(potentialMana, permanent.getPotentialMana(this));
         }
 
         return potentialMana;
