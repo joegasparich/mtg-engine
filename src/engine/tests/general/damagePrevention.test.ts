@@ -77,6 +77,17 @@ test("a finite shield carries over and observers see only damage that was actual
     expect(protectedPlayer.life).toBe(17);
 });
 
+test("a one-point shield waits for damage to its recipient and expires unused at cleanup", () => {
+    const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
+    shield(protectedPlayer, 1);
+    gameEventManager.addEvent(new GameEvent_DealDamage(attacker, opponent, 1));
+    expect(opponent.life).toBe(19);
+    expect(gameEventManager.checkEvent(hit(attacker, 1))).toBe(false);
+    gameEventManager.addEvent(new GameEvent_Cleanup(protectedPlayer));
+    gameEventManager.addEvent(hit(attacker, 1));
+    expect(protectedPlayer.life).toBe(19);
+});
+
 test("source selection and prevention both check the configured creature and tapped requirements", () => {
     const targetValidator = { cardType: CardType.Creature, tapped: true };
     circle = addTestCard({ ...redCircle, abilities: [{ parts: {

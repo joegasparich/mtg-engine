@@ -38,6 +38,24 @@ test("should trade", () => {
     expect(playerB.graveyard.objects).toContainEqual(expect.objectContaining({ card: bearsB.card }));
 });
 
+test("a confirmed blocker remains blocking after its attacker leaves until combat ends", () => {
+    const attacker = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const blocker = addTestCard(cardData[GRIZZLY_BEARS], playerB, playerB.battlefield);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(attacker).perform(playerA, [playerB]);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    new PlayerActions.DeclareBlocker(blocker).perform(playerB, [attacker]);
+    expect(CombatManager.isBlocking(blocker)).toBe(false);
+    gameEventManager.addEvent(new GameEvent_Advance(playerB));
+    expect(CombatManager.isBlocking(blocker)).toBe(true);
+    moveTestCard(attacker, playerA.hand);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.EndOfCombat));
+    expect(CombatManager.isBlocking(blocker)).toBe(true);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
+    expect(CombatManager.isBlocking(blocker)).toBe(false);
+});
+
 describe("first strike and double strike", () => {
     function beginDamage(attackers: Permanent[], blocks: [Permanent, Permanent][] = []) {
         game.startGame();

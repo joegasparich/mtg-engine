@@ -189,6 +189,11 @@ export class CombatManager {
         return CombatManager.blockedAttackers.has(attacker);
     }
 
+    static isBlocking(creature: Permanent): boolean {
+        // 509.1g: A declared blocker remains a blocker even if every attacker it blocked leaves combat.
+        return CombatManager.effectiveBlocks.has(creature);
+    }
+
     static *blockRelationships(): IterableIterator<[Permanent, Permanent]> {
         if (!CombatManager.blocksConfirmed) {
             for (const [blocker, attackers] of CombatManager.blockingCreatures) {

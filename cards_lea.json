@@ -941,5 +941,63 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Righteousness",
+        "image_url": "https://cards.scryfall.io/large/front/5/6/566b46e8-e036-48de-b0aa-f9597f113b26.jpg?1783919572",
+        "oracle_text": "Target blocking creature gets +7/+7 until end of turn.",
+        "type": "Instant",
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": {
+                        "saveAs": "BLOCKER",
+                        "validTargets": ["Permanent"],
+                        "targetValidator": { "cardType": "Creature", "blocking": true }
+                    },
+                    "AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn": {
+                        "inSignal": "SPELL_RESOLVE",
+                        "recipient": "BLOCKER",
+                        "power": 7,
+                        "toughness": 7
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Samite Healer",
+        "image_url": "https://cards.scryfall.io/large/front/b/e/bea8c66e-5ffa-480d-b7db-acd3bf87ebbb.jpg?1783919571",
+        "oracle_text": "{T}: Prevent the next 1 damage that would be dealt to any target this turn.",
+        "type": "Creature",
+        "subtypes": ["Human", "Cleric"],
+        "cost": "{1}{W}",
+        "power": 1,
+        "toughness": 1,
+        "abilities": [
+            {
+                "activateString": "{T}: Prevent the next 1 damage to any target",
+                "parts": {
+                    "AbilityPart_Activate_Tap": {},
+                    "AbilityPart_Target": {
+                        "saveAs": "RECIPIENT",
+                        "validTargets": ["Player", "Permanent"],
+                        "targetValidator": { "cardType": "Creature" }
+                    },
+                    "AbilityPart_Effect_PreventDamage": { "target": "RECIPIENT", "amount": 1 }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Savannah Lions",
+        "image_url": "https://cards.scryfall.io/large/front/d/1/d136d1fc-c413-4deb-952c-b10aa1c72abe.jpg?1783919570",
+        "oracle_text": "",
+        "type": "Creature",
+        "subtypes": ["Cat"],
+        "cost": "{W}",
+        "power": 2,
+        "toughness": 1
     }
 ]

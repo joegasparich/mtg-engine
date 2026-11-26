@@ -51,6 +51,7 @@ export type TargetValidator = {
     // Match the subtype before continuous type changes are applied.
     baseSubtype?: string;
     tapped?: boolean;
+    blocking?: boolean;
 };
 
 export enum AbilityActivator {

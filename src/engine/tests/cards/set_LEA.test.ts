@@ -2465,6 +2465,129 @@ describe("Reverse Damage", () => {
     });
 });
 
+describe("Righteousness", () => {
+    const def = cardData.find(card => card.name === "Righteousness");
+    const lions = cardData.find(card => card.name === "Savannah Lions");
+    let caster: Player;
+    let defender: Player;
+    let spell: CardObject;
+    let attacker: Permanent;
+    let blocker: Permanent;
+    let idle: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        defender = game.addPlayer(BASIC_DECK);
+        attacker = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        blocker = addTestCard(lions, defender, defender.battlefield);
+        idle = addTestCard(lions, defender, defender.battlefield);
+        startMainPhase();
+        spell = addTestCard(def, caster, caster.hand);
+        addTestCard(cardData.find(card => card.name === BasicLandType.Plains), caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(spell, caster)).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        new PlayerActions.DeclareAttacker(attacker).perform(caster, [defender]);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+        new PlayerActions.DeclareBlocker(blocker).perform(defender, [attacker]);
+        gameEventManager.addEvent(new GameEvent_Advance(defender));
+    });
+
+    test("casts for {W} on a blocking creature and gives it +7/+7 through the end of combat", () => {
+        const [cast] = playerActionManager.getCardActions(spell, caster);
+        cast.perform(caster);
+        const choice = game.pendingTargeter;
+        expect(choice.validateTargets([attacker])).toBe(false);
+        expect(choice.validateTargets([idle])).toBe(false);
+        expect(choice.validateTargets([blocker])).toBe(true);
+        choice.onTargeted([blocker]);
+        expect(blocker).toMatchObject({ power: 2, toughness: 1 });
+        passPriorityRound();
+        expect(blocker).toMatchObject({ power: 9, toughness: 8 });
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
+        expect(attacker.retired).toBe(true);
+        expect(blocker).toMatchObject({ power: 9, toughness: 8, damageTaken: 2 });
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+        expect(blocker).toMatchObject({ power: 2, toughness: 1, damageTaken: 0 });
+    });
+
+    test("rechecks whether the target is still blocking on resolution", () => {
+        expect(game.stack.spellCast(caster, spell, [blocker])).toBe(true);
+        CombatManager.removeFromCombat(blocker);
+        passPriorityRound();
+        expect(blocker).toMatchObject({ power: 2, toughness: 1, zone: defender.battlefield });
+        expect(caster.graveyard.objects.map(object => object.card)).toContain(spell.card);
+    });
+});
+
+describe("Samite Healer", () => {
+    const def = cardData.find(card => card.name === "Samite Healer");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+    });
+
+    test("casts for {1}{W} as a 1/1 Human Cleric with summoning sickness", () => {
+        startMainPhase();
+        const card = addTestCard(def, caster, caster.hand);
+        caster.manaPool[ManaColour.G] = 1;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.W] = 1;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(caster.manaPool.every(amount => amount === 0)).toBe(true);
+        passPriorityRound();
+        const healer = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(healer).toMatchObject({ power: 1, toughness: 1, subtypes: ["Human", "Cleric"], tapped: false });
+        expect(playerActionManager.getCardActions(healer, caster)).toHaveLength(0);
+    });
+
+    test("taps to prevent exactly one damage to the chosen player after resolution", () => {
+        const healer = addTestCard(def, caster, caster.battlefield);
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        startMainPhase();
+        const [activate] = playerActionManager.getCardActions(healer, caster);
+        activate.perform(caster);
+        const choice = game.pendingTargeter;
+        expect(choice.validateTargets([land])).toBe(false);
+        expect(choice.validateTargets([caster])).toBe(true);
+        expect(choice.validateTargets([healer])).toBe(true);
+        expect(healer.tapped).toBe(false);
+        choice.onTargeted([opponent]);
+        expect(healer.tapped).toBe(true);
+        expect(game.stack.objects).toEqual([expect.any(StackAbility)]);
+        expect(playerActionManager.getCardActions(healer, caster)).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_DealDamage(attacker, opponent, 1));
+        expect(opponent.life).toBe(19);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(attacker, opponent, 3));
+        expect(opponent.life).toBe(17);
+        gameEventManager.addEvent(new GameEvent_DealDamage(attacker, opponent, 1));
+        expect(opponent.life).toBe(16);
+    });
+
+    test("can protect a creature even if the Healer leaves before resolution", () => {
+        const healer = addTestCard(def, caster, caster.battlefield);
+        const bear = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        startMainPhase();
+        const [activate] = playerActionManager.getCardActions(healer, caster);
+        activate.perform(caster);
+        game.pendingTargeter.onTargeted([bear]);
+        // 113.7a: The activated ability resolves independently of the Healer.
+        moveTestCard(healer, caster.graveyard);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(bear, bear, 2));
+        expect(bear.zone).toBe(opponent.battlefield);
+        expect(bear.damageTaken).toBe(1);
+    });
+});
+
 describe("Resurrection", () => {
     const def = cardData.find(card => card.name === "Resurrection");
     const creature = cardData[GRIZZLY_BEARS];
