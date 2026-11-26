@@ -1063,5 +1063,40 @@
                 }
             }
         ]
+    },
+    {
+        "name": "White Knight",
+        "image_url": "https://cards.scryfall.io/large/front/3/2/32683d26-4b59-4460-b507-f3ab21daf151.jpg?1783919568",
+        "oracle_text": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from black (This creature can't be blocked, targeted, dealt damage, or enchanted by anything black.)",
+        "type": "Creature",
+        "subtypes": ["Human", "Knight"],
+        "cost": "{W}{W}",
+        "power": 2,
+        "toughness": 2,
+        "abilities": [
+            { "keyword": "first strike" },
+            { "parts": { "AbilityPart_Protection": { "colour": "B" } } }
+        ]
+    },
+    {
+        "name": "Wrath of God",
+        "image_url": "https://cards.scryfall.io/large/front/1/4/14de01ae-a52e-4530-9fe3-9888a8480fc8.jpg?1783919567",
+        "oracle_text": "Destroy all creatures. They can't be regenerated.",
+        "type": "Sorcery",
+        "cost": "{2}{W}{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectsFromZone": {
+                        "inSignal": "SPELL_RESOLVE", "zone": "battlefield",
+                        "targetValidator": { "cardType": "Creature" }, "saveAs": "CREATURES", "outSignal": "DESTROY_CREATURES"
+                    },
+                    "AbilityPart_Effect_DestroyPermanents": {
+                        "inSignal": "DESTROY_CREATURES", "permanentsFrom": "CREATURES"
+                    },
+                    "AbilityPart_PreventRegeneration": {}
+                }
+            }
+        ]
     }
 ]

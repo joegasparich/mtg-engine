@@ -1,7 +1,8 @@
 import { makeAbility } from "@engine/abilities";
 import { PlayerActions } from "@engine/actions";
 import { CombatManager } from "@engine/CombatManager";
-import { GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DestroyPermanent,GameEvent_GoToNextStep,GameEvent_GoToStep,GameEvent_SacrificePermanent } from "@engine/events";
+import { GameEvent_Advance,GameEvent_Cleanup,GameEvent_DealDamage,GameEvent_DestroyPermanent,GameEvent_GoToNextStep,GameEvent_GoToStep,GameEvent_RegeneratePermanent,GameEvent_SacrificePermanent } from "@engine/events";
+import type { CheckRemovalOverride } from "@engine/effects/EffectSystem";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import type { Permanent } from "@engine/GameObject";
@@ -120,4 +121,23 @@ test("regenerating a blocker removes it from combat and keeps its attacker block
     expect(opponent.life).toBe(20);
     expect(attacker.damageTaken).toBe(0);
     expect(blocker.damageTaken).toBe(0);
+});
+
+test("a check override can veto one regeneration replacement in a simultaneous destruction batch", () => {
+    const first = addTestCard(bears, player, player.battlefield);
+    const second = addTestCard(bears, player, player.battlefield);
+    addShield(first);
+    addShield(second);
+    const destroyFirst = new GameEvent_DestroyPermanent(first);
+    const denyFirst: CheckRemovalOverride = (event, _source, replacement) =>
+        event === destroyFirst && replacement instanceof GameEvent_RegeneratePermanent;
+    gameEventManager.onCheckRemovalOverride(denyFirst);
+    try {
+        gameEventManager.performSimultaneous([destroyFirst, new GameEvent_DestroyPermanent(second)]);
+    } finally {
+        gameEventManager.offCheckRemovalOverride(denyFirst);
+    }
+    expect(player.graveyard.objects.map(object => object.card)).toEqual([first.card]);
+    expect(second.zone).toBe(player.battlefield);
+    expect(second.tapped).toBe(true);
 });

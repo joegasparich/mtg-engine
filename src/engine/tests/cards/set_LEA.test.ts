@@ -2823,3 +2823,124 @@ describe("Veteran Bodyguard", () => {
         expect(defender.life).toBe(20);
     });
 });
+
+test("White Knight prevents black damage, refuses black blockers, and deals first strike damage to a legal blocker", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const knight = addTestCard(cardData.find(card => card.name === "White Knight"), player, player.battlefield);
+    const black = addTestCard({ ...cardData[GRIZZLY_BEARS], cost: "{B}{B}" }, opponent, opponent.battlefield);
+    const green = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    startMainPhase();
+    gameEventManager.addEvent(new GameEvent_DealDamage(black, knight, 2));
+    expect(knight.damageTaken).toBe(0);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    new PlayerActions.DeclareAttacker(knight).perform(player, [opponent]);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+    expect(CombatManager.canBlockAttacker(black, knight)).toBe(false);
+    expect(CombatManager.canBlockAttacker(green, knight)).toBe(true);
+    new PlayerActions.DeclareBlocker(green).perform(opponent, [knight]);
+    gameEventManager.addEvent(new GameEvent_Advance(opponent));
+    passPriorityRound();
+    expect(game.currentStepIndex).toBe(StepIndex.FirstStrikeDamage);
+    expect(green.retired).toBe(true);
+    passPriorityRound();
+    expect(knight.zone).toBe(player.battlefield);
+    expect(knight.damageTaken).toBe(0);
+});
+
+describe("Wrath of God", () => {
+    const wrath = cardData.find(card => card.name === "Wrath of God");
+    const ward = cardData.find(card => card.name === "Death Ward");
+    let caster: Player;
+    let opponent: Player;
+    let spell: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        spell = addTestCard(wrath, caster, caster.hand);
+    });
+
+    test("casts for {2}{W}{W} and destroys both players' creatures simultaneously through a Death Ward", () => {
+        const friendly = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const opposing = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const survivor = addTestCard({
+            ...cardData[GRIZZLY_BEARS], abilities: [{ keyword: Keyword.Indestructible, parts: {} }],
+        }, opponent, opponent.battlefield);
+        const response = addTestCard(ward, opponent, opponent.hand);
+
+        caster.manaPool[ManaColour.G] = 3;
+        caster.manaPool[ManaColour.W] = 1;
+        expect(playerActionManager.getCardActions(spell, caster)).toEqual([]);
+        caster.manaPool[ManaColour.W] = 2;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        expect(game.pendingTargeter).toBeNull();
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(caster.manaPool[ManaColour.G]).toBe(1);
+        expect(game.stack.spellCast(opponent, response, [opposing])).toBe(true);
+        passPriorityRound();
+
+        const destroyed = vi.fn(() => {
+            expect(friendly.retired && opposing.retired).toBe(true);
+        });
+        gameEventManager.onGamePerformed(GameEventType.DestroyPermanent, destroyed);
+        passPriorityRound();
+        expect(destroyed).toHaveBeenCalledTimes(2);
+        expect(opponent.battlefield.objects).toEqual([land, survivor]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([friendly.card, spell.card]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([response.card, opposing.card]);
+    });
+
+    test("allows regeneration from a different destruction while Wrath waits on the stack", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, spell)).toBe(true);
+        const response = addTestCard(ward, opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, response, [creature])).toBe(true);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(creature));
+        expect(creature.zone).toBe(opponent.battlefield);
+        expect(creature.tapped).toBe(true);
+        passPriorityRound();
+        expect(creature.retired).toBe(true);
+    });
+
+    test("also bypasses regeneration from a creature's activated ability", () => {
+        const creature = addTestCard({
+            ...cardData[GRIZZLY_BEARS],
+            abilities: [{ parts: {
+                AbilityPart_Activate_Mana: { cost: "{0}" },
+                AbilityPart_Effect_Regenerate: { recipient: "THIS" },
+            } }],
+        }, caster, caster.battlefield);
+        expect(game.stack.spellCast(caster, spell)).toBe(true);
+        new PlayerActions.ActivateAbility(creature, creature.abilities[0]).perform(caster);
+        expect(game.stack.objects.at(-1)).toBeInstanceOf(StackAbility);
+        passPriorityRound();
+        expect(creature.zone).toBe(caster.battlefield);
+        passPriorityRound();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([creature.card, spell.card]);
+    });
+
+    test("allows a replacement that returns a creature to hand instead of destroying it", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const returnToHand = (check: EventCheck) => {
+            for (const event of check.events) {
+                if (event instanceof GameEvent_DestroyPermanent && event.permanent === creature)
+                    check.replace(event, new GameEvent_ChangeCardZone(creature, opponent.hand));
+            }
+        };
+        gameEventManager.withCheckSource({ object: creature }, () => gameEventManager.onCheck(returnToHand));
+        try {
+            expect(game.stack.spellCast(caster, spell)).toBe(true);
+            passPriorityRound();
+            expect(opponent.hand.objects.map(object => object.card)).toContain(creature.card);
+            expect(opponent.graveyard.objects).toHaveLength(0);
+        } finally {
+            gameEventManager.offCheck(returnToHand);
+        }
+    });
+});

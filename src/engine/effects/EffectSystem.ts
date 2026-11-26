@@ -18,7 +18,7 @@ export interface EventCheck {
 
 export type CheckListener = (check: EventCheck) => void;
 export type CheckSource = { readonly object: CardObject; readonly keyword?: Keyword; readonly ability?: Ability };
-export type CheckRemovalOverride = (event: GameEvent, source: CheckSource) => boolean;
+export type CheckRemovalOverride = (event: GameEvent, source: CheckSource, replacement?: GameEvent) => boolean;
 
 export enum EventCheckPhase {
     Proposal,
@@ -221,7 +221,7 @@ export class EffectSystem {
                 add: event => { events.push(event); },
                 replace: (event, replacement) => {
                     const index = events.indexOf(event);
-                    if (index < 0 || !this.canRemove(event, source))
+                    if (index < 0 || !this.canRemove(event, source, replacement))
                         return;
 
                     replacement.effect ??= event.effect;
@@ -239,10 +239,10 @@ export class EffectSystem {
         return events.includes(checkedEvent) ? checkedEvent : undefined;
     }
 
-    private canRemove(event: GameEvent, source?: CheckSource): boolean {
+    private canRemove(event: GameEvent, source?: CheckSource, replacement?: GameEvent): boolean {
         if (source) {
             for (const allow of this.checkOverrides) {
-                if (allow(event, source))
+                if (allow(event, source, replacement))
                     return false;
             }
         }
