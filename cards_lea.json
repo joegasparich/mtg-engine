@@ -852,5 +852,31 @@
         "cost": "{2}{W}",
         "power": 2,
         "toughness": 2
+    },
+    {
+        "name": "Personal Incarnation",
+        "image_url": "https://cards.scryfall.io/large/front/3/e/3e6d10d7-66ac-427e-b91f-af6198e5ae48.jpg?1783919574",
+        "oracle_text": "{0}: The next 1 damage that would be dealt to this creature this turn is dealt to its owner instead. Only this creature's owner may activate this ability.\nWhen this creature dies, its owner loses half their life, rounded up.",
+        "type": "Creature",
+        "subtypes": ["Avatar", "Incarnation"],
+        "cost": "{3}{W}{W}{W}",
+        "power": 6,
+        "toughness": 6,
+        "abilities": [
+            {
+                "activateString": "{0}: Redirect the next 1 damage to its owner",
+                "activator": "Owner",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{0}" },
+                    "AbilityPart_Effect_RedirectDamage": { "from": "THIS", "to": "THIS.owner", "amount": 1 }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_Trigger_Dies": {},
+                    "AbilityPart_Effect_LoseLife": { "target": "THIS.owner", "amount": "HalfRoundedUp" }
+                }
+            }
+        ]
     }
 ]

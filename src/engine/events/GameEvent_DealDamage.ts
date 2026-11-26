@@ -1,32 +1,51 @@
 import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
-import type { CardObject,Permanent } from "@engine/GameObject";
+import { type CardObject,Permanent } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
 import { CardType } from "~/defs";
 
+export type DamageRecipient = Permanent | Player;
+
+export function canReceiveDamage(recipient: unknown): recipient is DamageRecipient {
+    return recipient instanceof Player ? game.players.includes(recipient)
+        : recipient instanceof Permanent && recipient.zone instanceof Battlefield && recipient.type === CardType.Creature;
+}
+
 export class GameEvent_DealDamage extends GameEvent {
     type = GameEventType.DealDamage;
 
-    constructor(readonly source: CardObject, readonly recipient: Permanent | Player, readonly amount: number) {
+    constructor(readonly source: CardObject, readonly recipient: DamageRecipient, readonly amount: number) {
         super();
         const recipientLogName = recipient instanceof Player ? this.recipientName : recipient.logName;
         this.label = `${source.logName} dealt ${amount} damage to ${recipientLogName}`;
     }
 
     get recipientName() {
-        return this.recipient instanceof Player ? `Player ${this.recipient.id}` : this.recipient.name;
+        return this.getRecipientName();
     }
 
     get affectedPlayer() {
-        return this.recipient instanceof Player ? this.recipient : this.recipient.controller;
+        return this.getAffectedPlayer();
+    }
+
+    getRecipientName(recipient = this.recipient): string {
+        return recipient instanceof Player ? `Player ${recipient.id}` : recipient.name;
+    }
+
+    getAffectedPlayer(recipient = this.recipient): Player {
+        return recipient instanceof Player ? recipient : recipient.controller;
     }
 
     withAmount(amount: number): GameEvent_DealDamage {
-        if (amount === this.amount)
+        return this.withRecipient(this.recipient, amount);
+    }
+
+    withRecipient(recipient: DamageRecipient, amount: number): GameEvent_DealDamage {
+        if (recipient === this.recipient && amount === this.amount)
             return this;
 
-        const event = new GameEvent_DealDamage(this.source, this.recipient, amount);
+        const event = new GameEvent_DealDamage(this.source, recipient, amount);
         event.isAction = this.isAction;
         event.effect = this.effect;
         event.callback = this.callback;
@@ -45,9 +64,7 @@ export class GameEvent_DealDamage extends GameEvent {
         return true;
     }
 
-    canDealDamage(): boolean {
-        return this.amount > 0 && Number.isSafeInteger(this.amount) && (this.recipient instanceof Player
-            ? game.players.includes(this.recipient)
-            : this.recipient.zone instanceof Battlefield && this.recipient.type === CardType.Creature);
+    canDealDamage(recipient = this.recipient): boolean {
+        return this.amount > 0 && Number.isSafeInteger(this.amount) && canReceiveDamage(recipient);
     }
 }

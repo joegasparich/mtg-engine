@@ -9,7 +9,7 @@ export class AbilityPart_Activate_Mana extends AbilityPart_Activate {
     cost: string;
 
     private get payingPlayer() {
-        return this.ability.controller ?? this.ability.source.controller;
+        return this.ability.controller ?? this.ability.activator;
     }
 
     canActivate(reservedManaSource?: CardObject): boolean {

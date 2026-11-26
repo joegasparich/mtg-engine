@@ -7,6 +7,7 @@ import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import { addTestCard,FOREST,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { AbilityActivator } from "~/defs";
 import { cardData } from "~/index";
 
 let player: Player;
@@ -79,6 +80,28 @@ test("two queued activations cannot pay with the same mana", () => {
     expect(player.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
     expect(game.stack.objects).toHaveLength(1);
     expect(playerActionManager.getCardActions(creature, player)).toHaveLength(0);
+});
+
+test("an owner-only activation uses its owner's mana after a control change", () => {
+    const opponent = game.addPlayer([]);
+    startMainPhase();
+    const creature = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{
+            activator: AbilityActivator.Owner,
+            parts: { AbilityPart_Activate_Mana: { cost: "{G}" } },
+        }],
+    }, player, player.battlefield);
+    creature.controller = opponent;
+    opponent.manaPool[ManaColour.G] = 1;
+    expect(playerActionManager.getCardActions(creature, player)).toHaveLength(0);
+
+    player.manaPool[ManaColour.G] = 1;
+    const [activate] = playerActionManager.getCardActions(creature, player);
+    activate.perform(player);
+    expect(player.manaPool[ManaColour.G]).toBe(0);
+    expect(opponent.manaPool[ManaColour.G]).toBe(1);
+    expect(game.stack.objects[0]).toMatchObject({ controller: player, source: creature });
 });
 
 test("an activation with mana and tap costs reserves its source and only spends mana if it taps", () => {

@@ -36,7 +36,7 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 | `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
 | `AbilityGrant` | Grants an ability to a fixed list or a live selection of permanents. Each recipient keeps its ability instance while it qualifies. A continuous grant part can save those instances to its slate for another part to read. [Ability grants](src/engine/effects/EffectSystem.ts) |
 | `ModifyPowerToughness` | Adds power and toughness whenever those stats are read. It uses the same `recipients` input as `AbilityGrant`. [Power and toughness](src/engine/effects/EffectSystem.ts) |
-| `DamagePrevention` | Registers a finite shield, a shield for the next hit from a source, or ongoing prevention such as protection. The affected player chooses how to apply competing effects or divide a finite shield among simultaneous sources. [Damage prevention](src/engine/effects/DamagePrevention.ts) |
+| `DamageEffect` | Registers a damage prevention or redirection rule. The affected player or permanent's controller chooses the order of competing rules and allocates limited effects among simultaneous sources. [Damage resolver](src/engine/effects/DamagePrevention.ts) |
 
 ### Event check phases
 
@@ -61,6 +61,8 @@ Black Ward's attachment override reads the protection grant from the slate and e
 `addEvent` and `addEvents` append to the pending queue and run `Proposal` checks on it. If the event loop is idle, it starts draining immediately. The loop takes the pending events as a batch and runs them in order. Events queued during that batch wait for the next pass. When an event succeeds, the manager calls its `onPerformed` listeners and then its `then` callback. [Event manager](src/engine/events/GameEventManager.ts)
 
 Use `onGamePerformed(type, callback, options)` for subscriptions owned by the current game. It returns a function that cancels the subscription. Use `matches` to filter events, and set `once` to detach the callback on its first match. Starting a new game drops these subscriptions. A subscription created during notification starts observing with the next event or simultaneous batch. [Event manager](src/engine/events/GameEventManager.ts)
+
+For look-back triggers under rule 603.10a, `captureBeforeBatch` saves the listener's state before any event in the batch performs. A successful event delivers that state to the callback even if the source retired during the batch. The death trigger listens for `ChangeCardZone` and matches moves from the battlefield to a graveyard. [Zone changes](src/engine/events/GameEvent_ChangeCardZone.ts) · [Death trigger](src/engine/abilities/parts/trigger/AbilityPart_Trigger_Dies.ts)
 
 Blaze of Glory uses a one-shot `Cleanup` subscription to revoke its grant alongside marked damage removal under rule 514.2. An ability that triggers on a later event uses its subscription to queue a stack object with `Stack.abilityTriggered`. Delayed triggers capture their source and controller when created under rule 603.7. When several events match simultaneously, rule 603.7b can require the controller to choose the event. [Stack](src/engine/Stack.ts) · [Comprehensive Rules](ref/MagicCompRules.txt)
 

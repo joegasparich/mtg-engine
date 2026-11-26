@@ -26,8 +26,7 @@ export class GameEvent_ActivateAbility extends GameEvent {
     }
 
     perform(): boolean {
-        if (this.permanent.controller !== this.player
-            || !this.permanent.canActivate(this.ability, playerActionManager.isPayingManaCost(this.player)))
+        if (!this.permanent.canActivate(this.ability, this.player, playerActionManager.isPayingManaCost(this.player)))
             return false;
 
         const targeter = this.ability.targeter;

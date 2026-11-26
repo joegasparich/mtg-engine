@@ -22,6 +22,26 @@ test("a one-shot game listener waits for a matching event and cancels before cal
     expect(callback).toHaveBeenCalledExactlyOnceWith(matching);
 });
 
+test("a one-shot listener captures once per batch and fires for its first successful match", () => {
+    Game.init();
+    const skipped = new GameEvent_Log(GameEventType.Log, "Skip");
+    const matching = new GameEvent_Log(GameEventType.Log, "Match");
+    const rejected = new GameEvent_Log(GameEventType.Log, "Rejected match");
+    rejected.perform = () => false;
+    const captureBeforeBatch = vi.fn(() => "Before the batch");
+    const callback = vi.fn();
+    gameEventManager.onGamePerformed(GameEventType.Log, callback, {
+        once: true,
+        matches: event => event !== skipped,
+        captureBeforeBatch,
+    });
+
+    gameEventManager.performSimultaneous([skipped, rejected, matching, new GameEvent_Log(GameEventType.Log, "Another match")]);
+
+    expect(captureBeforeBatch).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledExactlyOnceWith(matching, "Before the batch");
+});
+
 test("cancelled game listeners and listeners from a previous game do not observe events", () => {
     Game.init();
     const cancelled = vi.fn();

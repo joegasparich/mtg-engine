@@ -55,9 +55,10 @@ export abstract class GameEvent {
     label: string;
     isAction = true;
     effect?: OneShotEffect;
-    readonly additionalPerformedTypes?: readonly GameEventType[];
     readonly duringDamagePrevention?: boolean;
     callback: () => void;
+
+    get additionalPerformedTypes(): readonly GameEventType[] { return []; }
 
     perform(): boolean {
         return true;
@@ -79,6 +80,8 @@ export class GameEvent_Log extends GameEvent {
 }
 
 type Listener = (event: GameEvent) => void;
+type GameSubscription = { notify: Listener } | { capture: () => Listener };
+type CapturedListeners = ReadonlyMap<GameEventType, readonly Listener[]>;
 
 function isDamage(event: GameEvent): event is GameEvent_DealDamage {
     return event.type === GameEventType.DealDamage;
@@ -92,7 +95,7 @@ interface GameSubscriptionOptions<T extends GameEvent> {
 class GameEventManager {
     readonly effects = new EffectSystem(this);
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
-    private readonly gameListenersByType = new Map<GameEventType, Set<Listener>>();
+    private readonly gameListenersByType = new Map<GameEventType, Set<GameSubscription>>();
     private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
     private readonly resolutionSteps: (() => void)[] = [];
@@ -133,21 +136,42 @@ class GameEventManager {
         this.eventPerformedListenersByType.get(eventType).delete(listener);
     }
 
+    onGamePerformed<T extends GameEvent, State>(eventType: GameEventType, listener: (event: T, state: State) => void,
+        options: GameSubscriptionOptions<T> & { captureBeforeBatch: () => State }): () => void;
     onGamePerformed<T extends GameEvent>(eventType: GameEventType, listener: (event: T) => void,
-        { once, matches }: GameSubscriptionOptions<T> = {}): () => void {
-        const listeners = this.gameListenersByType.get(eventType) ?? new Set<Listener>();
+        options?: GameSubscriptionOptions<T>): () => void;
+    onGamePerformed<T extends GameEvent, State>(eventType: GameEventType, listener: (event: T, state?: State) => void,
+        { once, matches, captureBeforeBatch }: GameSubscriptionOptions<T> & { captureBeforeBatch?: () => State } = {}): () => void {
+        const listeners = this.gameListenersByType.get(eventType) ?? new Set<GameSubscription>();
         this.gameListenersByType.set(eventType, listeners);
 
-        const notify: Listener = event => {
-            if (!listeners.has(notify) || matches?.(event as T) === false)
+        let fired = false;
+        const notify = (event: GameEvent, state?: State) => {
+            if (fired || matches?.(event as T) === false)
                 return;
 
-            if (once)
+            if (once) {
+                fired = true;
                 cancel();
-            listener(event as T);
+            }
+            if (captureBeforeBatch)
+                listener(event as T, state);
+            else
+                listener(event as T);
         };
-        const cancel = () => { listeners.delete(notify); };
-        listeners.add(notify);
+        const subscription: GameSubscription = captureBeforeBatch ? {
+            capture: () => {
+                const state = captureBeforeBatch();
+                return event => notify(event, state);
+            },
+        } : {
+            notify: event => {
+                if (listeners.has(subscription))
+                    notify(event);
+            },
+        };
+        const cancel = () => { listeners.delete(subscription); };
+        listeners.add(subscription);
         return cancel;
     }
 
@@ -234,17 +258,19 @@ class GameEventManager {
         if (events.some(isDamage)) {
             let performed = false;
             const prepared = events.flatMap(event => this.prepareEvent(event).events);
-            this.commitPrepared(prepared, results => { performed = this.notifySimultaneous(results); });
+            this.commitPrepared(prepared, (results, _, captured) => { performed = this.notifySimultaneous(results, captured); });
             return performed;
         }
 
+        const captured = this.captureGameListeners();
         const performed = events.flatMap(event => this.prepareEvent(event).events.filter(pending => pending.perform()));
-        return this.notifySimultaneous(performed);
+        return this.notifySimultaneous(performed, captured);
     }
 
-    private notifySimultaneous(performed: GameEvent[]): boolean {
+    private notifySimultaneous(performed: GameEvent[], captured: CapturedListeners): boolean {
         // 704.3: Commit the whole batch before any listener observes its results.
         const notifications = performed.map(event => ({ event, listeners: this.getGameListeners(event) }));
+        this.notifyCapturedListeners(performed, captured);
         for (const { event, listeners } of notifications)
             this.notifyPerformed(event, listeners);
         return performed.some(event => event.isAction);
@@ -315,7 +341,8 @@ class GameEventManager {
     private performEvent(event: GameEvent): boolean {
         const { events, checked } = this.prepareEvent(event);
         let performed = false;
-        this.commitPrepared(events, (results, checkedPerformed) => {
+        this.commitPrepared(events, (results, checkedPerformed, captured) => {
+            this.notifyCapturedListeners(results, captured);
             for (const pending of results)
                 this.notifyPerformed(pending);
             performed = checkedPerformed;
@@ -329,20 +356,23 @@ class GameEventManager {
         return { events, checked };
     }
 
-    private commitPrepared(events: GameEvent[], notify: (performed: GameEvent[], checkedPerformed: boolean) => void,
-        checked?: GameEvent) {
-        const commit = (amounts?: readonly number[]) => {
+    private commitPrepared(events: GameEvent[],
+        notify: (performed: GameEvent[], checkedPerformed: boolean, captured: CapturedListeners) => void, checked?: GameEvent) {
+        const commit = (damage?: readonly GameEvent_DealDamage[][]) => {
+            const captured = this.captureGameListeners();
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
             let hitIndex = 0;
             for (const event of events) {
-                const actual = amounts && isDamage(event) ? event.withAmount(amounts[hitIndex++]) : event;
-                if (actual.perform()) {
-                    performed.push(actual);
-                    checkedPerformed ||= event === checked;
+                const actual = damage && isDamage(event) ? damage[hitIndex++] : [event];
+                for (const portion of actual) {
+                    if (portion.perform()) {
+                        performed.push(portion);
+                        checkedPerformed ||= event === checked;
+                    }
                 }
             }
-            notify(performed, checkedPerformed);
+            notify(performed, checkedPerformed, captured);
         };
 
         const hits = events.filter(isDamage);
@@ -352,16 +382,43 @@ class GameEventManager {
         }
 
         this.damagePending = true;
-        this.effects.damagePrevention.resolve(hits, this.damageChoices, amounts => {
+        this.effects.damagePrevention.resolve(hits, this.damageChoices, damage => {
             this.damagePending = false;
-            commit(amounts);
+            commit(damage);
         });
     }
 
     private getGameListeners(event: GameEvent): Listener[] {
         // 603.7a: A registration made during dispatch starts with a later event.
-        const types = new Set([event.type, ...(event.additionalPerformedTypes ?? []), GameEventType.All]);
-        return [...types].flatMap(type => [...(this.gameListenersByType.get(type) ?? [])]);
+        return [...this.getPerformedTypes(event)].flatMap(type => [...(this.gameListenersByType.get(type) ?? [])]
+            .flatMap(subscription => "notify" in subscription ? [subscription.notify] : []));
+    }
+
+    private captureGameListeners(): CapturedListeners {
+        // 603.10: Capture look-back subscriptions before any event in the batch changes the game state.
+        const captured = new Map<GameEventType, Listener[]>();
+        for (const [type, subscriptions] of this.gameListenersByType) {
+            const listeners = [...subscriptions].flatMap(subscription => "capture" in subscription ? [subscription.capture()] : []);
+            if (listeners.length)
+                captured.set(type, listeners);
+        }
+        return captured;
+    }
+
+    private notifyCapturedListeners(performed: readonly GameEvent[], captured: CapturedListeners) {
+        if (!captured.size)
+            return;
+
+        for (const event of performed) {
+            for (const type of this.getPerformedTypes(event)) {
+                for (const listener of captured.get(type) ?? [])
+                    listener(event);
+            }
+        }
+    }
+
+    private getPerformedTypes(event: GameEvent) {
+        return new Set([event.type, ...event.additionalPerformedTypes, GameEventType.All]);
     }
 
     private notifyPerformed(event: GameEvent, gameListeners = this.getGameListeners(event)) {
@@ -369,7 +426,7 @@ class GameEventManager {
             listener(event);
 
         this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
-        for (const type of event.additionalPerformedTypes ?? [])
+        for (const type of event.additionalPerformedTypes)
             this.eventPerformedListenersByType.get(type)?.forEach(listener => listener(event));
         this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
 

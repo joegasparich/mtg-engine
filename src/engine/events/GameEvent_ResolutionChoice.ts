@@ -1,3 +1,4 @@
+import type { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import type { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
@@ -109,6 +110,7 @@ export type DamagePreventionAllocationChoice = {
     readonly sourceName: string;
     readonly hits: readonly GameEvent_DealDamage[];
     readonly total: number;
+    readonly action: DamageAllocationAction;
     submit(player: Player, amounts: readonly number[]): void;
 };
 

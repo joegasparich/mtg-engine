@@ -1,5 +1,5 @@
 import type { Ability } from "@engine/abilities/Ability";
-import { type DamagePrevention,DamagePreventionSystem } from "@engine/effects/DamagePrevention";
+import { type DamageEffect,DamagePreventionSystem } from "@engine/effects/DamagePrevention";
 import type gameEventManager from "@engine/events/GameEventManager";
 import type { GameEvent } from "@engine/events/GameEventManager";
 import type { CardObject,Permanent } from "@engine/GameObject";
@@ -36,7 +36,7 @@ export enum ContinuousEffectKind {
     CheckOverride,
     AbilityGrant,
     ModifyPowerToughness,
-    DamagePrevention,
+    DamageEffect,
 }
 
 type Recipients = readonly Permanent[] | (() => readonly Permanent[]);
@@ -60,7 +60,7 @@ export type ContinuousEffect =
     | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
     | AbilityGrantEffect
-    | { kind: ContinuousEffectKind.DamagePrevention; prevention: DamagePrevention }
+    | { kind: ContinuousEffectKind.DamageEffect; rule: DamageEffect }
     | PowerToughnessEffect;
 
 // 609.1 and 610.1: A resolving instruction produces events and can continue after a player choice.
@@ -147,8 +147,8 @@ export class EffectSystem {
             case ContinuousEffectKind.CheckOverride:
                 this.onCheckRemovalOverride(effect.allow);
                 return () => this.offCheckRemovalOverride(effect.allow);
-            case ContinuousEffectKind.DamagePrevention:
-                return this.damagePrevention.register(effect.prevention,
+            case ContinuousEffectKind.DamageEffect:
+                return this.damagePrevention.register(effect.rule,
                     { object: ability.source, keyword: ability.def.keyword, ability });
             case ContinuousEffectKind.AbilityGrant:
                 return this.applyAbilityGrant(ability, effect);

@@ -20,8 +20,8 @@ export class AbilityPart_Effect_PreventDamage extends AbilityPart_Effect {
 
         // 615.7: Prevent this many points of damage to the recipient over the rest of the turn.
         gameEventManager.startContinuousUntilEndOfTurn(this.ability, {
-            kind: ContinuousEffectKind.DamagePrevention,
-            prevention: { kind: DamagePreventionKind.Points, recipient, amount },
+            kind: ContinuousEffectKind.DamageEffect,
+            rule: { kind: DamagePreventionKind.Points, recipient, amount },
         });
     }
 }

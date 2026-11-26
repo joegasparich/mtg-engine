@@ -9,6 +9,7 @@ import { game } from "@engine/Game";
 import { ManaAmount,ManaCost,ManaUtility } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
+import { Battlefield } from "@engine/Zone";
 import { CardType } from "~/defs";
 
 export enum TargetType {
@@ -64,7 +65,8 @@ class PlayerActionManager {
     getAvailableActions(actor: Player, ignoreManaAbilities = false): Map<CardObject, PlayerAction[]> {
         const actions = new Map<CardObject, PlayerAction[]>();
 
-        for (const zone of [actor.hand, actor.battlefield]) {
+        const otherBattlefields = game.players.filter(player => player !== actor).map(player => player.battlefield);
+        for (const zone of [actor.hand, actor.battlefield, ...otherBattlefields]) {
             for (const object of zone.objects) {
                 const cardActions = this.getCardActions(object, actor, ignoreManaAbilities);
 
@@ -93,15 +95,18 @@ class PlayerActionManager {
                 cardActions.push(new PlayerActions.PlayCard(object));
         }
 
-        if (object instanceof Permanent && object.zone === actor.battlefield && object.controller === actor) {
+        if (object instanceof Permanent && object.zone instanceof Battlefield) {
             for (const ability of object.abilities) {
                 if (ignoreManaAbilities && ability.def.isManaAbility)
                     continue;
 
-                if (object.canActivate(ability)) {
+                if (object.canActivate(ability, actor)) {
                     cardActions.push(new PlayerActions.ActivateAbility(object, ability));
                 }
             }
+
+            if (object.zone !== actor.battlefield || object.controller !== actor)
+                return cardActions;
 
             if (actor === game.declarationPlayer && game.currentStepIndex === StepIndex.DeclareAttackers
                 && CombatManager.defendingPlayer && CombatManager.canAttack(object)) {

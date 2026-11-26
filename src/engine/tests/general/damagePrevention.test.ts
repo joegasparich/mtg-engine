@@ -47,8 +47,8 @@ function hit(source: CardObject, amount = 2) {
 function shield(recipient: Player | Permanent, amount: number) {
     const permanent = addTestCard({ ...redCircle, name: "Finite shield" }, protectedPlayer, protectedPlayer.battlefield);
     gameEventManager.startContinuousUntilEndOfTurn(permanent.abilities[0], {
-        kind: ContinuousEffectKind.DamagePrevention,
-        prevention: { kind: DamagePreventionKind.Points, recipient, amount },
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: { kind: DamagePreventionKind.Points, recipient, amount },
     });
 }
 
@@ -80,8 +80,8 @@ test("a finite shield carries over and observers see only damage that was actual
 test("a next-hit shield evaluates its source predicate when damage would be dealt", () => {
     const attacker = addTestCard(redCreature, opponent, opponent.battlefield);
     gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
-        kind: ContinuousEffectKind.DamagePrevention,
-        prevention: {
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: {
             kind: DamagePreventionKind.NextHit,
             recipient: protectedPlayer,
             source: attacker,
@@ -104,8 +104,8 @@ test("different next-hit shield keys preserve the choice of which shield to spen
     attacker.power = 2;
     for (const minimumPower of [1, 2]) {
         gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
-            kind: ContinuousEffectKind.DamagePrevention,
-            prevention: {
+            kind: ContinuousEffectKind.DamageEffect,
+            rule: {
                 kind: DamagePreventionKind.NextHit,
                 recipient: protectedPlayer,
                 source: attacker,

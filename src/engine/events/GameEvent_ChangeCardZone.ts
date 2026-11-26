@@ -28,6 +28,10 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         this.label = `Card ${oldObject.logName} changed zones from ${this.oldZone?.name} to ${newZone.name}`;
     }
 
+    override get additionalPerformedTypes(): readonly GameEventType[] {
+        return this.type === GameEventType.ChangeCardZone ? [] : [GameEventType.ChangeCardZone];
+    }
+
     perform(): boolean {
         const { oldObject, oldZone, newZone, options } = this;
         if (oldObject.retired || oldObject.zone !== oldZone || oldZone === newZone)
@@ -76,7 +80,6 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
 export class GameEvent_DestroyPermanent extends GameEvent_ChangeCardZone {
     type = GameEventType.DestroyPermanent;
-    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
 
     constructor(readonly permanent: Permanent) {
         super(permanent, permanent.owner.graveyard);
@@ -93,7 +96,6 @@ export class GameEvent_DestroyPermanent extends GameEvent_ChangeCardZone {
 
 export class GameEvent_SacrificePermanent extends GameEvent_ChangeCardZone {
     type = GameEventType.SacrificePermanent;
-    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
 
     constructor(readonly player: Player, readonly permanent: Permanent) {
         super(permanent, permanent.owner.graveyard);
@@ -111,7 +113,6 @@ export class GameEvent_SacrificePermanent extends GameEvent_ChangeCardZone {
 
 export class GameEvent_DiscardCard extends GameEvent_ChangeCardZone {
     type = GameEventType.DiscardCard;
-    readonly additionalPerformedTypes = [GameEventType.ChangeCardZone];
 
     constructor(readonly player: Player, readonly cardObject: CardObject) {
         super(cardObject, player.graveyard);

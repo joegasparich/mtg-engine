@@ -36,8 +36,8 @@ export class AbilityPart_Effect_CircleOfProtection extends AbilityPart_Effect {
             presentation: CardChoicePresentation.SingleCardList,
         }, ([source]) => {
             gameEventManager.startContinuousUntilEndOfTurn(this.ability, {
-                kind: ContinuousEffectKind.DamagePrevention,
-                prevention: {
+                kind: ContinuousEffectKind.DamageEffect,
+                rule: {
                     kind: DamagePreventionKind.NextHit,
                     recipient: player,
                     source,

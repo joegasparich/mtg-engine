@@ -7,7 +7,6 @@ import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPerman
 import type { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { Battlefield } from "@engine/Zone";
-import { autobind } from "@utility/typeUtility";
 import type { TargetValidator } from "~/defs";
 import type { Ability } from "../Ability";
 import { AbilityPart_Effect } from "./effect/AbilityPart_Effect";
@@ -21,8 +20,13 @@ export class AbilityPart_Attach extends AbilityPart_Effect {
 
     setup(ability: Ability) {
         super.setup(ability);
-        if (ability.source.zone instanceof Battlefield)
-            this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
+        const { source } = ability;
+        if (!(source instanceof Permanent && source.zone instanceof Battlefield))
+            return;
+
+        // 701.3d: The attachment ends when the object changes zones.
+        this.stopListening ??= gameEventManager.onGamePerformed<GameEvent_ChangeCardZone>(GameEventType.ChangeCardZone,
+            () => { source.attachedTo = undefined; }, { matches: event => event.oldObject === source.attachedTo });
     }
 
     cleanup() {
@@ -42,13 +46,5 @@ export class AbilityPart_Attach extends AbilityPart_Effect {
 
     canAttachTo(target: Permanent) {
         return matchesTargetValidator(target, this);
-    }
-
-    @autobind
-    private onCardChangedZone(event: GameEvent_ChangeCardZone) {
-        // 701.3d: The attachment ends when the object changes zones.
-        const { source } = this.ability;
-        if (source instanceof Permanent && event.oldObject === source.attachedTo)
-            source.attachedTo = undefined;
     }
 }

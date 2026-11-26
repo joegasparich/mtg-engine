@@ -20,10 +20,11 @@ export class AbilityPart_Trigger_StepStart extends AbilityPart_Trigger {
             return;
 
         // 603.2b, 503.1a: Step-start triggers go on the stack before the first priority pass.
-        this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.StepStart, (event: GameEvent_StepStart) => {
-            if (event.stepIndex === StepIndex[this.step] && (!this.controllerOnly || event.player === ability.source.controller))
-                this.onTrigger(this.savePlayerAs ? { [this.savePlayerAs]: [event.player] } : {});
-        });
+        this.stopListening ??= gameEventManager.onGamePerformed(GameEventType.StepStart,
+            (event: GameEvent_StepStart) => this.onTrigger(this.savePlayerAs ? { [this.savePlayerAs]: [event.player] } : {}), {
+                matches: event => event.stepIndex === StepIndex[this.step]
+                    && (!this.controllerOnly || event.player === ability.source.controller),
+            });
     }
 
     cleanup() {

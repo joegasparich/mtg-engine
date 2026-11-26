@@ -2161,3 +2161,136 @@ describe("Lord of Atlantis", () => {
         expect(friendly.hasKeyword(Keyword.Islandwalk)).toBe(false);
     });
 });
+
+describe("Personal Incarnation", () => {
+    const def = cardData.find(card => card.name === "Personal Incarnation");
+    let owner: Player;
+    let opponent: Player;
+    let source: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        owner = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        source = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    });
+
+    function activate(incarnation: Permanent) {
+        const [action] = playerActionManager.getCardActions(incarnation, owner);
+        expect(action).toBeInstanceOf(PlayerActions.ActivateAbility);
+        action.perform(owner);
+    }
+
+    function addStolenIncarnation(): Permanent {
+        const card = addTestCard(def, owner, owner.hand);
+        const enter = new GameEvent_ChangeCardZone(card, opponent.battlefield, { controller: opponent });
+        gameEventManager.addEvent(enter);
+        return enter.newObject as Permanent;
+    }
+
+    test("casts a 6/6 Avatar Incarnation for {3}{W}{W}{W}", () => {
+        const card = addTestCard(def, owner, owner.hand);
+        owner.manaPool[ManaColour.W] = 2;
+        owner.manaPool[ManaColour.G] = 4;
+        expect(playerActionManager.getCardActions(card, owner)).toHaveLength(0);
+
+        owner.manaPool[ManaColour.W]++;
+        const [cast] = playerActionManager.getCardActions(card, owner);
+        cast.perform(owner);
+        passPriorityRound();
+
+        expect(owner.manaPool[ManaColour.W]).toBe(0);
+        expect(owner.manaPool[ManaColour.G]).toBe(1);
+        expect(owner.battlefield.objects.find(object => object.card === card.card)).toMatchObject({
+            power: 6, toughness: 6, subtypes: ["Avatar", "Incarnation"],
+        });
+    });
+
+    test("each free activation uses the stack and redirects one point of damage", () => {
+        const incarnation = addTestCard(def, owner, owner.battlefield);
+        activate(incarnation);
+        activate(incarnation);
+        expect(game.stack.objects).toHaveLength(2);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 1));
+        expect(owner.life).toBe(20);
+        expect(incarnation.damageTaken).toBe(1);
+
+        passPriorityRound();
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 3));
+        expect(owner.life).toBe(18);
+        expect(incarnation.damageTaken).toBe(2);
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 1));
+        expect(owner.life).toBe(18);
+        expect(incarnation.damageTaken).toBe(3);
+    });
+
+    test("the owner can activate it from an opponent's battlefield and the controller cannot", () => {
+        const incarnation = addStolenIncarnation();
+        expect(playerActionManager.getAvailableActions(owner).has(incarnation)).toBe(true);
+        activate(incarnation);
+        expect(game.stack.objects[0]).toMatchObject({ controller: owner, source: incarnation });
+        gameEventManager.addEvent(new GameEvent_Advance(owner));
+        expect(game.priorityPlayer).toBe(opponent);
+        expect(playerActionManager.getCardActions(incarnation, opponent)).toHaveLength(0);
+        expect(gameEventManager.performImmediate(new GameEvent_ActivateAbility(opponent, incarnation, incarnation.abilities[0]))).toBe(false);
+        gameEventManager.addEvent(new GameEvent_Advance(opponent));
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 1));
+        expect(owner.life).toBe(19);
+        expect(opponent.life).toBe(20);
+        expect(incarnation.damageTaken).toBe(0);
+    });
+
+    test("unused redirection expires during cleanup", () => {
+        const incarnation = addTestCard(def, owner, owner.battlefield);
+        activate(incarnation);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_Cleanup(owner));
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 1));
+        expect(owner.life).toBe(20);
+        expect(incarnation.damageTaken).toBe(1);
+    });
+
+    test("returning to the battlefield gives the card a new object and moving to hand triggers no life loss", () => {
+        const incarnation = addTestCard(def, owner, owner.battlefield);
+        activate(incarnation);
+        passPriorityRound();
+        activate(incarnation);
+        const returned = moveTestCard(moveTestCard(incarnation, owner.hand), owner.battlefield);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, returned, 1));
+        expect(returned.damageTaken).toBe(1);
+        expect(owner.life).toBe(20);
+    });
+
+    test("a stolen Incarnation's death trigger uses its owner's life at resolution", () => {
+        const incarnation = addStolenIncarnation();
+        gameEventManager.addEvent(new GameEvent_SacrificePermanent(opponent, incarnation));
+        expect(owner.graveyard.objects.at(-1).card).toBe(incarnation.card);
+        expect(game.stack.objects[0]).toMatchObject({ controller: opponent, source: incarnation });
+        expect(owner.life).toBe(20);
+
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, owner, 3));
+        passPriorityRound();
+        expect(owner.life).toBe(8);
+        expect(opponent.life).toBe(20);
+    });
+
+    test("lethal damage triggers the life loss through state-based actions", () => {
+        const incarnation = addTestCard(def, owner, owner.battlefield);
+        activate(incarnation);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_DealDamage(source, incarnation, 7));
+        expect(owner.life).toBe(19);
+        expect(owner.graveyard.objects.at(-1).card).toBe(incarnation.card);
+        expect(game.stack.objects).toHaveLength(1);
+
+        passPriorityRound();
+        expect(owner.life).toBe(9);
+    });
+});

@@ -337,10 +337,10 @@ export class Permanent extends CardObject {
         return potentialMana;
     }
 
-    canActivate(ability: Ability, payingManaCost = false) {
-        return this.zone === this.controller.battlefield
-            && (game.priorityPlayer === this.controller || (payingManaCost && ability.def.isManaAbility))
-            && this.abilities.includes(ability) && ability.activatable && ability.canActivate();
+    canActivate(ability: Ability, actor: Player, payingManaCost = false) {
+        return this.zone instanceof Battlefield && this.abilities.includes(ability) && ability.activator === actor
+            && (game.priorityPlayer === actor || (payingManaCost && ability.def.isManaAbility))
+            && ability.canActivate();
     }
 
     hasLegalAttachment(): boolean {

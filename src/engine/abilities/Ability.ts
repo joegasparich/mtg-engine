@@ -4,7 +4,7 @@ import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
 import type Player from "@engine/Player";
-import { AbilityDef } from "~/defs";
+import { AbilityActivator,AbilityDef } from "~/defs";
 import { SlateVar } from ".";
 import { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
 import { AbilityPart_Activate_Mana } from "./parts/activate/AbilityPart_Activate_Mana";
@@ -60,6 +60,11 @@ export class Ability {
     //-- Getters --//
 
     get controller(): Player | undefined { return this.slate.CONTROLLER?.[0]; }
+
+    get activator(): Player {
+        // 602.2: The controller activates by default unless the object says otherwise.
+        return this.def.activator === AbilityActivator.Owner ? this.source.owner : this.source.controller ?? this.source.owner;
+    }
 
     private _activationParts?: AbilityPart_Activate[];
     private get activationParts() {

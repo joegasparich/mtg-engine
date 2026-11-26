@@ -5,8 +5,7 @@ import { AbilityPart } from "../AbilityPart";
 export abstract class AbilityPart_Trigger extends AbilityPart {
     outSignal = "default";
 
-    onTrigger(inputs: Ability["slate"] = {}) {
-        const { controller } = this.ability.source;
+    onTrigger(inputs: Ability["slate"] = {}, controller = this.ability.source.controller) {
         if (!controller)
             return;
 

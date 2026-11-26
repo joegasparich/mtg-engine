@@ -1,3 +1,4 @@
+import { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,ManaPaymentDecision,OptionalDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
@@ -70,7 +71,7 @@ export class UIResolutionChoice {
         }
         if (choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
             const prompt = document.createElement("p");
-            prompt.textContent = "Choose a prevention effect to apply next.";
+            prompt.textContent = "Choose a damage effect to apply next.";
             const list = this.optionsList = document.createElement("ul");
             list.className = "resolution-card-options";
             choice.options.forEach((description, index) => {
@@ -171,14 +172,18 @@ export class UIResolutionChoice {
         const form = document.createElement("form");
         form.className = "numeric-choice-form";
         const prompt = document.createElement("p");
-        prompt.textContent = `Prevent ${choice.total} damage to ${choice.hits[0].recipientName}.`;
+        const recipient = choice.hits[0].recipientName;
+        const redirecting = choice.action === DamageAllocationAction.Redirect;
+        prompt.textContent = redirecting
+            ? `Redirect ${choice.total} damage from ${recipient}.`
+            : `Prevent ${choice.total} damage to ${recipient}.`;
         form.append(prompt);
         const inputs = choice.hits.map(hit => this.addNumberInput(form, `${hit.source.name} · ${hit.amount} damage`, hit.amount));
         this.status.setAttribute("role", "status");
-        this.confirm.textContent = "Confirm prevention";
+        this.confirm.textContent = redirecting ? "Confirm redirection" : "Confirm prevention";
         const update = () => {
             const assigned = inputs.reduce((sum, input) => sum + (input.valueAsNumber || 0), 0);
-            this.status.textContent = `${assigned} of ${choice.total} damage prevented`;
+            this.status.textContent = `${assigned} of ${choice.total} damage selected`;
             this.confirm.disabled = assigned !== choice.total || inputs.some(input => !input.validity.valid);
         };
         form.addEventListener("input", update);

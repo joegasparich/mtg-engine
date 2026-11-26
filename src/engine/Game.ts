@@ -1,6 +1,7 @@
 import type { Ability } from "@engine/abilities";
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
+import { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import {
@@ -100,7 +101,7 @@ export default class Game {
             () => game.advanceWhileIdle(), {
                 turnOrder: () => [...game.players.slice(game.currentTurnPlayerID), ...game.players.slice(0, game.currentTurnPlayerID)],
                 chooseEffect: (player, options, resume) => game.chooseDamagePreventionEffect(player, options, resume),
-                allocate: (player, hits, total, resume) => game.allocateDamagePrevention(player, hits, total, resume),
+                allocate: (player, hits, total, action, resume) => game.allocateDamageEffect(player, hits, total, action, resume),
             });
     }
 
@@ -187,7 +188,7 @@ export default class Game {
         const choice: DamagePreventionOrderChoice = {
             kind: ResolutionChoiceKind.DamagePreventionOrder,
             player,
-            sourceName: "Damage prevention",
+            sourceName: "Damage effects",
             options,
             submit: (actor, index) => this.submitResolutionChoice(choice, actor,
                 () => Number.isInteger(index) && index >= 0 && index < options.length, () => resume(index)),
@@ -195,14 +196,15 @@ export default class Game {
         this.openResolutionChoice(choice);
     }
 
-    private allocateDamagePrevention(player: Player, hits: readonly GameEvent_DealDamage[], total: number,
-        resume: (amounts: readonly number[]) => void) {
+    private allocateDamageEffect(player: Player, hits: readonly GameEvent_DealDamage[], total: number,
+        action: DamageAllocationAction, resume: (amounts: readonly number[]) => void) {
         const choice: DamagePreventionAllocationChoice = {
             kind: ResolutionChoiceKind.DamagePreventionAllocation,
             player,
-            sourceName: "Damage prevention",
+            sourceName: action === DamageAllocationAction.Redirect ? "Damage redirection" : "Damage prevention",
             hits,
             total,
+            action,
             submit: (actor, amounts) => {
                 const selection = [...amounts];
                 this.submitResolutionChoice(choice, actor,

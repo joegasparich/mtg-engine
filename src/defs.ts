@@ -53,8 +53,13 @@ export type TargetValidator = {
     tapped?: boolean;
 };
 
+export enum AbilityActivator {
+    Owner = "Owner",
+}
+
 export type AbilityDef = {
     activateString?: string;
+    activator?: AbilityActivator;
     keyword?: Keyword;
     isManaAbility?: boolean;
     parts: Record<ClassName, object> & {

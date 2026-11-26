@@ -20,8 +20,7 @@ export class PlayerAction_ActivateAbility extends PlayerAction<Permanent> {
     }
 
     perform(player: Player) {
-        if (!player || player !== this.object.controller || this.object.zone !== player.battlefield
-            || !this.object.abilities.includes(this.ability) || !this.object.canActivate(this.ability))
+        if (!player || !this.object.canActivate(this.ability, player))
             return;
 
         const activate = (targets: readonly ActionTarget[] = []) => {

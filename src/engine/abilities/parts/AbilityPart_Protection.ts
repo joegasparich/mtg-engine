@@ -20,8 +20,8 @@ export class AbilityPart_Protection extends AbilityPart_ContinuousEffect {
 
         // 702.16e: Protection prevents damage from sources of the specified colour.
         this.endDamagePrevention = gameEventManager.effects.startContinuous(ability, {
-            kind: ContinuousEffectKind.DamagePrevention,
-            prevention: {
+            kind: ContinuousEffectKind.DamageEffect,
+            rule: {
                 kind: DamagePreventionKind.EveryHit,
                 matches: hit => hit.recipient === ability.source && hit.source.colours.has(this.colour),
             },
