@@ -621,5 +621,61 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Holy Armor",
+        "image_url": "https://cards.scryfall.io/large/front/9/5/952fc556-ab93-4889-9232-30c4988cc16b.jpg?1783919579",
+        "oracle_text": "Enchant creature\nEnchanted creature gets +0/+2.\n{W}: Enchanted creature gets +0/+1 until end of turn.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "ENCHANTED_CREATURE", "toughness": 2 }
+                }
+            },
+            {
+                "activateString": "{W}: Enchanted creature gets +0/+1 until end of turn",
+                "parts": {
+                    "AbilityPart_Activate_Mana": { "cost": "{W}" },
+                    "AbilityPart_Effect_ModifyPowerToughnessUntilEndOfTurn": {
+                        "recipient": "THIS.attachedTo",
+                        "toughness": 1
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Holy Strength",
+        "image_url": "https://cards.scryfall.io/large/front/4/7/476eebd9-a5cb-426a-8481-0c193febbe3a.jpg?1783919581",
+        "oracle_text": "Enchant creature\nEnchanted creature gets +1/+2.",
+        "type": "Enchantment",
+        "subtypes": ["Aura"],
+        "cost": "{W}",
+        "abilities": [
+            {
+                "parts": {
+                    "SimpleAura": {
+                        "targetValidator": { "cardType": "Creature" }
+                    }
+                }
+            },
+            {
+                "parts": {
+                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "ENCHANTED_CREATURE", "power": 1, "toughness": 2 }
+                }
+            }
+        ]
     }
 ]

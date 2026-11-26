@@ -1516,3 +1516,78 @@ describe("Blessing", () => {
         expect(aura.retired).toBe(true);
     });
 });
+
+describe.each([
+    { name: "Holy Armor", power: 2 },
+    { name: "Holy Strength", power: 3 },
+])("$name", ({ name, power }) => {
+    test("enchants a creature for {W} and applies its static bonus to the current attachment", () => {
+        Game.init();
+        const caster = game.addPlayer(BASIC_DECK);
+        const opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        const card = addTestCard(cardData.find(def => def.name === name), caster, caster.hand);
+        const land = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const other = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+
+        caster.manaPool[ManaColour.W] = 1;
+        const [cast] = playerActionManager.getCardActions(card, caster);
+        cast.perform(caster);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        game.pendingTargeter.onTargeted([creature]);
+        expect(caster.manaPool[ManaColour.W]).toBe(0);
+        expect(creature).toMatchObject({ power: 2, toughness: 2 });
+
+        passPriorityRound();
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura?.attachedTo).toBe(creature);
+        expect(creature).toMatchObject({ power, toughness: 4 });
+        expect(other).toMatchObject({ power: 2, toughness: 2 });
+
+        // 303.4m and 611.3a: The static effect follows the Aura's current attachment.
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(aura, other));
+        expect(creature).toMatchObject({ power: 2, toughness: 2 });
+        expect(other).toMatchObject({ power, toughness: 4 });
+
+        moveTestCard(aura, caster.graveyard);
+        expect(other).toMatchObject({ power: 2, toughness: 2 });
+    });
+});
+
+test("Holy Armor's controller can pay {W} repeatedly for extra toughness until cleanup", () => {
+    Game.init();
+    const caster = game.addPlayer(BASIC_DECK);
+    const opponent = game.addPlayer(BASIC_DECK);
+    startMainPhase();
+    const card = addTestCard(cardData.find(def => def.name === "Holy Armor"), caster, caster.hand);
+    const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+    expect(game.stack.spellCast(caster, card, [creature])).toBe(true);
+    passPriorityRound();
+    const aura = caster.battlefield.objects.find(object => object.card === card.card);
+    expect(playerActionManager.getCardActions(aura, caster)).toHaveLength(0);
+
+    caster.manaPool[ManaColour.W] = 2;
+    for (let payment = 0; payment < 2; payment++) {
+        const [activate] = playerActionManager.getCardActions(aura, caster);
+        expect(activate).toBeInstanceOf(PlayerActions.ActivateAbility);
+        activate.perform(caster);
+    }
+    expect(caster.manaPool[ManaColour.W]).toBe(0);
+    expect(game.pendingTargeter).toBeNull();
+    expect(game.stack.objects).toHaveLength(2);
+    expect(creature).toMatchObject({ power: 2, toughness: 4 });
+
+    gameEventManager.addEvent(new GameEvent_Advance());
+    // 303.4e: The Aura's controller activates its abilities.
+    opponent.manaPool[ManaColour.W] = 1;
+    expect(playerActionManager.getCardActions(aura, opponent)).toHaveLength(0);
+    gameEventManager.addEvent(new GameEvent_Advance());
+    expect(creature).toMatchObject({ power: 2, toughness: 5 });
+    passPriorityRound();
+    expect(creature).toMatchObject({ power: 2, toughness: 6 });
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Cleanup));
+    expect(creature).toMatchObject({ power: 2, toughness: 4 });
+});

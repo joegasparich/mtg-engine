@@ -6,6 +6,34 @@ import { ZoneKind } from "@engine/Zone";
 import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
+test("a continuous object selection resolves its configured reference on each read", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bearsDef = cardData[GRIZZLY_BEARS];
+    const inHand = addTestCard({
+        ...bearsDef,
+        abilities: [{ parts: {
+            AbilityPart_SelectObjectContinuously: { target: "MARKED", saveAs: "SELECTED" },
+        } }],
+    }, player, player.hand);
+    expect(inHand.abilities[0].slate).not.toHaveProperty("SELECTED");
+
+    const source = moveTestCard(inHand, player.battlefield);
+    const other = addTestCard(bearsDef, player, player.battlefield);
+    const { slate } = source.abilities[0];
+    expect(slate.SELECTED).toEqual([]);
+
+    slate.MARKED = [source];
+    expect(slate.SELECTED).toEqual([source]);
+    slate.MARKED = [other];
+    expect(slate.SELECTED).toEqual([other]);
+    delete slate.MARKED;
+    expect(slate.SELECTED).toEqual([]);
+
+    moveTestCard(source, player.graveyard);
+    expect(slate).not.toHaveProperty("SELECTED");
+});
+
 test("a static modifier reads a live selection from the slate until the ability is removed", () => {
     Game.init();
     const player = game.addPlayer([]);
