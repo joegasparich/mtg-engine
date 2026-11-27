@@ -1,5 +1,6 @@
 import { CardObject,Permanent,Spell } from "@engine/GameObject";
 import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
+import { game } from "@engine/Game";
 import { CombatManager } from "@engine/CombatManager";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
@@ -79,7 +80,9 @@ enum GrammarProperty {
 export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
     const [variable, ...properties] = key.split(".");
     // CR 506.2: The defending player is known before attackers are declared.
-    let result: GrammarValue = variable === "DEFENDING_PLAYER" ? CombatManager.defendingPlayer ?? undefined : ability.slate[variable]?.[0];
+    let result: GrammarValue = ability.slate[variable]?.[0];
+    if (variable === "DEFENDING_PLAYER") result = CombatManager.defendingPlayer ?? undefined;
+    if (variable === "ACTIVE_PLAYER") result = game.currentTurnPlayer();
     for (const property of properties) {
         if (!(result instanceof CardObject))
             return undefined;

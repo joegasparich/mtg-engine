@@ -294,6 +294,7 @@ export class Permanent extends CardObject {
     private baseController: Player;
     private currentController: Player;
     private readonly controlOrAttachmentListeners = new Set<() => void>();
+    lastAttackedTurn?: number;
     private controlledSinceTurn: number;
     private isTapped = false;
     get tapped() { return this.isTapped; }
@@ -342,6 +343,10 @@ export class Permanent extends CardObject {
     onControlOrAttachmentChanged(update: () => void) {
         this.controlOrAttachmentListeners.add(update);
         return () => this.controlOrAttachmentListeners.delete(update);
+    }
+
+    get attackedThisTurn() {
+        return this.lastAttackedTurn === game.turnNumber;
     }
 
     get controlledSinceTurnStart() {

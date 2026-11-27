@@ -48,6 +48,16 @@ export class GameEvent_CheckBlockLimit extends GameEvent {
     }
 }
 
+export class GameEvent_CheckRequiredAttack extends GameEvent {
+    type = GameEventType.CheckRequiredAttack;
+    label = "";
+    required = false;
+
+    constructor(readonly attacker: Permanent) {
+        super();
+    }
+}
+
 export class GameEvent_CheckRequiredBlock extends GameEvent {
     type = GameEventType.CheckRequiredBlock;
     label = "";

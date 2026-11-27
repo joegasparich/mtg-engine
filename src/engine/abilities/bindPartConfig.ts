@@ -3,7 +3,7 @@ import { isBasicLandType,readWord,WordKind } from "~/rulesWords";
 import type { Ability } from "./Ability";
 
 // CR 612.2: These configuration fields represent subtype words in the card's text.
-const subtypeFields = new Set(["landType", "cardSubtype", "baseSubtype"]);
+const subtypeFields = new Set(["landType", "cardSubtype", "excludedSubtype", "baseSubtype"]);
 
 export function bindPartConfig(config: object, ability: Ability, cache: WeakMap<object, object>): object {
     if (cache.has(config)) return cache.get(config);

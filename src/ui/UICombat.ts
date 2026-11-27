@@ -247,7 +247,7 @@ export class UICombat {
         if (attacking) {
             this.instruction.textContent = this.formingBand
                 ? 'Choose which attackers join this band. Up to one can lack banding.'
-                : 'Select highlighted creatures to attack.';
+                : this.confirm.disabled ? 'Select every creature required to attack.' : 'Select highlighted creatures to attack.';
         } else if (this.selectedBlocker) {
             this.instruction.textContent = `Click a highlighted attacker for ${this.selectedBlocker.name} to block. Esc cancels selection.`;
         } else if (this.confirm.disabled) {

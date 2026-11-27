@@ -7,13 +7,17 @@ type TargetValidatorConfig = TargetValidator & { targetValidator?: TargetValidat
 
 export function matchesTargetValidator(target: CardObject, config: TargetValidatorConfig): boolean {
     // Explicit parts can still declare their filters directly.
-    const { baseSubtype, blocking, cardType, cardTypes, cardSubtype, colour, hasManaAbility, onBattlefield, tapped, unblocked } = config.targetValidator ?? config;
+    const { attackedThisTurn, baseSubtype, blocking, cardType, cardTypes, cardSubtype, colour, controlledSinceTurnStart,
+        excludedSubtype, hasManaAbility, onBattlefield, tapped, unblocked } = config.targetValidator ?? config;
     // 105.2: An object can match any of its current colours.
     return (!onBattlefield || target.zone instanceof Battlefield)
         && (!cardType || target.hasType(cardType))
         && (!cardTypes || cardTypes.some(type => target.hasType(type)))
         && (!colour || target.colours.has(colour))
         && (!baseSubtype || target.hasBaseSubtype(baseSubtype))
+        && (!excludedSubtype || !target.subtypes.includes(excludedSubtype))
+        && (attackedThisTurn === undefined || (target instanceof Permanent && target.attackedThisTurn === attackedThisTurn))
+        && (controlledSinceTurnStart === undefined || (target instanceof Permanent && target.controlledSinceTurnStart === controlledSinceTurnStart))
         && (!cardSubtype || target.subtypes.includes(cardSubtype))
         && (hasManaAbility === undefined || target.abilities.some(ability => ability.def.isManaAbility) === hasManaAbility)
         && (tapped === undefined || (target instanceof Permanent && target.tapped === tapped))

@@ -1,8 +1,10 @@
 import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
+import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapAttacker,GameEvent_TapCard } from "@engine/events";
-import { GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { RulesEventType } from "@engine/events/RulesEvent";
+import { GameEvent_CheckRequiredAttack,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
@@ -701,4 +703,51 @@ test("attacking and tap costs require continuous control since the turn began", 
     established.controller = playerA;
     expect(CombatManager.canAttack(established)).toBe(false);
     expect(established.canPayTapCost).toBe(false);
+});
+
+test("confirmation enforces legal required attacks and records only confirmed attackers, including vigilant creatures", () => {
+    const required = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const vigilant = addTestCard(cardData.find(card => card.name === "Serra Angel"), playerA, playerA.battlefield);
+    const optional = addTestCard(cardData[GRIZZLY_BEARS], playerA, playerA.battlefield);
+    const wall = addTestCard(cardData.find(card => card.name === "Wall of Swords"), playerA, playerA.battlefield);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+    const requiredCreatures = [required, vigilant, wall];
+    const stop = gameEventManager.effects.startContinuous(vigilant.abilities[0], {
+        kind: ContinuousEffectKind.EventCheck,
+        check: ({ events }) => {
+            for (const event of events) {
+                if (event instanceof GameEvent_CheckRequiredAttack && requiredCreatures.includes(event.attacker))
+                    event.required = true;
+            }
+        },
+    });
+    const attacks: Permanent[][] = [];
+    gameEventManager.rules.onBatch(events => {
+        const declared = events.filter(event => event.type === RulesEventType.Attacks);
+        if (declared.length) {
+            expect(declared.every(event => event.defender === playerB && event.attacker.attackedThisTurn)).toBe(true);
+            attacks.push(declared.map(event => event.attacker));
+        }
+    });
+    const select = new PlayerActions.DeclareAttacker(optional);
+    select.perform(playerA);
+    select.withdraw(playerA);
+    new PlayerActions.DeclareAttacker(required).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_Advance(playerA));
+    expect(game.declarationPlayer).toBe(playerA);
+    expect(attacks).toEqual([]);
+    expect(required.attackedThisTurn).toBe(false);
+    new PlayerActions.DeclareAttacker(vigilant).perform(playerA);
+    gameEventManager.addEvent(new GameEvent_Advance(playerA));
+    expect(game.declarationPlayer).toBeNull();
+    expect(attacks).toEqual([[required, vigilant]]);
+    expect(vigilant.tapped).toBe(false);
+    expect(optional.attackedThisTurn).toBe(false);
+    CombatManager.removeFromCombat(required);
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.SecondMain));
+    expect(required.attackedThisTurn && vigilant.attackedThisTurn).toBe(true);
+    stop();
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    expect(required.attackedThisTurn || vigilant.attackedThisTurn).toBe(false);
 });

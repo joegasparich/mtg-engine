@@ -33,6 +33,8 @@ export enum GameEventType {
     DeclareBlocker,
     CheckBlockLimit,
     CheckRequiredBlock,
+    CheckRequiredAttack,
+    AttackersDeclared,
     StartTargeting,
     PlayLand,
     SacrificePermanent,

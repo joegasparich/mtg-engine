@@ -4690,3 +4690,107 @@ describe("Sea Serpent", () => {
         expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
     });
 });
+
+describe("Siren's Call", () => {
+    const def = cardData.find(card => card.name === "Siren's Call");
+    const bears = cardData[GRIZZLY_BEARS];
+    let active: Player;
+    let caster: Player;
+
+    beforeEach(() => {
+        Game.init();
+        active = game.addPlayer(BASIC_DECK);
+        caster = game.addPlayer(BASIC_DECK);
+    });
+
+    test("costs {U} and can be cast on the opponent's turn through beginning of combat", () => {
+        const ownCopy = addTestCard(def, active, active.hand);
+        const spell = addTestCard(def, caster, caster.hand);
+        startMainPhase();
+        active.manaPool[ManaColour.U] = 1;
+        expect(playerActionManager.getCardActions(ownCopy, active)).toHaveLength(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.BeginningOfCombat));
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        expect(playerActionManager.getCardActions(spell, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+
+        const lateCopy = addTestCard(def, caster, caster.hand);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        caster.manaPool[ManaColour.U] = 1;
+        expect(game.priorityPlayer).toBe(caster);
+        expect(playerActionManager.getCardActions(lateCopy, caster)).toHaveLength(0);
+    });
+
+    test("requires legal attacks and destroys only continuously controlled non-Walls that didn't attack", () => {
+        const attacker = addTestCard(bears, active, active.battlefield);
+        const tapped = addTestCard(bears, active, active.battlefield);
+        const saved = addTestCard(bears, active, active.battlefield);
+        const wall = addTestCard(cardData.find(card => card.name === "Wall of Swords"), active, active.battlefield);
+        const other = addTestCard(bears, caster, caster.battlefield);
+        const regained = addTestCard(bears, active, active.battlefield);
+        const spell = addTestCard(def, caster, caster.hand);
+        startMainPhase();
+        const newcomer = addTestCard(bears, active, active.battlefield);
+        regained.controller = caster;
+        regained.controller = active;
+        for (const creature of [tapped, saved])
+            gameEventManager.addEvent(new GameEvent_TapCard(creature));
+
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        expect(game.declarationPlayer).toBe(active);
+        new PlayerActions.DeclareAttacker(attacker).perform(active);
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        expect(game.declarationPlayer).toBeNull();
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+        expect(game.stack.objects).toHaveLength(1);
+        expect(game.stack.objects[0].controller).toBe(caster);
+        expect(tapped.zone).toBe(active.battlefield);
+        moveTestCard(saved, active.hand);
+        passPriorityRound();
+        expect(active.graveyard.objects.map(object => object.card)).toEqual([tapped.card]);
+        expect(active.battlefield.objects).toEqual(expect.arrayContaining([attacker, wall, newcomer, regained]));
+        expect(other.zone).toBe(caster.battlefield);
+    });
+
+    test("checks creature types at declaration and again when the one-time end-step trigger resolves", () => {
+        const animated = addTestCard(bears, active, active.battlefield);
+        const lateCreature = addTestCard(bears, active, active.battlefield);
+        animated.types = lateCreature.types = [CardType.Artifact];
+        const spell = addTestCard(def, caster, caster.hand);
+        startMainPhase();
+        gameEventManager.addEvent(new GameEvent_Advance(active));
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        passPriorityRound();
+
+        animated.types = [CardType.Artifact, CardType.Creature];
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(CombatManager.canConfirmAttackers()).toBe(false);
+        new PlayerActions.DeclareAttacker(animated).perform(active);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+        expect(game.stack.objects).toHaveLength(1);
+        lateCreature.types = [CardType.Artifact, CardType.Creature];
+        passPriorityRound();
+        expect(active.graveyard.objects.map(object => object.card)).toEqual([lateCreature.card]);
+        expect(animated.zone).toBe(active.battlefield);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(CombatManager.canConfirmAttackers()).toBe(true);
+    });
+});

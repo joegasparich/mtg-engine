@@ -1,5 +1,7 @@
 import { AbilityPart_Banding } from "@engine/abilities/parts/AbilityPart_Banding";
-import { GameEvent_CheckBlockLimit,GameEvent_CheckRequiredBlock,GameEvent_DeclareAttacker,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { GameEvent_CheckBlockLimit,GameEvent_CheckRequiredAttack,GameEvent_CheckRequiredBlock,GameEvent_DeclareAttacker,GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
+import { GameEvent_AttackersDeclared } from "@engine/events/GameEvent_AttackersDeclared";
+import { GameEvent_TapAttacker } from "@engine/events/GameEvent_TapCard";
 import { GameEvent_CheckCombatDamageChooser } from "@engine/events/GameEvent_CombatDamageChoice";
 import { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { Permanent } from "@engine/GameObject";
@@ -99,12 +101,33 @@ export class CombatManager {
     }
 
     static canConfirmAttackers() {
-        return CombatManager.validBands(CombatManager.attackingPlayer, CombatManager.bands);
+        const player = CombatManager.attackingPlayer;
+        const defender = CombatManager.defendingPlayer;
+        if (!CombatManager.validBands(player, CombatManager.bands)) return false;
+        if (!defender) return true;
+
+        // 508.1c–d: An attack requirement can only compel a legal attack.
+        for (const creature of player.battlefield.objects) {
+            if (CombatManager.attackingCreatures.has(creature) || !CombatManager.canAttack(creature, defender))
+                continue;
+            const check = new GameEvent_CheckRequiredAttack(creature);
+            gameEventManager.checkEvent(check);
+            if (check.required) return false;
+        }
+        return true;
     }
 
     static confirmAttackers() {
         CombatManager.attackersConfirmed = true;
-        CombatManager.declaredAnyAttackers = CombatManager.attackingCreatures.size > 0;
+        const attacks = new Map(CombatManager.attackingCreatures);
+        CombatManager.declaredAnyAttackers = attacks.size > 0;
+        if (attacks.size) {
+            // 508.1f, 508.1m: Tap attackers and report the completed declaration, including vigilant attackers.
+            gameEventManager.performSimultaneous([
+                ...Array.from(attacks.keys(), attacker => new GameEvent_TapAttacker(attacker)),
+                new GameEvent_AttackersDeclared(attacks),
+            ]);
+        }
     }
 
     static blockLimit(blocker: Permanent): number {

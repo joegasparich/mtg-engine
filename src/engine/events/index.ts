@@ -1,4 +1,5 @@
 export * from "./GameEvent_ActivateAbility";
+export * from "./GameEvent_AttackersDeclared";
 export * from "./GameEvent_CardInteractionChecks";
 export * from "./GameEvent_CastSpell";
 export * from "./GameEvent_ChangeCardZone";

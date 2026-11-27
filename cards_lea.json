@@ -1662,5 +1662,24 @@
                 "AbilityPart_Effect_SacrificePermanent": { "target": "THIS" }
             } }
         ]
+    },
+    {
+        "name": "Siren's Call",
+        "image_url": "https://api.scryfall.com/cards/30a/77?format=image&version=large",
+        "oracle_text": "Cast this spell only during an opponent's turn, before attackers are declared.\nCreatures the active player controls attack this turn if able.\nAt the beginning of the next end step, destroy all non-Wall creatures that player controls that didn't attack this turn. Ignore this effect for each creature the player didn't control continuously since the beginning of the turn.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_CastDuringSteps": { "opponentsTurnOnly": true, "steps": ["Upkeep", "Draw", "Main", "BeginningOfCombat"] },
+            "AbilityPart_ReadValue": { "inSignal": "SPELL_RESOLVE", "value": "ACTIVE_PLAYER", "saveAs": "PLAYER", "outSignal": "CALL" },
+            "AbilityPart_Effect_RequireAttacksThisTurn": { "inSignal": "CALL", "player": "PLAYER" },
+            "AbilityPart_Trigger_NextStep": { "inSignal": "CALL", "step": "End", "outSignal": "SELECT_CREATURES" },
+            "AbilityPart_SelectObjects": {
+                "inSignal": "SELECT_CREATURES", "zone": "battlefield", "controlledBy": "PLAYER",
+                "targetValidator": { "cardType": "Creature", "excludedSubtype": "Wall", "attackedThisTurn": false, "controlledSinceTurnStart": true },
+                "saveAs": "CREATURES", "outSignal": "DESTROY"
+            },
+            "AbilityPart_Effect_DestroyPermanents": { "inSignal": "DESTROY", "permanentsFrom": "CREATURES" }
+        } }]
     }
 ]

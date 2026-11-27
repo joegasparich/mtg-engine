@@ -1,9 +1,11 @@
 import type { CardObject,Permanent } from "@engine/GameObject";
+import type Player from "@engine/Player";
 import type { Zone } from "@engine/Zone";
 import type { GameEvent_ChangeCardZone } from "./GameEvent_ChangeCardZone";
 import type { GameEvent } from "./GameEventManager";
 
 export enum RulesEventType {
+    Attacks,
     BecomesTapped,
     ZoneChanged,
 }
@@ -22,7 +24,13 @@ interface BecomesTapped {
     readonly permanent: Permanent;
 }
 
-export type RulesEvent = ZoneChanged | BecomesTapped;
+interface Attacks {
+    readonly type: RulesEventType.Attacks;
+    readonly attacker: Permanent;
+    readonly defender: Player;
+}
+
+export type RulesEvent = ZoneChanged | BecomesTapped | Attacks;
 type EventOfType<T extends RulesEventType> = Extract<RulesEvent, { type: T }>;
 export type RecordRulesEvent = (event: RulesEvent) => void;
 export type RulesBatchListener = (events: readonly RulesEvent[]) => void;
