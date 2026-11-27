@@ -38,7 +38,7 @@ function redirect(from: DamageRecipient = creature, to: DamageRecipient = owner,
 function prevent(recipient: Permanent | Player, amount = 1) {
     gameEventManager.startContinuousUntilEndOfTurn(creature.abilities[0], {
         kind: ContinuousEffectKind.DamageEffect,
-        rule: { kind: DamagePreventionKind.Points, recipient, amount },
+        rule: { kind: DamagePreventionKind.Points, target: recipient, amount },
     });
 }
 

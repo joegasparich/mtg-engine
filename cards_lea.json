@@ -1545,5 +1545,25 @@
                 "AbilityPart_Effect_SacrificePermanent": { "target": "THIS" }
             } }
         ]
+    },
+    {
+        "name": "Power Leak",
+        "image_url": "https://cards.scryfall.io/large/front/d/3/d3c80531-e2cb-4862-aa17-b79e2fe41666.jpg",
+        "oracle_text": "Enchant enchantment\nAt the beginning of the upkeep of enchanted enchantment's controller, that player may pay any amount of mana. This Aura deals 2 damage to that player. Prevent X of that damage, where X is the amount of mana that player paid this way.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{1}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Enchantment" } } } },
+            { "parts": {
+                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.attachedTo.controller", "savePlayerAs": "UPKEEP_PLAYER" },
+                "AbilityPart_Effect_PayAnyMana": { "player": "UPKEEP_PLAYER", "saveAs": "MANA_PAID", "outSignal": "PAYMENT_COMPLETE" },
+                "AbilityPart_Effect_DealDamage": {
+                    "inSignal": "PAYMENT_COMPLETE", "source": "THIS", "target": "UPKEEP_PLAYER", "amount": 2,
+                    "saveAs": "UPKEEP_DAMAGE", "beforeDamageSignal": "PREVENT_DAMAGE"
+                },
+                "AbilityPart_Effect_PreventDamage": { "inSignal": "PREVENT_DAMAGE", "target": "UPKEEP_DAMAGE", "amount": "MANA_PAID" }
+            } }
+        ]
     }
 ]

@@ -1,3 +1,4 @@
+import { makeAbility } from "@engine/abilities";
 import { PlayerActions } from "@engine/actions";
 import { DamagePreventionKind,DamageRedirectionKind } from "@engine/effects/DamagePrevention";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
@@ -48,7 +49,7 @@ function shield(recipient: Player | Permanent, amount: number) {
     const permanent = addTestCard({ ...redCircle, name: "Finite shield" }, protectedPlayer, protectedPlayer.battlefield);
     gameEventManager.startContinuousUntilEndOfTurn(permanent.abilities[0], {
         kind: ContinuousEffectKind.DamageEffect,
-        rule: { kind: DamagePreventionKind.Points, recipient, amount },
+        rule: { kind: DamagePreventionKind.Points, target: recipient, amount },
     });
 }
 
@@ -527,4 +528,87 @@ test("combat waits for prevention allocation before dealing damage and granting 
     choice.submit(opponent, [0, 1]);
     expect(opponent.life).toBe(18);
     expect(game.priorityPlayer).toBe(protectedPlayer);
+});
+
+function shieldedHit(source: CardObject, prevent: number) {
+    const event = hit(source);
+    const ability = makeAbility({ parts: { AbilityPart_Effect_PreventDamage: { target: "DAMAGE", amount: prevent } } }, source);
+    ability.slate.DAMAGE = [event];
+    ability.fireSignal("default");
+    return event;
+}
+
+test("only the selected event is prevented in a simultaneous batch", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    const protectedHit = shieldedHit(source, 3);
+    const otherHit = hit(source);
+    expect(gameEventManager.checkEvent(protectedHit)).toBe(false);
+    expect(gameEventManager.checkEvent(otherHit)).toBe(true);
+    const observed = vi.fn();
+    gameEventManager.onGamePerformed(GameEventType.DealDamage, observed);
+    gameEventManager.performSimultaneous([otherHit, protectedHit]);
+    expect(observed).toHaveBeenCalledExactlyOnceWith(otherHit);
+    expect(protectedPlayer.life).toBe(18);
+    expect(gameEventManager.effects.getEventCheckReferences()).not.toContain(source);
+});
+
+test("cleanup removes a continuous shield whose saved damage event was vetoed", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    const event = shieldedHit(source, 2);
+    const veto = (check: EventCheck) => check.removeWhere(candidate => candidate === event);
+    gameEventManager.onCheck(veto);
+    try {
+        gameEventManager.addEvent(event);
+    } finally {
+        gameEventManager.offCheck(veto);
+    }
+    expect(protectedPlayer.life).toBe(20);
+    expect(gameEventManager.effects.getEventCheckReferences()).toContain(source);
+    gameEventManager.addEvent(new GameEvent_Cleanup(protectedPlayer));
+    expect(gameEventManager.effects.getEventCheckReferences()).not.toContain(source);
+    expect(gameEventManager.checkEvent(event)).toBe(true);
+});
+
+test("a shield on a saved hit lets another hit from the same ability resolve first", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    const ability = makeAbility({ parts: {
+        AbilityPart_Effect_PreventDamage: { inSignal: "BEFORE_DAMAGE", target: "SAVED_HIT", amount: 3 },
+        AbilityPart_Effect_DealDamage: [
+            { inSignal: "default", source: "THIS", target: "RECIPIENT", amount: 2, saveAs: "SAVED_HIT", beforeDamageSignal: "BEFORE_DAMAGE" },
+            { inSignal: "BEFORE_DAMAGE", source: "THIS", target: "RECIPIENT", amount: 1 },
+        ],
+    } }, source);
+    ability.slate.RECIPIENT = [protectedPlayer];
+    ability.fireSignal("default");
+    expect(protectedPlayer.life).toBe(19);
+});
+
+test("the recipient can apply event-specific prevention before a lasting shield", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    shield(protectedPlayer, 2);
+    gameEventManager.addEvent(shieldedHit(source, 2));
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a prevention order choice");
+    const index = choice.options.findIndex(label => label.startsWith(source.name));
+    expect(index).toBeGreaterThanOrEqual(0);
+    choice.submit(protectedPlayer, index);
+    gameEventManager.addEvent(hit(source, 3));
+    expect(protectedPlayer.life).toBe(19);
+});
+
+test("prevention for a single event follows its damage if redirected first", () => {
+    const source = addTestCard(redCreature, opponent, opponent.battlefield);
+    gameEventManager.startContinuousUntilEndOfTurn(circle.abilities[0], {
+        kind: ContinuousEffectKind.DamageEffect,
+        rule: { kind: DamageRedirectionKind.Points, recipient: protectedPlayer, destination: opponent, amount: 2 },
+    });
+    gameEventManager.addEvent(shieldedHit(source, 1));
+    const choice = game.pendingDamagePreventionChoice;
+    if (choice?.kind !== ResolutionChoiceKind.DamagePreventionOrder)
+        throw new Error("Expected a redirection order choice");
+    const index = choice.options.findIndex(label => label.startsWith(circle.name));
+    expect(index).toBeGreaterThanOrEqual(0);
+    choice.submit(protectedPlayer, index);
+    expect([protectedPlayer.life, opponent.life]).toEqual([20, 19]);
 });

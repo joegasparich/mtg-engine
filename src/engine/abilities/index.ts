@@ -1,4 +1,5 @@
 import { CardObject,Permanent,Spell } from "@engine/GameObject";
+import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { CombatManager } from "@engine/CombatManager";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
@@ -64,7 +65,7 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
     return ability;
 }
 
-type GrammarValue = ActionTarget | number | undefined;
+type GrammarValue = ActionTarget | GameEvent_DealDamage | number | undefined;
 
 enum GrammarProperty {
     Controller = "controller",

@@ -38,6 +38,7 @@ export type CardChoice = CardChoiceDetails & (
 export enum ResolutionChoiceKind {
     Card,
     ManaPayment,
+    ManaAmountPayment,
     SpellX,
     SpellMode,
     DamagePreventionOrder,
@@ -88,6 +89,14 @@ export type ManaPaymentChoice = {
     readonly sourceName: string;
     readonly cost: string;
     submit(player: Player, decision: ManaPaymentDecision): void;
+};
+
+export type ManaAmountPaymentChoice = {
+    readonly kind: ResolutionChoiceKind.ManaAmountPayment;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly max: number;
+    submit(player: Player, amount: number): void;
 };
 
 export enum OptionalDecision {
@@ -143,7 +152,7 @@ export type DamagePreventionAllocationChoice = {
 };
 
 export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
-export type ResolutionChoice = CardResolutionChoice | BasicLandTypeChoice | ColourChoice | ManaAbilityChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
+export type ResolutionChoice = CardResolutionChoice | BasicLandTypeChoice | ColourChoice | ManaAbilityChoice | ManaPaymentChoice | ManaAmountPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
 
 export class GameEvent_RequestResolutionChoice extends GameEvent {
     type = GameEventType.RequestResolutionChoice;

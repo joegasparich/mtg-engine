@@ -4362,3 +4362,58 @@ describe("Pirate Ship", () => {
         expect(controller.graveyard.objects.at(-1).card).toBe(ship.card);
     });
 });
+
+describe("Power Leak", () => {
+    const def = cardData.find(card => card.name === "Power Leak");
+    const castle = cardData.find(card => card.name === "Castle");
+    let caster: Player;
+    let opponent: Player;
+    let target: Permanent;
+    let aura: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        target = addTestCard(castle, opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, target, 2, creature);
+        aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(target);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.stack.objects[0]).toMatchObject({ source: aura, controller: caster });
+    });
+
+    test.each([0, 1, 2, 3])("paying %i prevents that much of this trigger's damage", paid => {
+        opponent.manaPool[ManaColour.R] = 3;
+        const hits: GameEvent_DealDamage[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (hit: GameEvent_DealDamage) => hits.push(hit));
+        passPriorityRound();
+        const choice = game.pendingManaAmountPaymentChoice;
+        expect(choice).toMatchObject({ kind: ResolutionChoiceKind.ManaAmountPayment, player: opponent, max: 3 });
+        choice.submit(opponent, paid);
+
+        const damage = Math.max(0, 2 - paid);
+        expect(opponent.manaPool[ManaColour.R]).toBe(3 - paid);
+        expect(hits).toHaveLength(damage ? 1 : 0);
+        if (damage)
+            expect(hits[0]).toMatchObject({ source: aura, recipient: opponent, amount: damage });
+        expect(opponent.life).toBe(20 - damage);
+        gameEventManager.addEvent(new GameEvent_DealDamage(aura, opponent, 1));
+        expect(opponent.life).toBe(19 - damage);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("damages the original upkeep player even if the Aura leaves before resolution", () => {
+        moveTestCard(aura, caster.graveyard);
+        target.controller = caster;
+        passPriorityRound();
+        expect(game.pendingManaAmountPaymentChoice).toBeNull();
+        expect([caster.life, opponent.life]).toEqual([20, 18]);
+    });
+});

@@ -1,5 +1,5 @@
 import { DamageAllocationAction } from "@engine/effects/DamagePrevention";
-import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,ManaPaymentDecision,OptionalDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
+import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAllocationChoice,type ManaAmountPaymentChoice,ManaPaymentDecision,OptionalDecision,type ResolutionChoice,ResolutionChoiceKind,type SpellXChoice } from "@engine/events/GameEvent_ResolutionChoice";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
@@ -46,8 +46,8 @@ export class UIResolutionChoice {
             this.panel.append(prompt, this.confirm, accept);
             return;
         }
-        if (choice.kind === ResolutionChoiceKind.SpellX) {
-            this.addSpellXForm(choice);
+        if (choice.kind === ResolutionChoiceKind.SpellX || choice.kind === ResolutionChoiceKind.ManaAmountPayment) {
+            this.addManaAmountForm(choice);
             return;
         }
         if (choice.kind === ResolutionChoiceKind.SpellMode) {
@@ -169,24 +169,28 @@ export class UIResolutionChoice {
             return this.selection;
     }
 
-    private addSpellXForm(choice: SpellXChoice) {
+    private addManaAmountForm(choice: SpellXChoice | ManaAmountPaymentChoice) {
         const form = document.createElement("form");
         form.className = "numeric-choice-form";
-        const input = this.addNumberInput(form, "Value of X", choice.max);
-        this.confirm.textContent = "Continue";
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.textContent = "Cancel";
-        cancel.addEventListener("click", () => choice.submit(choice.player, null));
-        form.addEventListener("keydown", event => {
-            if (event.key === "Escape")
-                choice.submit(choice.player, null);
-        });
+        const choosingX = choice.kind === ResolutionChoiceKind.SpellX;
+        const input = this.addNumberInput(form, choosingX ? "Value of X" : "Mana to pay", choice.max);
+        this.confirm.textContent = choosingX ? "Continue" : "Confirm payment";
+        if (choosingX) {
+            const cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.textContent = "Cancel";
+            cancel.addEventListener("click", () => choice.submit(choice.player, null));
+            form.addEventListener("keydown", event => {
+                if (event.key === "Escape")
+                    choice.submit(choice.player, null);
+            });
+            form.append(cancel);
+        }
         form.addEventListener("submit", event => {
             event.preventDefault();
             choice.submit(choice.player, input.valueAsNumber);
         });
-        form.append(cancel, this.confirm);
+        form.append(this.confirm);
         this.panel.append(form);
     }
 

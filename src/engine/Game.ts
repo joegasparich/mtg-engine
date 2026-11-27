@@ -59,6 +59,9 @@ export default class Game {
     get pendingManaPaymentChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaPayment ? this.resolutionChoice : null;
     }
+    get pendingManaAmountPaymentChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.ManaAmountPayment ? this.resolutionChoice : null;
+    }
     get pendingBasicLandTypeChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.BasicLandType ? this.resolutionChoice : null;
     }
