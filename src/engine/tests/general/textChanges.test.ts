@@ -24,6 +24,15 @@ test("only marked words change, including repeated words, plurals and landwalk",
         .toBe("Island Sanctuary gives a Plains plainswalk. All Plains tap for {U}.");
 });
 
+test("colour substitutions compose in order and leave literal names, mana symbols and land words intact", () => {
+    const template = "Red Ward gives protection from {color:R}. {color:R:capital} spells cost {R}. Fetch {land:Island:article}.";
+    expect(renderRulesText(template, [
+        { kind: WordKind.Colour, from: "R", to: "G" },
+        { kind: WordKind.BasicLandType, from: Island, to: Forest },
+        { kind: WordKind.Colour, from: "G", to: "U" },
+    ])).toBe("Red Ward gives protection from blue. Blue spells cost {R}. Fetch a Forest.");
+});
+
 test("part fields and nested filters read the current word while slate keys and shared definitions stay literal", () => {
     const parts = {
         AbilityPart_Landwalk: { landType: Forest },

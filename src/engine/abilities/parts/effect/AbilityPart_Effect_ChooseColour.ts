@@ -9,6 +9,8 @@ import { AbilityPart_Effect } from "./AbilityPart_Effect";
 @RegisterAbilityPart
 export class AbilityPart_Effect_ChooseColour extends AbilityPart_Effect {
     chooser: GrammarKey;
+    prompt = "Choose a colour.";
+    exceptFrom?: string;
     saveAs: string;
     outSignal?: string;
 
@@ -18,12 +20,16 @@ export class AbilityPart_Effect_ChooseColour extends AbilityPart_Effect {
         if (!(player instanceof Player))
             return;
 
+        const excluded = this.exceptFrom && ability.slate[this.exceptFrom]?.[0];
+        const options = cardColours.filter(colour => colour !== excluded);
         const currentGame = game;
         const choice: ColourChoice = {
             kind: ResolutionChoiceKind.Colour,
             player,
             sourceName: ability.source.name,
-            submit: (actor, colour) => currentGame.submitResolutionChoice(choice, actor, () => cardColours.includes(colour), () => {
+            prompt: this.prompt,
+            options,
+            submit: (actor, colour) => currentGame.submitResolutionChoice(choice, actor, () => options.includes(colour), () => {
                 ability.slate[this.saveAs] = [colour];
                 if (this.outSignal)
                     ability.fireSignal(this.outSignal);

@@ -1,6 +1,6 @@
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
-import type { WordReplacement } from "~/rulesWords";
+import { renderRulesText,type WordReplacement } from "~/rulesWords";
 import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
@@ -100,6 +100,11 @@ export class Ability {
     private _activationParts?: AbilityPart_Activate[];
     private get activationParts() {
         return this._activationParts ??= this.parts.filter(part => part instanceof AbilityPart_Activate);
+    }
+
+    get activateString() {
+        const text = this.def.activateString;
+        return text && renderRulesText(text, this.wordReplacements);
     }
 
     get activatable() { return this.activationParts.length > 0; }

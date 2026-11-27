@@ -43,6 +43,12 @@ export enum BasicLandType {
 export const cardColours = ["W", "U", "B", "R", "G"] as const;
 export type CardColour = (typeof cardColours)[number];
 
+export const colourNames: Record<CardColour, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
+
+export function isCardColour(value: unknown): value is CardColour {
+    return typeof value === "string" && Object.hasOwn(colourNames, value);
+}
+
 export type TargetValidator = {
     cardType?: CardType;
     cardTypes?: readonly CardType[];

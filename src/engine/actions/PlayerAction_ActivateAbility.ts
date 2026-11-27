@@ -16,7 +16,7 @@ export class PlayerAction_ActivateAbility extends PlayerAction<Permanent> {
     }
 
     label() {
-        return this.ability.def.activateString;
+        return this.ability.activateString;
     }
 
     perform(player: Player) {

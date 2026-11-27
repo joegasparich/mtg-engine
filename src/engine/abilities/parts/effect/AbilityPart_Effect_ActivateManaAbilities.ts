@@ -62,7 +62,7 @@ export class AbilityPart_Effect_ActivateManaAbilities extends AbilityPart_Effect
                 options: options.map(option => {
                     const { permanent, ability } = option;
                     const mana = isIntrinsic(option) && ability.parts.find(part => part instanceof AbilityPart_Effect_AddMana)?.mana;
-                    return `${permanent.name} · ${mana ? `{T}: Add ${mana}` : ability.def.activateString ?? "Activate mana ability"}`;
+                    return `${permanent.name} · ${mana ? `{T}: Add ${mana}` : ability.activateString ?? "Activate mana ability"}`;
                 }),
                 submit: (actor, index) => currentGame.submitResolutionChoice(choice, actor,
                     () => Number.isInteger(index) && !!options[index] && canActivate(options[index]),

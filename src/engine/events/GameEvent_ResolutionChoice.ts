@@ -70,6 +70,8 @@ export type ColourChoice = {
     readonly kind: ResolutionChoiceKind.Colour;
     readonly player: Player;
     readonly sourceName: string;
+    readonly prompt: string;
+    readonly options: readonly CardColour[];
     submit(player: Player, colour: CardColour): void;
 };
 

@@ -1,4 +1,5 @@
 import { defineComputedProperty } from "@utility/objectUtility";
+import { isCardColour } from "~/defs";
 import { isBasicLandType,readWord,WordKind } from "~/rulesWords";
 import type { Ability } from "./Ability";
 
@@ -14,6 +15,11 @@ export function bindPartConfig(config: object, ability: Ability, cache: WeakMap<
     for (const [key, value] of Object.entries(config)) {
         if (subtypeFields.has(key) && isBasicLandType(value)) {
             defineComputedProperty(writable(), key, () => readWord(value, WordKind.BasicLandType, ability.wordReplacements));
+            continue;
+        }
+
+        if (key === "colour" && isCardColour(value)) {
+            defineComputedProperty(writable(), key, () => readWord(value, WordKind.Colour, ability.wordReplacements));
             continue;
         }
 

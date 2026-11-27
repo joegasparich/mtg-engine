@@ -3,9 +3,7 @@ import { CardChoicePresentation,CardChoiceVisibility,type DamagePreventionAlloca
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { UICardSelection } from "@ui/UICardSelection";
 import type UIRoot from "@ui/UIRoot";
-import { type CardColour,cardColours } from "~/defs";
-
-const colourNames: Record<CardColour, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
+import { colourNames } from "~/defs";
 
 export class UIResolutionChoice {
     private readonly panel = document.createElement("section");
@@ -78,17 +76,16 @@ export class UIResolutionChoice {
             || choice.kind === ResolutionChoiceKind.ManaAbility) {
             const prompt = document.createElement("p");
             const prompts = {
-                [ResolutionChoiceKind.Colour]: "Choose a colour.",
                 [ResolutionChoiceKind.DamagePreventionOrder]: "Choose a damage effect to apply next.",
                 [ResolutionChoiceKind.ManaAbility]: "Choose a mana ability to activate next.",
             };
-            prompt.textContent = choice.kind === ResolutionChoiceKind.BasicLandType ? choice.prompt : prompts[choice.kind];
+            prompt.textContent = "prompt" in choice ? choice.prompt : prompts[choice.kind];
             const list = this.optionsList = document.createElement("ul");
             list.className = "resolution-card-options";
             let options: { label: string; select: () => void }[];
             switch (choice.kind) {
                 case ResolutionChoiceKind.Colour:
-                    options = cardColours.map(colour => ({ label: colourNames[colour], select: () => choice.submit(choice.player, colour) }));
+                    options = choice.options.map(colour => ({ label: colourNames[colour], select: () => choice.submit(choice.player, colour) }));
                     break;
                 case ResolutionChoiceKind.BasicLandType:
                     options = choice.options.map(type => ({ label: type, select: () => choice.submit(choice.player, type) }));

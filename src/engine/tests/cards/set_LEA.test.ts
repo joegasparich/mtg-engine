@@ -4794,3 +4794,127 @@ describe("Siren's Call", () => {
         expect(CombatManager.canConfirmAttackers()).toBe(true);
     });
 });
+
+describe("Sleight of Mind", () => {
+    const card = (name: string) => cardData.find(def => def.name === name);
+    let caster: Player;
+    let opponent: Player;
+    let sleight: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        sleight = addTestCard(card("Sleight of Mind"), caster, caster.hand);
+    });
+
+    function replaceColour(target: CardObject, from: CardColour, to: CardColour) {
+        expect(game.stack.spellCast(caster, sleight, [target])).toBe(true);
+        passPriorityRound();
+        game.pendingColourChoice.submit(caster, from);
+        game.pendingColourChoice.submit(caster, to);
+    }
+
+    test("pays {U} for a target without colour words and chooses two different colours on resolution", () => {
+        const land = addTestCard(card("Island"), opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(sleight, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(sleight, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([opponent])).toBe(false);
+        game.pendingTargeter.onTargeted([land]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(game.pendingColourChoice).toBeNull();
+
+        passPriorityRound();
+        const first = game.pendingColourChoice;
+        expect(first.options).toEqual(cardColours);
+        first.submit(opponent, "U");
+        expect(game.pendingColourChoice).toBe(first);
+        first.submit(caster, "U");
+        const second = game.pendingColourChoice;
+        expect(second.options).toEqual(cardColours.filter(colour => colour !== "U"));
+        second.submit(caster, "U");
+        expect(game.pendingColourChoice).toBe(second);
+        second.submit(caster, "R");
+        expect(game.pendingColourChoice).toBeNull();
+        expect(land.subtypes).toEqual([BasicLandType.Island]);
+        expect(land.abilities[0].getPotentialMana()[ManaColour.U]).toBe(1);
+        expect(caster.graveyard.objects.map(obj => obj.card)).toContain(sleight.card);
+    });
+
+    test("changes both modes of Blue Elemental Blast and rechecks the original target", () => {
+        const blast = addTestCard(card("Blue Elemental Blast"), opponent, opponent.hand);
+        const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], caster, caster.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        expect(game.stack.spellCast(opponent, blast, [goblins], 0, 1)).toBe(true);
+        const spell = game.stack.objects[0] as Spell;
+        replaceColour(spell, "R", "G");
+        expect(spell.characteristics.rulesText).toBe("Choose one —\n• Counter target green spell.\n• Destroy target green permanent.");
+        expect(spell.spellTargeter.validateTargets([bears])).toBe(true);
+        expect(spell.spellTargeter.validateTargets([goblins])).toBe(false);
+        passPriorityRound();
+        expect(caster.battlefield.objects).toEqual([goblins, bears]);
+        expect(opponent.graveyard.objects.map(obj => obj.card)).toContain(blast.card);
+    });
+
+    test("a changed Crusade spell boosts the new colour until it leaves the battlefield", () => {
+        const crusade = addTestCard(card("Crusade"), opponent, opponent.hand);
+        const knight = addTestCard(card("White Knight"), opponent, opponent.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        expect(game.stack.spellCast(opponent, crusade)).toBe(true);
+        replaceColour(game.stack.objects[0] as Spell, "W", "G");
+        passPriorityRound();
+        const enchantment = opponent.battlefield.objects.find(obj => obj.card === crusade.card);
+        expect(enchantment.characteristics.rulesText).toBe("Green creatures get +1/+1.");
+        expect(enchantment.colours).toEqual(new Set(["W"]));
+        expect([knight.power, bears.power]).toEqual([2, 3]);
+        moveTestCard(moveTestCard(enchantment, opponent.hand), opponent.battlefield);
+        expect([knight.power, bears.power]).toEqual([3, 2]);
+    });
+
+    test("changing a Ward updates the protection it grants", () => {
+        const ward = addTestCard(card("Blue Ward"), opponent, opponent.hand);
+        const knight = addTestCard(card("White Knight"), opponent, opponent.battlefield);
+        const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], caster, caster.battlefield);
+        const merfolk = addTestCard(card("Merfolk of the Pearl Trident"), caster, caster.battlefield);
+        expect(game.stack.spellCast(opponent, ward, [knight])).toBe(true);
+        passPriorityRound();
+        const aura = opponent.battlefield.objects.find(obj => obj.card === ward.card);
+        replaceColour(aura, "U", "R");
+        expect(aura.name).toBe("Blue Ward");
+        expect(aura.attachedTo).toBe(knight);
+        gameEventManager.addEvent(new GameEvent_DealDamage(goblins, knight, 1));
+        expect(knight.damageTaken).toBe(0);
+        gameEventManager.addEvent(new GameEvent_DealDamage(merfolk, knight, 1));
+        expect(knight.damageTaken).toBe(1);
+    });
+
+    test("a Circle's activation keeps its original colour while later activations use the new one", () => {
+        const circle = addTestCard(card("Circle of Protection: Red"), caster, caster.battlefield);
+        const goblins = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const activate = new PlayerActions.ActivateAbility(circle, circle.abilities[0]);
+        caster.manaPool[ManaColour.W] = 2;
+        activate.perform(caster);
+        replaceColour(circle, "R", "G");
+        expect(activate.label()).toBe("{1}: Prevent damage from a green source");
+        passPriorityRound();
+        expect(game.pendingResolutionChoice.options).toEqual([goblins]);
+        game.pendingResolutionChoice.submit(caster, [goblins]);
+        activate.perform(caster);
+        passPriorityRound();
+        expect(game.pendingResolutionChoice.options).toEqual([bears]);
+        game.pendingResolutionChoice.submit(caster, [bears]);
+    });
+
+    test("skips both choices if the target leaves and returns before resolution", () => {
+        const knight = addTestCard(card("White Knight"), opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, sleight, [knight])).toBe(true);
+        const returned = moveTestCard(moveTestCard(knight, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+        expect(game.pendingColourChoice).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(returned.characteristics.rulesText).toBe(knight.def.oracle_text);
+    });
+});

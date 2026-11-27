@@ -155,7 +155,7 @@
     {
         "name": "Black Ward",
         "image_url": "https://cards.scryfall.io/large/front/7/b/7b298f64-b912-47ae-87f2-ef2a944b8ce2.jpg",
-        "oracle_text": "Enchant creature\nEnchanted creature has protection from black. This effect doesn't remove this Aura.",
+        "rulesTextTemplate": "Enchant creature\nEnchanted creature has protection from {color:B}. This effect doesn't remove this Aura.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
@@ -245,7 +245,7 @@
     {
         "name": "Blue Ward",
         "image_url": "https://cards.scryfall.io/large/front/9/7/9707fd6f-9c01-4f03-8973-50835a0ffcf2.jpg?1783919589",
-        "oracle_text": "Enchant creature\nEnchanted creature has protection from blue. This effect doesn't remove this Aura.",
+        "rulesTextTemplate": "Enchant creature\nEnchanted creature has protection from {color:U}. This effect doesn't remove this Aura.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
@@ -302,7 +302,7 @@
     {
         "name": "Green Ward",
         "image_url": "https://cards.scryfall.io/large/front/4/e/4e265847-739d-47aa-8d99-24aff4d78e64.jpg?1783919582",
-        "oracle_text": "Enchant creature\nEnchanted creature has protection from green. This effect doesn't remove this Aura.",
+        "rulesTextTemplate": "Enchant creature\nEnchanted creature has protection from {color:G}. This effect doesn't remove this Aura.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
@@ -336,7 +336,7 @@
     {
         "name": "Red Ward",
         "image_url": "https://cards.scryfall.io/large/front/3/6/36df52ab-62bd-4a48-8c34-856e20a517c3.jpg?1783919574",
-        "oracle_text": "Enchant creature\nEnchanted creature has protection from red. This effect doesn't remove this Aura.",
+        "rulesTextTemplate": "Enchant creature\nEnchanted creature has protection from {color:R}. This effect doesn't remove this Aura.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
@@ -370,7 +370,7 @@
     {
         "name": "White Ward",
         "image_url": "https://cards.scryfall.io/large/front/d/d/dda1b5c6-ba71-4573-b4a8-872df961cc90.jpg?1783919567",
-        "oracle_text": "Enchant creature\nEnchanted creature has protection from white. This effect doesn't remove this Aura.",
+        "rulesTextTemplate": "Enchant creature\nEnchanted creature has protection from {color:W}. This effect doesn't remove this Aura.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
         "cost": "{W}",
@@ -404,12 +404,12 @@
     {
         "name": "Circle of Protection: Blue",
         "image_url": "https://cards.scryfall.io/large/front/4/d/4dd460dc-8d50-4a8e-bb34-aa421a72fcdc.jpg?1783919589",
-        "oracle_text": "{1}: The next time a blue source of your choice would deal damage to you this turn, prevent that damage.",
+        "rulesTextTemplate": "{1}: The next time a {color:U} source of your choice would deal damage to you this turn, prevent that damage.",
         "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
-                "activateString": "{1}: Prevent damage from a blue source",
+                "activateString": "{1}: Prevent damage from a {color:U} source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
                     "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "U" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
@@ -421,12 +421,12 @@
     {
         "name": "Circle of Protection: Green",
         "image_url": "https://cards.scryfall.io/large/front/7/6/76d13076-dce5-4c13-84f1-0421cea5dcda.jpg?1783919586",
-        "oracle_text": "{1}: The next time a green source of your choice would deal damage to you this turn, prevent that damage.",
+        "rulesTextTemplate": "{1}: The next time a {color:G} source of your choice would deal damage to you this turn, prevent that damage.",
         "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
-                "activateString": "{1}: Prevent damage from a green source",
+                "activateString": "{1}: Prevent damage from a {color:G} source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
                     "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "G" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
@@ -438,12 +438,12 @@
     {
         "name": "Circle of Protection: Red",
         "image_url": "https://cards.scryfall.io/large/front/0/a/0a13c4d2-1791-4d4a-bd90-aa2b969cc717.jpg?1783919586",
-        "oracle_text": "{1}: The next time a red source of your choice would deal damage to you this turn, prevent that damage.",
+        "rulesTextTemplate": "{1}: The next time a {color:R} source of your choice would deal damage to you this turn, prevent that damage.",
         "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
-                "activateString": "{1}: Prevent damage from a red source",
+                "activateString": "{1}: Prevent damage from a {color:R} source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
                     "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "R" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
@@ -455,12 +455,12 @@
     {
         "name": "Circle of Protection: White",
         "image_url": "https://cards.scryfall.io/large/front/e/1/e166bee4-8623-4c38-b687-3040b016e57f.jpg?1783919585",
-        "oracle_text": "{1}: The next time a white source of your choice would deal damage to you this turn, prevent that damage.",
+        "rulesTextTemplate": "{1}: The next time a {color:W} source of your choice would deal damage to you this turn, prevent that damage.",
         "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
-                "activateString": "{1}: Prevent damage from a white source",
+                "activateString": "{1}: Prevent damage from a {color:W} source",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{1}" },
                     "AbilityPart_Effect_ChooseDamageSource": { "targetValidator": { "colour": "W" }, "saveAs": "SOURCE", "outSignal": "SOURCE_CHOSEN" },
@@ -521,7 +521,7 @@
     {
         "name": "Crusade",
         "image_url": "https://cards.scryfall.io/large/front/b/9/b99452c0-5d1c-4a73-90b6-0ec3ac0af893.jpg",
-        "oracle_text": "White creatures get +1/+1.",
+        "rulesTextTemplate": "{color:W:capital} creatures get +1/+1.",
         "types": ["Enchantment"],
         "cost": "{W}{W}",
         "abilities": [
@@ -828,7 +828,7 @@
     {
         "name": "Northern Paladin",
         "image_url": "https://cards.scryfall.io/large/front/c/3/c39387b9-3638-49d6-9056-e370464a9214.jpg?1783919576",
-        "oracle_text": "{W}{W}, {T}: Destroy target black permanent.",
+        "rulesTextTemplate": "{W}{W}, {T}: Destroy target {color:B} permanent.",
         "types": ["Creature"],
         "subtypes": ["Human", "Knight"],
         "cost": "{2}{W}{W}",
@@ -836,7 +836,7 @@
         "toughness": 3,
         "abilities": [
             {
-                "activateString": "{W}{W}, {T}: Destroy target black permanent",
+                "activateString": "{W}{W}, {T}: Destroy target {color:B} permanent",
                 "parts": {
                     "AbilityPart_Activate_Mana": { "cost": "{W}{W}" },
                     "AbilityPart_Activate_Tap": {},
@@ -889,7 +889,7 @@
     {
         "name": "Purelace",
         "image_url": "https://cards.scryfall.io/large/front/f/f/ffa2615c-de01-4afd-a260-0ff628ccc4a5.jpg?1783919576",
-        "oracle_text": "Target spell or permanent becomes white. (Mana symbols on that permanent remain unchanged.)",
+        "rulesTextTemplate": "Target spell or permanent becomes {color:W}. (Mana symbols on that permanent remain unchanged.)",
         "types": ["Instant"],
         "cost": "{W}",
         "abilities": [
@@ -1068,7 +1068,7 @@
     {
         "name": "White Knight",
         "image_url": "https://cards.scryfall.io/large/front/3/2/32683d26-4b59-4460-b507-f3ab21daf151.jpg?1783919568",
-        "oracle_text": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from black (This creature can't be blocked, targeted, dealt damage, or enchanted by anything black.)",
+        "rulesTextTemplate": "First strike (This creature deals combat damage before creatures without first strike.)\nProtection from {color:B} (This creature can't be blocked, targeted, dealt damage, or enchanted by anything {color:B}.)",
         "types": ["Creature"],
         "subtypes": ["Human", "Knight"],
         "cost": "{W}{W}",
@@ -1161,7 +1161,7 @@
     {
         "name": "Blue Elemental Blast",
         "image_url": "https://cards.scryfall.io/large/front/4/8/4822809c-7041-4ebd-9a5b-7702452011fb.jpg?1783919565",
-        "oracle_text": "Choose one —\n• Counter target red spell.\n• Destroy target red permanent.",
+        "rulesTextTemplate": "Choose one —\n• Counter target {color:R} spell.\n• Destroy target {color:R} permanent.",
         "types": ["Instant"],
         "cost": "{U}",
         "abilities": [],
@@ -1425,7 +1425,7 @@
                 { "inSignal": "SPELL_RESOLVE", "prompt": "Choose the basic land type to replace.", "saveAs": "FROM", "outSignal": "CHOOSE_REPLACEMENT" },
                 { "inSignal": "CHOOSE_REPLACEMENT", "prompt": "Choose the replacement basic land type.", "exceptFrom": "FROM", "saveAs": "TO", "outSignal": "REPLACE_WORD" }
             ],
-            "AbilityPart_Effect_ReplaceBasicLandTypeWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
+            "AbilityPart_Effect_ReplaceRulesWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
         } }]
     },
     {
@@ -1680,6 +1680,21 @@
                 "saveAs": "CREATURES", "outSignal": "DESTROY"
             },
             "AbilityPart_Effect_DestroyPermanents": { "inSignal": "DESTROY", "permanentsFrom": "CREATURES" }
+        } }]
+    },
+    {
+        "name": "Sleight of Mind",
+        "image_url": "https://cards.scryfall.io/large/front/c/9/c9dfc21c-1336-443f-ac87-57ad1b369906.jpg?1783919548",
+        "oracle_text": "Change the text of target spell or permanent by replacing all instances of one color word with another.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "validTargets": ["Spell", "Permanent"], "saveAs": "TARGET" },
+            "AbilityPart_Effect_ChooseColour": [
+                { "inSignal": "SPELL_RESOLVE", "chooser": "THIS.controller", "prompt": "Choose the colour word to replace.", "saveAs": "FROM", "outSignal": "CHOOSE_REPLACEMENT" },
+                { "inSignal": "CHOOSE_REPLACEMENT", "chooser": "THIS.controller", "prompt": "Choose the replacement colour word.", "exceptFrom": "FROM", "saveAs": "TO", "outSignal": "REPLACE_WORD" }
+            ],
+            "AbilityPart_Effect_ReplaceRulesWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
         } }]
     }
 ]
