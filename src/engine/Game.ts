@@ -37,6 +37,8 @@ export default class Game {
     readonly exile = new Exile();
 
     currentTurnPlayerID = 0;
+    private regularTurnPlayerID = 0;
+    private readonly extraTurns: Player[] = [];
     turnNumber = 0;
     currentStepIndex = 0;
     landPlayedThisTurn = false;
@@ -273,6 +275,8 @@ export default class Game {
         }
 
         this.currentTurnPlayerID = 0;
+        this.regularTurnPlayerID = 0;
+        this.extraTurns.length = 0;
         this.turnNumber = 0;
         this.currentStepIndex = 0;
         this.landPlayedThisTurn = false;
@@ -425,13 +429,21 @@ export default class Game {
 
         if (this.currentStepIndex > StepIndex.Cleanup)
         {
-            this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
+            // 500.7: The most recently created extra turn comes first. Regular turn order then resumes.
+            const extraTurn = this.extraTurns.pop();
+            if (!extraTurn)
+                this.regularTurnPlayerID = (this.regularTurnPlayerID + 1) % this.players.length;
+            this.currentTurnPlayerID = extraTurn?.id ?? this.regularTurnPlayerID;
             this.turnNumber++;
             this.currentStepIndex = StepIndex.Untap;
             this.landPlayedThisTurn = false;
 
             this.startTurn();
         }
+    }
+
+    addExtraTurn(player: Player) {
+        this.extraTurns.push(player);
     }
 
     private startTurn() {

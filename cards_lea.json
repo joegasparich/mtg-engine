@@ -1752,5 +1752,15 @@
                 }
             }
         ]
+    },
+    {
+        "name": "Time Walk",
+        "image_url": "https://cards.scryfall.io/large/front/e/a/ea3fee06-e337-4301-86f1-ec9b1a25bffc.jpg",
+        "oracle_text": "Take an extra turn after this one.",
+        "types": ["Sorcery"],
+        "cost": "{1}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Effect_AddExtraTurn": { "inSignal": "SPELL_RESOLVE", "player": "THIS.controller" }
+        } }]
     }
 ]

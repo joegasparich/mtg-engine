@@ -15,6 +15,7 @@ export enum GameEventType {
     GoToStep,
     GoToNextPhase,
     GoToNextTurn,
+    AddExtraTurn,
     TurnStart,
     CheckStep,
     StepStart,

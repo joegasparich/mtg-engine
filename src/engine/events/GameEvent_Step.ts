@@ -82,6 +82,21 @@ export class GameEvent_GoToNextTurn extends GameEvent {
     }
 }
 
+export class GameEvent_AddExtraTurn extends GameEvent {
+    type = GameEventType.AddExtraTurn;
+    label: string;
+
+    constructor(readonly player: Player) {
+        super();
+        this.label = `Player ${player.id} gets an extra turn`;
+    }
+
+    perform(): boolean {
+        game.addExtraTurn(this.player);
+        return true;
+    }
+}
+
 export class GameEvent_TurnStart extends GameEvent {
     type = GameEventType.TurnStart;
     label = "Next turn";

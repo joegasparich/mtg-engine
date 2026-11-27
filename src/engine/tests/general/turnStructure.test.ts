@@ -1,5 +1,5 @@
 import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
-import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
+import { GameEvent_AddExtraTurn,GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { StackAbility } from "@engine/GameObject";
@@ -104,6 +104,24 @@ test("should change turns", () => {
     expect(nextStepSpy).toHaveBeenCalledTimes(11);
     expect(game.currentStepIndex).toBe(StepIndex.Untap);
     expect(game.turnNumber).toBe(1);
+});
+
+test("newest extra turns happen first, including turns added during an extra turn", () => {
+    const second = game.addPlayer(BASIC_DECK);
+    const third = game.addPlayer(BASIC_DECK);
+    game.startGame();
+    gameEventManager.addEvent(new GameEvent_AddExtraTurn(third));
+    gameEventManager.addEvent(new GameEvent_AddExtraTurn(second));
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    expect(game.currentTurnPlayer()).toBe(second);
+
+    gameEventManager.addEvent(new GameEvent_AddExtraTurn(player));
+    // Finish the nested turn and the older extra turn, then resume the original rotation.
+    for (const expected of [player, third, second, third]) {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentTurnPlayer()).toBe(expected);
+        expect(game.currentStepIndex).toBe(StepIndex.Untap);
+    }
 });
 
 test("a step-start trigger can pass the turn player to its effect", () => {

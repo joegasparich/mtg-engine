@@ -5108,3 +5108,50 @@ describe("Thoughtlace", () => {
         expect(opponent.battlefield.objects[0]).toMatchObject({ card: creature.card, colours: new Set(["U"]), cost: creature.cost });
     });
 });
+
+describe("Time Walk", () => {
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        card = addTestCard(cardData.find(def => def.name === "Time Walk"), caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.Colourless] = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+    });
+
+    test("resolves for {1}{U} and gives its controller a full extra turn", () => {
+        passPriorityRound();
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(caster.manaPool[ManaColour.Colourless]).toBe(0);
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+        expect(game.currentStepIndex).toBe(StepIndex.Main);
+        expect(game.turnNumber).toBe(0);
+
+        const land = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        land.tapped = true;
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentTurnPlayer()).toBe(caster);
+        expect(game.turnNumber).toBe(1);
+        expect(land.tapped).toBe(false);
+        const handSize = caster.hand.objects.length;
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Draw));
+        expect(caster.hand.objects).toHaveLength(handSize + 1);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentTurnPlayer()).toBe(opponent);
+    });
+
+    test("a countered Time Walk leaves the opponent next in turn order", () => {
+        const counter = addTestCard(cardData.find(def => def.name === "Counterspell"), opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, counter, [game.stack.objects[0]])).toBe(true);
+        passPriorityRound();
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentTurnPlayer()).toBe(opponent);
+    });
+});
