@@ -1,3 +1,4 @@
+import { AbilityPart_Landwalk } from "@engine/abilities/parts/AbilityPart_Landwalk";
 import { AbilityPart_ContinuousEffect } from "@engine/abilities/parts/AbilityPart_ContinuousEffect";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { type ContinuousEffect,ContinuousEffectKind } from "@engine/effects/EffectSystem";
@@ -9,10 +10,11 @@ import gameEventManager,{ GameEvent,GameEventType } from "@engine/events/GameEve
 import { game } from "@engine/Game";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { Keyword } from "~/defs";
+import { type BasicLandType,Keyword } from "~/defs";
 
 @RegisterAbilityPart
 export class AbilityPart_IslandSanctuary extends AbilityPart_ContinuousEffect {
+    landType: BasicLandType;
     private readonly declinedDraws = new WeakSet<GameEvent_DrawCard>();
 
     protected getContinuousEffect(): ContinuousEffect {
@@ -53,11 +55,12 @@ export class AbilityPart_IslandSanctuary extends AbilityPart_ContinuousEffect {
 
     private restrictAttacks(player: Player) {
         // 508.1c, 611.2a: This restriction lasts until the player's next turn even if the source leaves.
+        const landType = this.landType;
         const end = gameEventManager.effects.startContinuous(this.ability, {
             kind: ContinuousEffectKind.EventCheck,
             check: check => check.removeWhere(event => event instanceof GameEvent_DeclareAttacker
                 && event.defender === player && !event.attacker.hasKeyword(Keyword.Flying)
-                && !event.attacker.hasKeyword(Keyword.Islandwalk)),
+                && !AbilityPart_Landwalk.hasLandwalk(event.attacker, landType)),
         });
         gameEventManager.onGamePerformed<GameEvent_TurnStart>(GameEventType.TurnStart, end, {
             once: true,

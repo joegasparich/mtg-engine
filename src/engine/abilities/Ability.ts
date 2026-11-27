@@ -1,5 +1,6 @@
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
+import type { WordReplacement } from "~/rulesWords";
 import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
@@ -33,6 +34,14 @@ export class Ability {
     constructor(source: CardObject, readonly grantedBy?: CardObject) {
         this.slate["THIS"] = [ source ];
         this.source = source;
+    }
+
+    // CR 612.3, 113.7a: Granted text belongs to the granting instruction.
+    // A stack ability takes a snapshot of the words at activation or trigger time.
+    wordSource?: () => readonly WordReplacement[];
+
+    get wordReplacements(): readonly WordReplacement[] {
+        return this.wordSource?.() ?? (this.grantedBy ? [] : this.source.characteristics.wordReplacements);
     }
 
     private staticEffects?: TimedEffect[];

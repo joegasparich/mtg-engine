@@ -13,6 +13,7 @@ export { AbilityPart_Trigger } from "./parts/trigger/AbilityPart_Trigger";
 
 import { keywordData } from "~/index";
 import { AbilityParts } from "./registry";
+import { bindPartConfig } from "./bindPartConfig";
 
 // Ensures all parts are imported, since we are instantiating them by reflection
 import.meta.glob("./parts/**/*.ts", { eager: true });
@@ -47,13 +48,15 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
     if (def.keyword)
         ability.def = keywordData[def.keyword];
 
+    const boundConfigs = new WeakMap<object, object>();
     for (const [className, config] of expandParts(ability.def.parts)) {
         const ctor = AbilityParts[className];
         if (!ctor)
             continue;
 
         const part = new ctor();
-        Object.assign(part, config);
+        const bound = bindPartConfig(config, ability, boundConfigs);
+        Object.defineProperties(part, Object.getOwnPropertyDescriptors(bound));
 
         ability.addPart(part);
     }

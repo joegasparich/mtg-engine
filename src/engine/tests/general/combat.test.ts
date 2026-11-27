@@ -349,7 +349,7 @@ test("a blocker restriction accepts any configured type or subtype on the blocke
 
 test("islandwalk prevents blocks while the defender controls a land with the Island subtype", () => {
     const island = cardData.find(card => card.name === BasicLandType.Island);
-    const islandwalker = { ...cardData[GRIZZLY_BEARS], abilities: [{ keyword: Keyword.Islandwalk, parts: {} }] };
+    const islandwalker = { ...cardData[GRIZZLY_BEARS], abilities: [{ parts: { AbilityPart_Landwalk: { landType: BasicLandType.Island } } }] };
     const attacker = addTestCard(islandwalker, playerA, playerA.battlefield);
     const blocker = addTestCard(islandwalker, playerB, playerB.battlefield);
     addTestCard(island, playerA, playerA.battlefield);

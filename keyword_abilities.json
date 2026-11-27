@@ -31,12 +31,6 @@
             "AbilityPart_Indestructible": {}
         }
     },
-    "islandwalk": {
-        "keyword": "islandwalk",
-        "parts": {
-            "AbilityPart_Landwalk": { "landType": "Island" }
-        }
-    },
     "reach": {
         "keyword": "reach",
         "parts": {

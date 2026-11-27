@@ -69,7 +69,7 @@ export class CardObject extends GameObject {
 
     protected bindDefinition(def: Readonly<CardDef>): Characteristics {
         const cost = def.cost ? [...ManaUtility.parseManaString<ManaCost>(def.cost)] as ManaCost : undefined;
-        return { definition: def, name: def.name, rulesText: def.oracle_text, types: def.types, subtypes: def.subtypes ?? [], cost,
+        return { wordReplacements: [], definition: def, name: def.name, rulesText: def.oracle_text, types: def.types, subtypes: def.subtypes ?? [], cost,
             colours: new Set(cardColours.filter(colour => cost?.[ManaColour[colour]] > 0)),
             power: def.power, toughness: def.toughness, basePower: def.power, baseToughness: def.toughness,
             abilities: (def.abilities ?? []).map(ability => this.createAbility(ability)) };
@@ -457,6 +457,8 @@ export class StackAbility extends GameObject {
         this.targets = [...targets];
         // 113.7a: Each occurrence resolves independently of its source and other occurrences.
         this.ability = makeAbility(ability.def, source, ability.grantedBy);
+        const words = ability.wordReplacements;
+        this.ability.wordSource = () => words;
         for (const [key, value] of Object.entries({ ...ability.slate, ...inputs }))
             this.ability.slate[key] = Array.isArray(value) ? [...value] : value;
         this.ability.slate.CONTROLLER = [controller];

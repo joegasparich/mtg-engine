@@ -1,3 +1,4 @@
+import { AbilityPart_Landwalk } from "@engine/abilities/parts/AbilityPart_Landwalk";
 import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { makeAbility } from "@engine/abilities";
 import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
@@ -2141,23 +2142,23 @@ describe("Lord of Atlantis", () => {
         passPriorityRound();
         const lord = caster.battlefield.objects.find(object => object.card === card.card);
         expect(lord).toMatchObject({ power: 2, toughness: 2 });
-        expect(lord.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(lord, BasicLandType.Island)).toBe(false);
         expect(opposing).toMatchObject({ power: 1, toughness: 1 });
-        expect(opposing.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(opposing, BasicLandType.Island)).toBe(false);
         expect(bear).toMatchObject({ power: 2, toughness: 2 });
-        expect(bear.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(bear, BasicLandType.Island)).toBe(false);
 
         const opposingPermanent = moveTestCard(opposing, opponent.battlefield);
         for (const recipient of [friendly, opposingPermanent]) {
             expect(recipient).toMatchObject({ power: 2, toughness: 2 });
-            expect(recipient.hasKeyword(Keyword.Islandwalk)).toBe(true);
+            expect(AbilityPart_Landwalk.hasLandwalk(recipient, BasicLandType.Island)).toBe(true);
         }
         opposingPermanent.subtypes = ["Bear"];
         expect(opposingPermanent).toMatchObject({ power: 1, toughness: 1 });
-        expect(opposingPermanent.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(opposingPermanent, BasicLandType.Island)).toBe(false);
         opposingPermanent.subtypes = merfolk.subtypes;
         expect(opposingPermanent).toMatchObject({ power: 2, toughness: 2 });
-        expect(opposingPermanent.hasKeyword(Keyword.Islandwalk)).toBe(true);
+        expect(AbilityPart_Landwalk.hasLandwalk(opposingPermanent, BasicLandType.Island)).toBe(true);
     });
 
     test("two Lords grant each other islandwalk and stack their bonuses on other Merfolk", () => {
@@ -2168,7 +2169,7 @@ describe("Lord of Atlantis", () => {
         addTestCard(cardData.find(card => card.name === BasicLandType.Island), opponent, opponent.battlefield);
         for (const recipient of [lord, otherLord, friendly]) {
             expect(recipient).toMatchObject({ power: 3, toughness: 3 });
-            expect(recipient.hasKeyword(Keyword.Islandwalk)).toBe(true);
+            expect(AbilityPart_Landwalk.hasLandwalk(recipient, BasicLandType.Island)).toBe(true);
         }
 
         game.startGame({ allowAutoSkip: false });
@@ -2179,14 +2180,14 @@ describe("Lord of Atlantis", () => {
 
         moveTestCard(otherLord, opponent.graveyard);
         expect(lord).toMatchObject({ power: 2, toughness: 2 });
-        expect(lord.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(lord, BasicLandType.Island)).toBe(false);
         expect(CombatManager.canBlockAttacker(blocker, lord)).toBe(true);
         expect(friendly).toMatchObject({ power: 2, toughness: 2 });
-        expect(friendly.hasKeyword(Keyword.Islandwalk)).toBe(true);
+        expect(AbilityPart_Landwalk.hasLandwalk(friendly, BasicLandType.Island)).toBe(true);
 
         moveTestCard(lord, caster.graveyard);
         expect(friendly).toMatchObject({ power: 1, toughness: 1 });
-        expect(friendly.hasKeyword(Keyword.Islandwalk)).toBe(false);
+        expect(AbilityPart_Landwalk.hasLandwalk(friendly, BasicLandType.Island)).toBe(false);
     });
 });
 
@@ -3985,5 +3986,157 @@ describe("Lifetap", () => {
 
         gameEventManager.addEvent(new GameEvent_TapCard(first));
         expect(game.stack.objects).toHaveLength(0);
+    });
+});
+
+describe("Magical Hack", () => {
+    const card = (name: string) => cardData.find(def => def.name === name);
+    const { Forest, Island, Mountain, Plains, Swamp } = BasicLandType;
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    function hack(target: CardObject, from: BasicLandType, to: BasicLandType) {
+        const spell = addTestCard(card("Magical Hack"), caster, caster.hand);
+        expect(game.stack.spellCast(caster, spell, [target])).toBe(true);
+        passPriorityRound();
+        game.pendingBasicLandTypeChoice.submit(caster, from);
+        game.pendingBasicLandTypeChoice.submit(caster, to);
+    }
+
+    test("pays {U}, targets an object without matching words and chooses distinct types on resolution", () => {
+        const spell = addTestCard(card("Magical Hack"), caster, caster.hand);
+        const bears = addTestCard(card("Grizzly Bears"), opponent, opponent.battlefield);
+        expect(playerActionManager.getCardActions(spell, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([caster])).toBe(false);
+        game.pendingTargeter.onTargeted([bears]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(game.pendingBasicLandTypeChoice).toBeNull();
+        passPriorityRound();
+        const first = game.pendingBasicLandTypeChoice;
+        expect(first.options).toEqual(Object.values(BasicLandType));
+        first.submit(opponent, Forest);
+        expect(game.pendingBasicLandTypeChoice).toBe(first);
+        first.submit(caster, Forest);
+        const second = game.pendingBasicLandTypeChoice;
+        expect(second.options).not.toContain(Forest);
+        second.submit(caster, Forest);
+        expect(game.pendingBasicLandTypeChoice).toBe(second);
+        second.submit(caster, Island);
+        expect(game.stack.objects).toHaveLength(0);
+        expect(bears.characteristics.rulesText).toBe(bears.def.oracle_text);
+        expect(bears.subtypes).toEqual(["Bear"]);
+    });
+
+    test("two Hacks change a basic land's subtype and intrinsic mana, retaining its name", () => {
+        const land = addTestCard(card(Forest), caster, caster.battlefield);
+        hack(land, Forest, Island);
+        expect(land.subtypes).toEqual([Island]);
+        expect(land.abilities[0].getPotentialMana()[ManaColour.U]).toBe(1);
+        hack(land, Island, Mountain);
+        expect(land.name).toBe(Forest);
+        expect(land.subtypes).toEqual([Mountain]);
+        expect(land.abilities).toHaveLength(1);
+        new PlayerActions.ActivateAbility(land, land.abilities[0]).perform(caster);
+        expect(caster.manaPool[ManaColour.R]).toBe(1);
+        expect(land.copiableDefinition.subtypes).toEqual([Forest]);
+    });
+
+    test("a hacked Lifetap spell keeps its wording on entry and loses it after leaving play", () => {
+        const incoming = addTestCard(card("Lifetap"), caster, caster.hand);
+        expect(game.stack.spellCast(caster, incoming)).toBe(true);
+        hack(game.stack.objects[0] as Spell, Forest, Island);
+        passPriorityRound();
+        const lifetap = caster.battlefield.objects.find(p => p.card === incoming.card);
+        expect(lifetap.characteristics.rulesText).toContain("an Island");
+        const forest = addTestCard(card(Forest), opponent, opponent.battlefield);
+        const island = addTestCard(card(Island), opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(forest));
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_TapCard(island));
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(caster.life).toBe(21);
+        const returned = moveTestCard(moveTestCard(lifetap, caster.graveyard), caster.battlefield);
+        expect(returned.characteristics.rulesText).toContain("a Forest");
+    });
+
+    test("changes both operands of Conversion before its type-changing effect", () => {
+        const conversion = addTestCard(card("Conversion"), caster, caster.battlefield);
+        const forest = addTestCard(card(Forest), opponent, opponent.battlefield);
+        const mountain = addTestCard(card(Mountain), opponent, opponent.battlefield);
+        hack(conversion, Mountain, Forest);
+        hack(conversion, Plains, Island);
+        expect(conversion.characteristics.rulesText).toContain("All Forests are Islands.");
+        expect(forest.subtypes).toEqual([Island]);
+        expect(mountain.subtypes).toEqual([Mountain]);
+        expect(forest.abilities[0].getPotentialMana()[ManaColour.U]).toBe(1);
+    });
+
+    test("editing Lord of Atlantis changes the landwalk it grants, and editing the recipient leaves the grant intact", () => {
+        const lord = addTestCard(card("Lord of Atlantis"), caster, caster.battlefield);
+        const merfolk = addTestCard({ ...card("Grizzly Bears"), subtypes: ["Merfolk"] }, opponent, opponent.battlefield);
+        hack(lord, Island, Forest);
+        expect(lord.characteristics.rulesText).toContain("forestwalk");
+        expect(AbilityPart_Landwalk.hasLandwalk(merfolk, Forest)).toBe(true);
+        hack(merfolk, Forest, Swamp);
+        expect(AbilityPart_Landwalk.hasLandwalk(merfolk, Forest)).toBe(true);
+        expect(AbilityPart_Landwalk.hasLandwalk(merfolk, Swamp)).toBe(false);
+        moveTestCard(lord, caster.graveyard);
+        expect(AbilityPart_Landwalk.hasLandwalk(merfolk, Forest)).toBe(false);
+    });
+
+    test("Island Sanctuary locks in the landwalk word when its controller skips a draw", () => {
+        const sanctuary = addTestCard(card("Island Sanctuary"), opponent, opponent.battlefield);
+        const walker = (landType: BasicLandType) => addTestCard({ ...card("Grizzly Bears"),
+            abilities: [{ parts: { AbilityPart_Landwalk: { landType } } }] }, caster, caster.battlefield);
+        const forestwalker = walker(Forest);
+        const islandwalker = walker(Island);
+        hack(sanctuary, Island, Forest);
+        expect(sanctuary.name).toBe("Island Sanctuary");
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Draw));
+        game.pendingOptionalChoice.submit(opponent, OptionalDecision.Accept);
+        hack(sanctuary, Forest, Island);
+        moveTestCard(sanctuary, opponent.graveyard);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(forestwalker, opponent))).toBe(true);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(islandwalker, opponent))).toBe(false);
+    });
+
+    test("a lost target ends resolution before either word is chosen", () => {
+        const land = addTestCard(card(Forest), opponent, opponent.battlefield);
+        const spell = addTestCard(card("Magical Hack"), caster, caster.hand);
+        expect(game.stack.spellCast(caster, spell, [land])).toBe(true);
+        const returned = moveTestCard(moveTestCard(land, opponent.hand), opponent.battlefield);
+        passPriorityRound();
+        expect(game.pendingBasicLandTypeChoice).toBeNull();
+        expect(game.stack.objects).toHaveLength(0);
+        expect(returned.subtypes).toEqual([Forest]);
+    });
+
+    test("Karma's stacked trigger keeps its wording while the next trigger uses the edited word", () => {
+        const karma = addTestCard(card("Karma"), caster, caster.battlefield);
+        addTestCard(card(Forest), caster, caster.battlefield);
+        addTestCard(card(Swamp), opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        hack(karma, Swamp, Forest);
+        passPriorityRound();
+        expect(opponent.life).toBe(19);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        passPriorityRound();
+        expect(caster.life).toBe(19);
     });
 });

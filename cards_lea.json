@@ -495,7 +495,7 @@
     {
         "name": "Conversion",
         "image_url": "https://cards.scryfall.io/large/front/5/6/5695021b-7ee6-4149-8591-0021d5662720.jpg?1783919584",
-        "oracle_text": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nAll Mountains are Plains.",
+        "rulesTextTemplate": "At the beginning of your upkeep, sacrifice this enchantment unless you pay {W}{W}.\nAll {land:Mountain:plural} are {land:Plains:plural}.",
         "types": ["Enchantment"],
         "cost": "{2}{W}{W}",
         "abilities": [
@@ -726,19 +726,19 @@
     {
         "name": "Island Sanctuary",
         "image_url": "https://cards.scryfall.io/large/front/3/c/3c25c773-c64a-4197-9d25-c4c3ffb8be0c.jpg?1783919580",
-        "oracle_text": "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or islandwalk.",
+        "rulesTextTemplate": "If you would draw a card during your draw step, instead you may skip that draw. If you do, until your next turn, you can't be attacked except by creatures with flying and/or {land:Island:walk}.",
         "types": ["Enchantment"],
         "cost": "{1}{W}",
         "abilities": [
             {
-                "parts": { "AbilityPart_IslandSanctuary": {} }
+                "parts": { "AbilityPart_IslandSanctuary": { "landType": "Island" } }
             }
         ]
     },
     {
         "name": "Karma",
         "image_url": "https://cards.scryfall.io/large/front/1/6/16bb2840-a763-4695-99de-de448cd65adf.jpg?1783919579",
-        "oracle_text": "At the beginning of each player's upkeep, this enchantment deals damage to that player equal to the number of Swamps they control.",
+        "rulesTextTemplate": "At the beginning of each player's upkeep, this enchantment deals damage to that player equal to the number of {land:Swamp:plural} they control.",
         "types": ["Enchantment"],
         "cost": "{2}{W}{W}",
         "abilities": [
@@ -765,7 +765,7 @@
     {
         "name": "Lord of Atlantis",
         "image_url": "https://cards.scryfall.io/large/front/8/f/8f005191-0e0e-4ba3-acde-9c279ca589f6.jpg?1783919555",
-        "oracle_text": "Other Merfolk get +1/+1 and have islandwalk. (They can't be blocked as long as defending player controls an Island.)",
+        "rulesTextTemplate": "Other Merfolk get +1/+1 and have {land:Island:walk}. (They can't be blocked as long as defending player controls {land:Island:article}.)",
         "types": ["Creature"],
         "subtypes": ["Merfolk"],
         "cost": "{U}{U}",
@@ -783,7 +783,7 @@
                     "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "OTHER_MERFOLK", "power": 1, "toughness": 1 },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "OTHER_MERFOLK",
-                        "grant": { "keyword": "islandwalk" }
+                        "grant": { "parts": { "AbilityPart_Landwalk": { "landType": "Island" } } }
                     }
                 }
             }
@@ -1402,7 +1402,7 @@
     {
         "name": "Lifetap",
         "image_url": "https://cards.scryfall.io/large/front/7/3/73e68f01-3699-4682-a3c0-c70a45246c76.jpg?1783919556",
-        "oracle_text": "Whenever a Forest an opponent controls becomes tapped, you gain 1 life.",
+        "rulesTextTemplate": "Whenever {land:Forest:article} an opponent controls becomes tapped, you gain 1 life.",
         "types": ["Enchantment"],
         "cost": "{U}{U}",
         "abilities": [{
@@ -1413,5 +1413,20 @@
                 "AbilityPart_Effect_GainLife": { "target": "CONTROLLER", "amount": 1 }
             }
         }]
+    },
+    {
+        "name": "Magical Hack",
+        "image_url": "https://cards.scryfall.io/large/front/0/d/0d2f40ff-f9d2-41ac-bc9f-51711c90d8be.jpg?1783919557",
+        "oracle_text": "Change the text of target spell or permanent by replacing all instances of one basic land type with another.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "validTargets": ["Spell", "Permanent"], "saveAs": "TARGET" },
+            "AbilityPart_Effect_ChooseBasicLandType": [
+                { "inSignal": "SPELL_RESOLVE", "prompt": "Choose the basic land type to replace.", "saveAs": "FROM", "outSignal": "CHOOSE_REPLACEMENT" },
+                { "inSignal": "CHOOSE_REPLACEMENT", "prompt": "Choose the replacement basic land type.", "exceptFrom": "FROM", "saveAs": "TO", "outSignal": "REPLACE_WORD" }
+            ],
+            "AbilityPart_Effect_ReplaceBasicLandTypeWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
+        } }]
     }
 ]

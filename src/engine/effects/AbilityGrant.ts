@@ -17,12 +17,14 @@ export function removeAbilities(matches: (ability: Ability) => boolean, mode = A
     });
 }
 
-export function abilityGrant(def: AbilityDef, source: CardObject, timestamp: () => number) {
+export function abilityGrant(def: AbilityDef, source: CardObject, timestamp: () => number,
+    readWords?: Ability["wordSource"]) {
     const instances = new WeakMap<CardObject, Ability>();
     function forObject(object: CardObject) {
         if (!instances.has(object)) {
             const ability = object.createAbility(def, source);
             ability.grantTimestamp = timestamp;
+            ability.wordSource = readWords;
             instances.set(object, ability);
         }
         return instances.get(object);

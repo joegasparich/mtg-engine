@@ -135,8 +135,9 @@ export class EffectSystem {
             case ContinuousEffectKind.AbilityGrant: {
                 const recipients = typeof effect.recipients === "function" ? effect.recipients : [...effect.recipients];
                 const timestamp = this.layers.nextTimestamp();
+                const words = ability.wordReplacements;
                 const contribution = { select: () => getRecipients(recipients),
-                    changes: [abilityGrant(effect.grant, ability.source, () => timestamp).change] };
+                    changes: [abilityGrant(effect.grant, ability.source, () => timestamp, () => words).change] };
                 return typeof recipients === "function" ? this.layers.register(contribution, timestamp)
                     : this.layers.registerResolved(contribution, timestamp);
             }

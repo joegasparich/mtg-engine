@@ -16,7 +16,7 @@ export class AbilityPart_GrantAbilityContinuously extends AbilityPart {
     private grants: ReturnType<typeof abilityGrant>;
 
     layerEffect() {
-        this.grants = abilityGrant(this.grant, this.ability.source, () => this.ability.timestamp);
+        this.grants = abilityGrant(this.grant, this.ability.source, () => this.ability.timestamp, () => this.ability.wordReplacements);
         return { selectionKey: this.permanentsFrom,
             select: () => getObjectsFromSlateInZones(this.ability, this.permanentsFrom, Battlefield),
             changes: [this.grants.change] };

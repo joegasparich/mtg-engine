@@ -1,7 +1,7 @@
 import type { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import type { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
-import type { CardColour } from "~/defs";
+import type { BasicLandType,CardColour } from "~/defs";
 import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 import { GameEvent,GameEventType } from "./GameEventManager";
 
@@ -44,6 +44,7 @@ export enum ResolutionChoiceKind {
     DamagePreventionAllocation,
     Optional,
     Colour,
+    BasicLandType,
     ManaAbility,
 }
 
@@ -53,6 +54,15 @@ export type ManaAbilityChoice = {
     readonly sourceName: string;
     readonly options: readonly string[];
     submit(player: Player, index: number): void;
+};
+
+export type BasicLandTypeChoice = {
+    readonly kind: ResolutionChoiceKind.BasicLandType;
+    readonly player: Player;
+    readonly sourceName: string;
+    readonly prompt: string;
+    readonly options: readonly BasicLandType[];
+    submit(player: Player, type: BasicLandType): void;
 };
 
 export type ColourChoice = {
@@ -133,7 +143,7 @@ export type DamagePreventionAllocationChoice = {
 };
 
 export type DamagePreventionChoice = DamagePreventionOrderChoice | DamagePreventionAllocationChoice;
-export type ResolutionChoice = CardResolutionChoice | ColourChoice | ManaAbilityChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
+export type ResolutionChoice = CardResolutionChoice | BasicLandTypeChoice | ColourChoice | ManaAbilityChoice | ManaPaymentChoice | OptionalResolutionChoice | SpellXChoice | SpellModeChoice | DamagePreventionChoice;
 
 export class GameEvent_RequestResolutionChoice extends GameEvent {
     type = GameEventType.RequestResolutionChoice;

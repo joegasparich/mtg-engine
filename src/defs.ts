@@ -4,6 +4,7 @@ export interface CardDef {
     name: string,
     image_url: string,
     oracle_text: string,
+    rulesTextTemplate?: string,
     types: readonly CardType[],
     subtypes?: string[],
     cost: string, // {3}{G}{G}
@@ -76,7 +77,6 @@ export enum Keyword {
     FirstStrike = "first strike",
     Flying = "flying",
     Indestructible = "indestructible",
-    Islandwalk = "islandwalk",
     Reach = "reach",
     Vigilance = "vigilance",
 }

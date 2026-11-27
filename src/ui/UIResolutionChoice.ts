@@ -74,7 +74,7 @@ export class UIResolutionChoice {
             this.panel.append(prompt, list, cancel);
             return;
         }
-        if (choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder
+        if (choice.kind === ResolutionChoiceKind.BasicLandType || choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder
             || choice.kind === ResolutionChoiceKind.ManaAbility) {
             const prompt = document.createElement("p");
             const prompts = {
@@ -82,12 +82,20 @@ export class UIResolutionChoice {
                 [ResolutionChoiceKind.DamagePreventionOrder]: "Choose a damage effect to apply next.",
                 [ResolutionChoiceKind.ManaAbility]: "Choose a mana ability to activate next.",
             };
-            prompt.textContent = prompts[choice.kind];
+            prompt.textContent = choice.kind === ResolutionChoiceKind.BasicLandType ? choice.prompt : prompts[choice.kind];
             const list = this.optionsList = document.createElement("ul");
             list.className = "resolution-card-options";
-            const options = choice.kind === ResolutionChoiceKind.Colour
-                ? cardColours.map(colour => ({ label: colourNames[colour], select: () => choice.submit(choice.player, colour) }))
-                : choice.options.map((label, index) => ({ label, select: () => choice.submit(choice.player, index) }));
+            let options: { label: string; select: () => void }[];
+            switch (choice.kind) {
+                case ResolutionChoiceKind.Colour:
+                    options = cardColours.map(colour => ({ label: colourNames[colour], select: () => choice.submit(choice.player, colour) }));
+                    break;
+                case ResolutionChoiceKind.BasicLandType:
+                    options = choice.options.map(type => ({ label: type, select: () => choice.submit(choice.player, type) }));
+                    break;
+                default:
+                    options = choice.options.map((label, index) => ({ label, select: () => choice.submit(choice.player, index) }));
+            }
             for (const { label, select } of options) {
                 const item = document.createElement("li");
                 const option = document.createElement("button");

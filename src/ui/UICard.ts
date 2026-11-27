@@ -37,6 +37,8 @@ export default class UICard extends PIXI.Container {
     private copyIcon?: PIXI.Graphics;
     private originalFace?: PIXI.Sprite;
     private powerToughness?: UICardPowerToughness;
+    private rulesBox?: PIXI.Container;
+    private rulesLabel?: PIXI.Text;
     private typeLine?: UICardTypeLine;
     private focusOutline?: PIXI.Graphics;
     private glowFilter?: GlowFilter;
@@ -212,6 +214,29 @@ export default class UICard extends PIXI.Container {
         this.powerToughness.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
+    private updateRulesText({ rulesText }: Readonly<Characteristics>) {
+        const show = rulesText !== this.face.oracle_text && this.art.texture !== PIXI.Texture.EMPTY;
+        if (this.rulesBox) this.rulesBox.visible = show;
+        if (!show) return;
+
+        if (!this.rulesBox) {
+            const box = this.rulesBox = this.artwork.addChild(new PIXI.Container());
+            box.eventMode = "none";
+            // Fit inside the rules box of the 30th Anniversary frame, above the P/T capsule.
+            box.addChild(new PIXI.Graphics().roundRect(-54, 20, 108, 48, 1.5).fill(0xf4f1e8));
+            this.rulesLabel = box.addChild(new PIXI.Text({ resolution: 4, style: {
+                fontFamily: "Georgia, serif", fontSize: 6.5, fill: 0x183553, wordWrap: true, wordWrapWidth: 102,
+            } }));
+            this.rulesLabel.position.set(-51, 22);
+        }
+        if (this.rulesLabel.text !== rulesText) {
+            this.rulesLabel.text = rulesText;
+            this.rulesLabel.scale.set(1);
+            this.rulesLabel.scale.set(Math.min(1, 44 / this.rulesLabel.height));
+        }
+        this.rulesBox.scale.set(this.art.width / CARD_WIDTH, this.art.height / CARD_HEIGHT);
+    }
+
     private updateTypeLine({ types, subtypes }: Readonly<Characteristics>) {
         const { art } = this;
         if (art.texture === PIXI.Texture.EMPTY)
@@ -298,6 +323,7 @@ export default class UICard extends PIXI.Container {
         const characteristics = this.object.characteristics;
         this.updatePowerToughness(characteristics);
         this.updateTypeLine(characteristics);
+        this.updateRulesText(characteristics);
 
         const selection = uiRoot.cardSelection;
         const state = selection?.stateFor(this.object);

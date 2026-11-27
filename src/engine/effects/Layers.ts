@@ -1,3 +1,4 @@
+import type { WordReplacement } from "~/rulesWords";
 import type { Ability } from "@engine/abilities/Ability";
 import type { CardObject } from "@engine/GameObject";
 import type { ManaCost } from "@engine/mana";
@@ -11,6 +12,7 @@ export enum Layer {
 }
 
 export interface Characteristics {
+    wordReplacements: readonly WordReplacement[];
     definition: Readonly<CardDef>;
     name: string;
     rulesText: string;
@@ -239,7 +241,7 @@ export class LayerSystem {
                 if (state.prohibitedAbilities?.length)
                     state.abilities = state.abilities.filter(ability => !state.prohibitedAbilities.some(matches => matches(ability)));
             }
-            if (layer === Layer.Type)
+            if (layer === Layer.Type || (layer === Layer.Text && state.subtypes !== before.subtypes))
                 state.abilities = object.withLandAbilities(state);
             this.context.set(object, state);
             abilitiesChanged ||= state.abilities !== before.abilities;
