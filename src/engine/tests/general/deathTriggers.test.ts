@@ -105,7 +105,7 @@ test("three simultaneous deaths resolve independently using one pre-move slate p
             AbilityPart_SelectObjects: {
                 inSignal: "READ", zone: ZoneKind.Battlefield, targetValidator: { cardType: CardType.Creature }, saveAs: "CREATURES",
             },
-            AbilityPart_Effect_DealDamage: { source: "THIS", target: "PLAYER", amount: "AMOUNT" },
+            AbilityPart_Effect_DealDamage: { source: "THIS", assignments: [{ target: "PLAYER", amount: "AMOUNT" }] },
         } }],
     }, player, player.battlefield);
     const second = addTestCard({ ...bear, power: 3 }, opponent, opponent.battlefield);
@@ -159,7 +159,7 @@ test("a later death keeps its own reads while the previous trigger is still on t
         ...bear, abilities: [{ parts: {
             AbilityPart_Trigger_Dies: { subject: "WATCHED", beforeMoveSignal: "READ" },
             AbilityPart_ReadValue: { inSignal: "READ", value: "WATCHED.power", saveAs: "AMOUNT" },
-            AbilityPart_Effect_DealDamage: { source: "THIS", target: "CONTROLLER", amount: "AMOUNT" },
+            AbilityPart_Effect_DealDamage: { source: "THIS", assignments: [{ target: "CONTROLLER", amount: "AMOUNT" }] },
         } }],
     }, player, player.battlefield);
     const slate = source.abilities[0].slate;

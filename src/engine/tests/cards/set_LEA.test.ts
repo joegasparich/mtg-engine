@@ -83,7 +83,7 @@ describe("Guardian Angel", () => {
                 saveAs: "VICTIM", validTargets: [TargetTypeKeys.Permanent],
                 targetValidator: { cardType: CardType.Creature },
             },
-            AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "VICTIM", amount: 3 },
+            AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", assignments: [{ target: "VICTIM", amount: 3 }] },
         } }],
     };
     let caster: Player;
@@ -2469,7 +2469,7 @@ describe("Reverse Damage", () => {
             ...cardData[ANCESTRAL_RECALL],
             abilities: [{ parts: {
                 AbilityPart_Target: { saveAs: "TARGET", validTargets: ["Player"] },
-                AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "TARGET", amount: 3 },
+                AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", assignments: [{ target: "TARGET", amount: 3 }] },
             } }],
         }, opponent, opponent.hand);
         expect(game.stack.spellCast(opponent, burn, [caster])).toBe(true);
@@ -4517,5 +4517,176 @@ describe("Power Sink", () => {
         expect(land.tapped).toBe(false);
         expect(opponent.manaPool[ManaColour.R]).toBe(1);
         expect(caster.graveyard.objects.map(card => card.card)).toEqual([sink.card]);
+    });
+});
+
+describe("Prodigal Sorcerer", () => {
+    const def = cardData.find(card => card.name === "Prodigal Sorcerer");
+
+    test("taps to deal 1 to a creature or player, even if the Sorcerer leaves before resolution", () => {
+        Game.init();
+        const caster = game.addPlayer([]);
+        const opponent = game.addPlayer([]);
+        const sorcerer = addTestCard(def, caster, caster.battlefield);
+        startMainPhase();
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const newSorcerer = addTestCard(def, caster, caster.battlefield);
+        expect(newSorcerer.canActivate(newSorcerer.abilities[0], caster)).toBe(false);
+
+        playerActionManager.getCardActions(sorcerer, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([opponent])).toBe(true);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        game.pendingTargeter.onTargeted([creature]);
+        expect(sorcerer.tapped).toBe(true);
+        expect(creature.damageTaken).toBe(0);
+        moveTestCard(sorcerer, caster.graveyard);
+        passPriorityRound();
+        expect(creature.damageTaken).toBe(1);
+    });
+});
+
+describe("Psionic Blast", () => {
+    const def = cardData.find(card => card.name === "Psionic Blast");
+    let caster: Player;
+    let opponent: Player;
+    let blast: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        blast = addTestCard(def, caster, caster.hand);
+    });
+
+    test("deals 4 to its target and 2 to its controller simultaneously", () => {
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.Colourless] = 2;
+        playerActionManager.getCardActions(blast, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        game.pendingTargeter.onTargeted([opponent]);
+        expect(caster.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+
+        const observed: number[][] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, () => observed.push([opponent.life, caster.life]));
+        passPriorityRound();
+        expect(observed).toEqual([[16, 18], [16, 18]]);
+    });
+
+    test("targeting yourself deals 6 damage in one hit", () => {
+        const amounts: number[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (hit: GameEvent_DealDamage) => amounts.push(hit.amount));
+        expect(game.stack.spellCast(caster, blast, [caster])).toBe(true);
+        passPriorityRound();
+        expect(amounts).toEqual([6]);
+        expect(caster.life).toBe(14);
+    });
+
+    test("deals no damage if its only target has left the battlefield", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, blast, [creature])).toBe(true);
+        moveTestCard(creature, opponent.hand);
+        passPriorityRound();
+        expect(caster.life).toBe(20);
+        expect(caster.graveyard.objects[0].card).toBe(blast.card);
+    });
+});
+
+describe("Psychic Venom", () => {
+    const def = cardData.find(card => card.name === "Psychic Venom");
+    let caster: Player;
+    let opponent: Player;
+    let land: Permanent;
+    let aura: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, land, 2, creature);
+        aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(land);
+    });
+
+    test("triggers only when the enchanted land becomes tapped, including for mana", () => {
+        const otherLand = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(otherLand));
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        new PlayerActions.ActivateAbility(land, land.abilities[0]).perform(opponent);
+        expect(opponent.manaPool[ManaColour.G]).toBe(1);
+        gameEventManager.addEvent(new GameEvent_TapCard(land));
+        expect(game.stack.objects).toHaveLength(1);
+        expect(opponent.life).toBe(20);
+        passPriorityRound();
+        expect(opponent.life).toBe(18);
+
+        gameEventManager.addEvent(new GameEvent_UntapCard(land));
+        gameEventManager.addEvent(new GameEvent_TapCard(land));
+        passPriorityRound();
+        expect(opponent.life).toBe(16);
+    });
+
+    test("follows the tapped land when the Aura moves and uses its last controller if the land leaves", () => {
+        const otherLand = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(land));
+        gameEventManager.addEvent(new GameEvent_AttachPermanent(aura, otherLand));
+        land.controller = caster;
+        moveTestCard(land, opponent.hand);
+        passPriorityRound();
+        expect([caster.life, opponent.life]).toEqual([18, 20]);
+    });
+});
+
+describe("Sea Serpent", () => {
+    const def = cardData.find(card => card.name === "Sea Serpent");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+    });
+
+    test("can attack only a defending player who controls an Island, even a tapped one", () => {
+        addTestCard(island, caster, caster.battlefield);
+        const serpent = addTestCard(def, caster, caster.battlefield);
+        addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        startMainPhase();
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        const attack = new PlayerActions.DeclareAttacker(serpent);
+        attack.perform(caster);
+        expect(CombatManager.attackingCreatures.has(serpent)).toBe(false);
+
+        const defendingIsland = addTestCard(island, opponent, opponent.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(defendingIsland));
+        attack.perform(caster);
+        expect(CombatManager.attackingCreatures.get(serpent)).toBe(opponent);
+    });
+
+    test("casts for {5}{U} without an Island and is sacrificed even if its controller gains an Island in response", () => {
+        startMainPhase();
+        const card = addTestCard(def, caster, caster.hand);
+        addTestCard(island, opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.Colourless] = 6;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        caster.manaPool[ManaColour.Colourless] = 5;
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(caster.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        passPriorityRound();
+        const [serpent] = caster.battlefield.objects;
+        expect(serpent).toMatchObject({ power: 5, toughness: 5, subtypes: ["Serpent"] });
+        expect(game.stack.objects).toHaveLength(1);
+        addTestCard(island, caster, caster.battlefield);
+        passPriorityRound();
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([card.card]);
     });
 });

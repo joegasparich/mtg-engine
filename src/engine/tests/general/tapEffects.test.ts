@@ -3,9 +3,24 @@ import { GameEvent_TapCard } from "@engine/events/GameEvent_TapCard";
 import gameEventManager from "@engine/events/GameEventManager";
 import { RulesEventType } from "@engine/events/RulesEvent";
 import Game,{ game } from "@engine/Game";
-import type { Permanent } from "@engine/GameObject";
+import { type Permanent,StackAbility } from "@engine/GameObject";
 import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { cardData } from "~/index";
+
+test("each tap trigger stores its own permanent when two permanents tap simultaneously", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const creature = cardData[GRIZZLY_BEARS];
+    const first = addTestCard(creature, player, player.battlefield);
+    const second = addTestCard(creature, player, player.battlefield);
+    addTestCard({ ...creature, abilities: [{ parts: {
+        AbilityPart_Trigger_BecomesTapped: { storeAs: "TAPPED" },
+    } }] }, player, player.battlefield);
+    gameEventManager.performSimultaneous([new GameEvent_TapCard(first), new GameEvent_TapCard(second)]);
+    game.checkState();
+    const triggered = game.stack.objects.filter(object => object instanceof StackAbility);
+    expect(triggered.map(trigger => trigger.ability.slate.TAPPED)).toEqual([[first], [second]]);
+});
 
 test("tapping a selection produces one simultaneous batch for its untapped permanents", () => {
     Game.init();

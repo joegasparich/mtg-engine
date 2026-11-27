@@ -104,7 +104,7 @@ test("damage can use the size of a slate selection and deals nothing for an empt
     const source = addTestCard({
         ...creature,
         abilities: [{ parts: {
-            AbilityPart_Effect_DealDamage: { source: "THIS", target: "RECIPIENT", amount: { countFrom: "SELECTED" } },
+            AbilityPart_Effect_DealDamage: { source: "THIS", assignments: [{ target: "RECIPIENT", amount: { countFrom: "SELECTED" } }] },
         } }],
     }, player, player.battlefield);
     const [ability] = source.abilities;

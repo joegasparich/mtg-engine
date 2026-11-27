@@ -755,8 +755,7 @@
                     "AbilityPart_Effect_DealDamage": {
                         "inSignal": "SWAMPS_SELECTED",
                         "source": "THIS",
-                        "target": "UPKEEP_PLAYER",
-                        "amount": { "countFrom": "SWAMPS" }
+                        "assignments": [{ "target": "UPKEEP_PLAYER", "amount": { "countFrom": "SWAMPS" } }]
                     }
                 }
             }
@@ -1311,7 +1310,7 @@
                     { "inSignal": "READ_DYING_CREATURE", "value": "DYING.toughness", "saveAs": "TOUGHNESS" },
                     { "inSignal": "READ_DYING_CREATURE", "value": "DYING.controller", "saveAs": "RECIPIENT" }
                 ],
-                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "RECIPIENT", "amount": "TOUGHNESS" }
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "assignments": [{ "target": "RECIPIENT", "amount": "TOUGHNESS" }] }
             } }
         ]
     },
@@ -1351,7 +1350,7 @@
             { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Enchantment" } } } },
             { "parts": {
                 "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.attachedTo.controller", "savePlayerAs": "UPKEEP_PLAYER" },
-                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "UPKEEP_PLAYER", "amount": 1 }
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "assignments": [{ "target": "UPKEEP_PLAYER", "amount": 1 }] }
             } }
         ]
     },
@@ -1534,7 +1533,7 @@
                 "AbilityPart_Target": {
                     "saveAs": "RECIPIENT", "validTargets": ["Player", "Permanent"], "targetValidator": { "cardType": "Creature" }
                 },
-                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "RECIPIENT", "amount": 1 }
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "assignments": [{ "target": "RECIPIENT", "amount": 1 }] }
             } },
             { "parts": {
                 "AbilityPart_SelectObjectsContinuously": {
@@ -1559,7 +1558,7 @@
                 "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.attachedTo.controller", "savePlayerAs": "UPKEEP_PLAYER" },
                 "AbilityPart_Effect_PayAnyMana": { "player": "UPKEEP_PLAYER", "saveAs": "MANA_PAID", "outSignal": "PAYMENT_COMPLETE" },
                 "AbilityPart_Effect_DealDamage": {
-                    "inSignal": "PAYMENT_COMPLETE", "source": "THIS", "target": "UPKEEP_PLAYER", "amount": 2,
+                    "inSignal": "PAYMENT_COMPLETE", "source": "THIS", "assignments": [{ "target": "UPKEEP_PLAYER", "amount": 2 }],
                     "saveAs": "UPKEEP_DAMAGE", "beforeDamageSignal": "PREVENT_DAMAGE"
                 },
                 "AbilityPart_Effect_PreventDamage": { "inSignal": "PREVENT_DAMAGE", "target": "UPKEEP_DAMAGE", "amount": "MANA_PAID" }
@@ -1590,5 +1589,78 @@
             "AbilityPart_Effect_TapPermanents": { "inSignal": "TAP_LANDS", "permanentsFrom": "LANDS", "outSignal": "CLEAR_POOL" },
             "AbilityPart_Effect_ClearManaPool": { "inSignal": "CLEAR_POOL", "target": "PAYER" }
         } }]
+    },
+    {
+        "name": "Prodigal Sorcerer",
+        "image_url": "https://api.scryfall.com/cards/30a/73?format=image&version=large",
+        "oracle_text": "{T}: This creature deals 1 damage to any target.",
+        "types": ["Creature"],
+        "subtypes": ["Human", "Wizard", "Sorcerer"],
+        "cost": "{2}{U}",
+        "power": 1,
+        "toughness": 1,
+        "abilities": [{ "activateString": "{T}: Deal 1 damage to any target", "parts": {
+            "AbilityPart_Activate_Tap": {},
+            "AbilityPart_Target": {
+                "saveAs": "RECIPIENT", "validTargets": ["Player", "Permanent"], "targetValidator": { "cardType": "Creature" }
+            },
+            "AbilityPart_Effect_DealDamage": { "source": "THIS", "assignments": [{ "target": "RECIPIENT", "amount": 1 }] }
+        } }]
+    },
+    {
+        "name": "Psionic Blast",
+        "image_url": "https://api.scryfall.com/cards/30a/74?format=image&version=large",
+        "oracle_text": "Psionic Blast deals 4 damage to any target and 2 damage to you.",
+        "types": ["Instant"],
+        "cost": "{2}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": {
+                "saveAs": "RECIPIENT", "validTargets": ["Player", "Permanent"], "targetValidator": { "cardType": "Creature" }
+            },
+            "AbilityPart_Effect_DealDamage": {
+                "inSignal": "SPELL_RESOLVE", "source": "THIS",
+                "assignments": [{ "target": "RECIPIENT", "amount": 4 }, { "target": "THIS.controller", "amount": 2 }]
+            }
+        } }]
+    },
+    {
+        "name": "Psychic Venom",
+        "image_url": "https://api.scryfall.com/cards/30a/75?format=image&version=large",
+        "oracle_text": "Enchant land\nWhenever enchanted land becomes tapped, this Aura deals 2 damage to that land's controller.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{1}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Land" } } } },
+            { "parts": {
+                "AbilityPart_Trigger_BecomesTapped": { "subject": "THIS.attachedTo", "storeAs": "TAPPED_LAND" },
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "assignments": [{ "target": "TAPPED_LAND.controller", "amount": 2 }] }
+            } }
+        ]
+    },
+    {
+        "name": "Sea Serpent",
+        "image_url": "https://api.scryfall.com/cards/30a/76?format=image&version=large",
+        "rulesTextTemplate": "This creature can't attack unless defending player controls {land:Island:article}.\nWhen you control no {land:Island:plural}, sacrifice this creature.",
+        "types": ["Creature"],
+        "subtypes": ["Serpent"],
+        "cost": "{5}{U}",
+        "power": 5,
+        "toughness": 5,
+        "abilities": [
+            { "parts": {
+                "AbilityPart_AttackRequiresDefenderPermanent": {
+                    "attacker": "THIS", "targetValidator": { "cardType": "Land", "cardSubtype": "Island" }
+                }
+            } },
+            { "parts": {
+                "AbilityPart_SelectObjectsContinuously": {
+                    "zone": "battlefield", "controlledBy": "THIS.controller",
+                    "targetValidator": { "cardType": "Land", "cardSubtype": "Island" }, "saveAs": "ISLANDS"
+                },
+                "AbilityPart_Trigger_NoPermanents": { "permanentsFrom": "ISLANDS" },
+                "AbilityPart_Effect_SacrificePermanent": { "target": "THIS" }
+            } }
+        ]
     }
 ]

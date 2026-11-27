@@ -54,3 +54,17 @@ test.each([true, false])("only distinct changes expose the intermediate empty se
     }
     expect(game.stack.objects).toHaveLength(simultaneous ? 0 : 1);
 });
+
+test("losing control of the last matching permanent triggers even though it stays on the battlefield", () => {
+    const land = addTestCard(cardData[FOREST], player, player.battlefield);
+    addTestCard(watcher, player, player.battlefield);
+    expect(game.stack.objects).toHaveLength(0);
+
+    land.controller = game.players[1];
+    game.checkState();
+    expect(game.stack.objects).toHaveLength(1);
+    land.controller = player;
+    passPriorityRound();
+    expect(player.life).toBe(21);
+    expect(game.stack.objects).toHaveLength(0);
+});

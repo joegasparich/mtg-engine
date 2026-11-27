@@ -355,7 +355,7 @@ test("the Circle can leave before resolution and its shield can stop a spell's d
         ...redCreature,
         types: [CardType.Instant],
         abilities: [{ parts: {
-            AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", target: "THIS.controller", amount: 3 },
+            AbilityPart_Effect_DealDamage: { inSignal: "SPELL_RESOLVE", source: "THIS", assignments: [{ target: "THIS.controller", amount: 3 }] },
         } }],
     }, protectedPlayer, protectedPlayer.hand);
     expect(game.stack.spellCast(protectedPlayer, damageSpell)).toBe(true);
@@ -389,7 +389,7 @@ test("a chosen permanent spell shields damage from the permanent it becomes", ()
 test("a retired source is a legal choice while the stack or a shield refers to it", () => {
     const red = addTestCard({ ...redCreature, abilities: [{ parts: {
         AbilityPart_Activate_Mana: { cost: "{1}" },
-        AbilityPart_Effect_DealDamage: { source: "THIS", target: "CONTROLLER", amount: 2 },
+        AbilityPart_Effect_DealDamage: { source: "THIS", assignments: [{ target: "CONTROLLER", amount: 2 }] },
     } }] }, protectedPlayer, protectedPlayer.battlefield);
     protectedPlayer.manaPool[ManaColour.R]++;
     gameEventManager.addEvent(new GameEvent_ActivateAbility(protectedPlayer, red, red.abilities[0]));
@@ -574,8 +574,8 @@ test("a shield on a saved hit lets another hit from the same ability resolve fir
     const ability = makeAbility({ parts: {
         AbilityPart_Effect_PreventDamage: { inSignal: "BEFORE_DAMAGE", target: "SAVED_HIT", amount: 3 },
         AbilityPart_Effect_DealDamage: [
-            { inSignal: "default", source: "THIS", target: "RECIPIENT", amount: 2, saveAs: "SAVED_HIT", beforeDamageSignal: "BEFORE_DAMAGE" },
-            { inSignal: "BEFORE_DAMAGE", source: "THIS", target: "RECIPIENT", amount: 1 },
+            { inSignal: "default", source: "THIS", assignments: [{ target: "RECIPIENT", amount: 2 }], saveAs: "SAVED_HIT", beforeDamageSignal: "BEFORE_DAMAGE" },
+            { inSignal: "BEFORE_DAMAGE", source: "THIS", assignments: [{ target: "RECIPIENT", amount: 1 }] },
         ],
     } }, source);
     ability.slate.RECIPIENT = [protectedPlayer];
@@ -611,4 +611,17 @@ test("prevention for a single event follows its damage if redirected first", () 
     expect(index).toBeGreaterThanOrEqual(0);
     choice.submit(protectedPlayer, index);
     expect([protectedPlayer.life, opponent.life]).toEqual([20, 19]);
+});
+
+test("preventing damage to one recipient of an instruction still deals damage to the other", () => {
+    const ability = makeAbility({ parts: {
+        AbilityPart_Effect_DealDamage: {
+            source: "THIS", assignments: [{ target: "FIRST", amount: 4 }, { target: "SECOND", amount: 2 }],
+        },
+    } }, circle);
+    ability.slate.FIRST = [protectedPlayer];
+    ability.slate.SECOND = [opponent];
+    shield(protectedPlayer, 4);
+    ability.fireSignal("default");
+    expect([protectedPlayer.life, opponent.life]).toEqual([20, 18]);
 });

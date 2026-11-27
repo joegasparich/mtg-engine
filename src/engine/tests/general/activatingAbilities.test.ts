@@ -171,7 +171,7 @@ test("targeted activations require a choice and each stack occurrence keeps its 
         abilities: [{ parts: {
             AbilityPart_Activate_Mana: { cost: "{R}" },
             AbilityPart_Target: { saveAs: "RECIPIENT", validTargets: [TargetTypeKeys.Player] },
-            AbilityPart_Effect_DealDamage: { source: "THIS", target: "RECIPIENT", amount: 1 },
+            AbilityPart_Effect_DealDamage: { source: "THIS", assignments: [{ target: "RECIPIENT", amount: 1 }] },
         } }],
     }, player, player.battlefield);
     player.manaPool[ManaColour.R] = 2;
