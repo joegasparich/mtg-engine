@@ -3702,3 +3702,76 @@ describe("Creature Bond", () => {
         expect(opponent.life).toBe(20);
     });
 });
+
+describe("Drain Power", () => {
+    const def = cardData.find(card => card.name === "Drain Power");
+    const island = cardData.find(card => card.name === "Island");
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        card = addTestCard(def, caster, caster.hand);
+    });
+
+    test("costs {U}{U} and drains both the mana made during resolution and the target's unspent mana", () => {
+        const firstIsland = addTestCard(island, caster, caster.battlefield);
+        const swamp = addTestCard(cardData.find(card => card.name === "Swamp"), caster, caster.battlefield);
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+        const secondIsland = addTestCard(island, caster, caster.battlefield);
+        const forest = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        forest.controller = opponent;
+        const plains = addTestCard(cardData.find(card => card.name === "Plains"), opponent, opponent.battlefield);
+        const mountain = addTestCard(cardData.find(card => card.name === "Mountain"), opponent, opponent.battlefield);
+        const lotus = addTestCard(cardData.find(card => card.name === "Black Lotus"), opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.W] = 1;
+        opponent.manaPool[ManaColour.Colourless] = 2;
+
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([forest])).toBe(false);
+        game.pendingTargeter.onTargeted([opponent]);
+        expect([firstIsland.tapped, secondIsland.tapped, forest.tapped]).toEqual([true, true, false]);
+
+        gameEventManager.addEvent(new GameEvent_Advance());
+        playerActionManager.getCardActions(mountain, opponent)[0].perform(opponent);
+        expect(opponent.manaPool[ManaColour.R]).toBe(1);
+        expect(forest.tapped).toBe(false);
+        passPriorityRound();
+
+        expect([forest.tapped, plains.tapped, mountain.tapped, swamp.tapped, lotus.tapped]).toEqual([true, true, true, false, false]);
+        expect(opponent.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        expect(caster.manaPool).toEqual([2, 0, 0, 1, 1, 2]);
+        expect(game.stack.objects).toHaveLength(0);
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+    });
+
+    test("can target its caster and return all of that player's unspent mana", () => {
+        const spare = addTestCard(island, caster, caster.battlefield);
+        const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 2;
+        caster.manaPool[ManaColour.W] = 1;
+
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        game.pendingTargeter.onTargeted([caster]);
+        passPriorityRound();
+
+        expect(spare.tapped).toBe(true);
+        expect(forest.tapped).toBe(false);
+        expect(caster.manaPool).toEqual([1, 1, 0, 0, 0, 0]);
+    });
+
+    test("still transfers unspent mana from a player with no lands", () => {
+        opponent.manaPool[ManaColour.B] = 2;
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        game.pendingTargeter.onTargeted([opponent]);
+        passPriorityRound();
+
+        expect(opponent.manaPool[ManaColour.B]).toBe(0);
+        expect(caster.manaPool[ManaColour.B]).toBe(2);
+    });
+});

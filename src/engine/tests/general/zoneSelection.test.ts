@@ -1,11 +1,12 @@
-import { selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
+import { getObjectsFromSlateInZones,selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
 import { PlayerAction_ActivateAbility,TargetType,TargetTypeKeys } from "@engine/actions";
 import { GameEvent_CheckTarget } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { type Spell,StackAbility } from "@engine/GameObject";
+import { Stack } from "@engine/Stack";
 import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard,startMainPhase } from "@engine/tests/testData";
-import { ZoneKind } from "@engine/Zone";
+import { Battlefield,Hand,ZoneKind } from "@engine/Zone";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -27,10 +28,13 @@ test("reference selections can read the same object once on a signal or live as 
     ability.fireSignal("CAPTURE");
     expect(slate.SNAPSHOT).toEqual([source]);
     expect(slate.LIVE).toEqual([source]);
+    expect(getObjectsFromSlateInZones(ability, "LIVE", Battlefield)).toEqual([source]);
 
     slate.MARKED = [addTestCard(cardData[FOREST], player, player.battlefield)];
     expect(slate.SNAPSHOT).toEqual([source]);
     expect(slate.LIVE).toEqual([]);
+    expect(getObjectsFromSlateInZones(ability, "SNAPSHOT", Battlefield)).toEqual([source]);
+    expect(getObjectsFromSlateInZones(ability, "LIVE", Battlefield)).toEqual([]);
     ability.fireSignal("CAPTURE");
     expect(slate.SNAPSHOT).toEqual([]);
 });
@@ -62,9 +66,11 @@ test("a signalled selection stores a snapshot of matching cards in the chosen pl
     ability.slate.PLAYER = [opponent];
     ability.fireSignal("SELECT");
     expect(ability.slate.CHOSEN).toEqual([matchingCard]);
+    expect(getObjectsFromSlateInZones(ability, "CHOSEN", Hand)).toEqual([matchingCard]);
 
     moveTestCard(matchingCard, opponent.graveyard);
     expect(ability.slate.CHOSEN).toEqual([matchingCard]);
+    expect(getObjectsFromSlateInZones(ability, "CHOSEN", Hand)).toEqual([]);
     ability.fireSignal("SELECT");
     expect(ability.slate.CHOSEN).toEqual([]);
 });
@@ -217,6 +223,10 @@ test("selection from the shared stack supports spells and stack abilities", () =
     const [spell] = game.stack.objects;
     const stackAbility = new StackAbility(opponent, source, ability, "unused");
     game.stack.onEnter(stackAbility);
+
+    ability.slate.SELECTED = [source, spell, opponent, stackAbility, card];
+    expect(getObjectsFromSlateInZones(ability, "SELECTED", Stack)).toEqual([spell, stackAbility]);
+    expect(getObjectsFromSlateInZones(ability, "SELECTED", Stack, Battlefield)).toEqual([source, spell, stackAbility]);
 
     expect(selectObjectsFromZone(ability, { zone: ZoneKind.Stack })).toEqual([spell, stackAbility]);
     expect(selectObjectsFromZone(ability, { zone: ZoneKind.Stack, controlledBy: "THIS.controller" })).toEqual([stackAbility]);

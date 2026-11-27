@@ -74,9 +74,15 @@ export class UIResolutionChoice {
             this.panel.append(prompt, list, cancel);
             return;
         }
-        if (choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder) {
+        if (choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder
+            || choice.kind === ResolutionChoiceKind.ManaAbility) {
             const prompt = document.createElement("p");
-            prompt.textContent = choice.kind === ResolutionChoiceKind.Colour ? "Choose a colour." : "Choose a damage effect to apply next.";
+            const prompts = {
+                [ResolutionChoiceKind.Colour]: "Choose a colour.",
+                [ResolutionChoiceKind.DamagePreventionOrder]: "Choose a damage effect to apply next.",
+                [ResolutionChoiceKind.ManaAbility]: "Choose a mana ability to activate next.",
+            };
+            prompt.textContent = prompts[choice.kind];
             const list = this.optionsList = document.createElement("ul");
             list.className = "resolution-card-options";
             const options = choice.kind === ResolutionChoiceKind.Colour

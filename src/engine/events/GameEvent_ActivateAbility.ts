@@ -5,6 +5,11 @@ import { GameEvent,GameEventType } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import Player from "@engine/Player";
 
+export enum AbilityActivationTiming {
+    Normal,
+    InstructedDuringResolution,
+}
+
 export class GameEvent_ActivateAbility extends GameEvent {
     type = GameEventType.ActivateAbility;
 
@@ -13,7 +18,8 @@ export class GameEvent_ActivateAbility extends GameEvent {
     ability: Ability;
     readonly targets: readonly ActionTarget[];
 
-    constructor(player: Player, permanent: Permanent, ability: Ability, targets: readonly ActionTarget[] = []) {
+    constructor(player: Player, permanent: Permanent, ability: Ability, targets: readonly ActionTarget[] = [],
+        private readonly timing = AbilityActivationTiming.Normal) {
         super();
 
         this.player = player;
@@ -26,7 +32,11 @@ export class GameEvent_ActivateAbility extends GameEvent {
     }
 
     perform(): boolean {
-        if (!this.permanent.canActivate(this.ability, this.player, playerActionManager.isPayingManaCost(this.player)))
+        // 605.3a and 608.2c: An effect can instruct a player to activate a mana ability during resolution.
+        const instructed = this.timing === AbilityActivationTiming.InstructedDuringResolution
+            && !!this.effect && game.stack.isResolving && !game.hasPendingPlayerInput;
+        const allowManaWithoutPriority = instructed || playerActionManager.isPayingManaCost(this.player);
+        if (!this.permanent.canActivate(this.ability, this.player, allowManaWithoutPriority))
             return false;
 
         const targeter = this.ability.targeter;

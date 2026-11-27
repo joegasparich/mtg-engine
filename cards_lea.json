@@ -1314,5 +1314,30 @@
                 "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "RECIPIENT", "amount": "TOUGHNESS" }
             } }
         ]
+    },
+    {
+        "name": "Drain Power",
+        "image_url": "https://cards.scryfall.io/large/front/6/a/6af0eb80-9c82-41c1-ba6d-176f6d70a8a9.jpg?1783919561",
+        "oracle_text": "Target player activates a mana ability of each land they control. Then that player loses all unspent mana and you add the mana lost this way.",
+        "types": ["Sorcery"],
+        "cost": "{U}{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_Target": { "saveAs": "TARGET_PLAYER", "validTargets": ["Player"] },
+                "AbilityPart_SelectObjects": {
+                    "inSignal": "SPELL_RESOLVE", "zone": "battlefield", "controlledBy": "TARGET_PLAYER",
+                    "targetValidator": { "cardType": "Land" }, "saveAs": "LANDS", "outSignal": "ACTIVATE_MANA"
+                },
+                "AbilityPart_Effect_ActivateManaAbilities": {
+                    "inSignal": "ACTIVATE_MANA", "player": "TARGET_PLAYER", "permanentsFrom": "LANDS", "outSignal": "CLEAR_POOL"
+                },
+                "AbilityPart_Effect_ClearManaPool": {
+                    "inSignal": "CLEAR_POOL", "target": "TARGET_PLAYER", "saveAs": "LOST_MANA", "outSignal": "ADD_MANA"
+                },
+                "AbilityPart_Effect_AddMana": {
+                    "inSignal": "ADD_MANA", "target": "THIS.controller", "manaFrom": "LOST_MANA"
+                }
+            }
+        }]
     }
 ]

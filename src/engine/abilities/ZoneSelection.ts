@@ -2,9 +2,9 @@ import { resolveAbilityGrammar,type GrammarKey } from "@engine/abilities";
 import type { Ability } from "@engine/abilities/Ability";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { game } from "@engine/Game";
-import { CardObject,type GameObject,Permanent } from "@engine/GameObject";
+import { CardObject,GameObject,Permanent } from "@engine/GameObject";
 import Player from "@engine/Player";
-import { Battlefield,type Zone,ZoneKind } from "@engine/Zone";
+import { type Zone,ZoneKind } from "@engine/Zone";
 import type { TargetValidator } from "~/defs";
 
 export type ZoneSelection = {
@@ -52,11 +52,16 @@ export function selectObjectsFromZone(ability: Ability, selection: ZoneSelection
         && (!targetValidator || (object instanceof CardObject && matchesTargetValidator(object, targetValidator)))));
 }
 
-export function getBattlefieldPermanentsFromSlate(ability: Ability, key: GrammarKey): readonly Permanent[] {
+type ZoneClass = abstract new () => Zone;
+type ObjectInZone<T extends ZoneClass> = InstanceType<T>["objects"][number];
+
+export function getObjectsFromSlateInZones<T extends readonly ZoneClass[]>(ability: Ability, key: GrammarKey,
+    ...zoneTypes: T): readonly ObjectInZone<T[number]>[] {
     // During a layer pass a static ability may exist before its event listeners are installed.
     const objects: readonly unknown[] = ability.parts.map(part => part.continuousSelection?.(key))
         .find(selection => selection !== undefined) ?? ability.slate[key] ?? [];
-    return objects.filter((object): object is Permanent => object instanceof Permanent && object.zone instanceof Battlefield);
+    return objects.filter((object): object is ObjectInZone<T[number]> =>
+        object instanceof GameObject && zoneTypes.some(zoneType => object.zone instanceof zoneType));
 }
 
 export function getSelectionZones(ability: Ability, { zone, zoneOf }: ZoneSelection): readonly Zone[] {

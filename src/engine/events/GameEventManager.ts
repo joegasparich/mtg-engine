@@ -50,6 +50,7 @@ export enum GameEventType {
     DrawCards,
     RegeneratePermanent,
     TakeSpecialAction,
+    LoseMana,
 }
 
 export interface TimestampAssignment {

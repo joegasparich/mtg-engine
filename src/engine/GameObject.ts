@@ -383,9 +383,9 @@ export class Permanent extends CardObject {
         return potentialMana;
     }
 
-    canActivate(ability: Ability, actor: Player, payingManaCost = false) {
+    canActivate(ability: Ability, actor: Player, allowManaWithoutPriority = false) {
         return this.zone instanceof Battlefield && this.abilities.includes(ability) && ability.activator === actor
-            && (game.priorityPlayer === actor || (payingManaCost && ability.def.isManaAbility))
+            && (game.priorityPlayer === actor || (allowManaWithoutPriority && ability.def.isManaAbility))
             && ability.canActivate();
     }
 

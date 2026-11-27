@@ -1,6 +1,7 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import { getBattlefieldPermanentsFromSlate } from "@engine/abilities/ZoneSelection";
+import { getObjectsFromSlateInZones } from "@engine/abilities/ZoneSelection";
 import { change,Layer } from "@engine/effects/Layers";
+import { Battlefield } from "@engine/Zone";
 import { BasicLandType,CardType } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
@@ -14,7 +15,7 @@ export class AbilityPart_SetBasicLandType extends AbilityPart {
     landType: BasicLandType;
 
     layerEffect() {
-        return { select: () => getBattlefieldPermanentsFromSlate(this.ability, this.landsFrom)
+        return { select: () => getObjectsFromSlateInZones(this.ability, this.landsFrom, Battlefield)
             .filter(object => object.hasType(CardType.Land)),
             changes: [change(Layer.Type, () => [this.landType] as const, (state, type) => {
                 // 305.7: Setting a basic land type replaces land subtypes and rules-text abilities.

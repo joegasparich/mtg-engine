@@ -11,6 +11,7 @@ import { AbilityPart_Effect } from "./AbilityPart_Effect";
 export class AbilityPart_Effect_AddMana extends AbilityPart_Effect {
     target: GrammarKey;
     mana = "";
+    manaFrom?: GrammarKey;
     colourFrom?: GrammarKey;
     amount = 1;
 
@@ -20,7 +21,13 @@ export class AbilityPart_Effect_AddMana extends AbilityPart_Effect {
             return;
 
         let mana: Readonly<ManaAmount>;
-        if (this.colourFrom) {
+        if (this.manaFrom) {
+            const stored: Readonly<ManaAmount> | undefined = this.ability.slate[this.manaFrom]?.[0];
+            if (!Array.isArray(stored) || stored.length !== ManaColour.Generic
+                || !stored.every(amount => Number.isSafeInteger(amount) && amount >= 0))
+                return;
+            mana = stored;
+        } else if (this.colourFrom) {
             const colour: CardColour | undefined = this.ability.slate[this.colourFrom]?.[0];
             if (!cardColours.includes(colour) || !Number.isSafeInteger(this.amount) || this.amount <= 0)
                 return;

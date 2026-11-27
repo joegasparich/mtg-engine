@@ -1,8 +1,9 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import { getBattlefieldPermanentsFromSlate } from "@engine/abilities/ZoneSelection";
+import { getObjectsFromSlateInZones } from "@engine/abilities/ZoneSelection";
 import { abilityGrant } from "@engine/effects/AbilityGrant";
 import type { Characteristics } from "@engine/effects/Layers";
 import type { CardObject } from "@engine/GameObject";
+import { Battlefield } from "@engine/Zone";
 import type { AbilityDef } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
@@ -17,7 +18,7 @@ export class AbilityPart_GrantAbilityContinuously extends AbilityPart {
     layerEffect() {
         this.grants = abilityGrant(this.grant, this.ability.source, () => this.ability.timestamp);
         return { selectionKey: this.permanentsFrom,
-            select: () => getBattlefieldPermanentsFromSlate(this.ability, this.permanentsFrom),
+            select: () => getObjectsFromSlateInZones(this.ability, this.permanentsFrom, Battlefield),
             changes: [this.grants.change] };
     }
 
