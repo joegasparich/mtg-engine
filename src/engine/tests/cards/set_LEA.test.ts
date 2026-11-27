@@ -4978,3 +4978,69 @@ describe("Spell Blast", () => {
         expect(opponent.graveyard.objects.map(object => object.card)).toEqual([sink.card]);
     });
 });
+
+describe("Stasis", () => {
+    const def = cardData.find(card => card.name === "Stasis");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+    let controller: Player;
+    let opponent: Player;
+    let stasis: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        controller = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        stasis = addTestCard(def, controller, controller.hand);
+        controller.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(stasis, controller)[0].perform(controller);
+        passPriorityRound();
+        expect(controller.battlefield.objects.at(-1).card).toBe(stasis.card);
+    });
+
+    test("both players skip untap, and the controller can pay for one more turn", () => {
+        const paymentLand = addTestCard(island, controller, controller.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        creature.tapped = true;
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentStepIndex).toBe(StepIndex.Upkeep);
+        expect(game.stack.objects).toHaveLength(0);
+        expect(creature.tapped).toBe(true);
+        gameEventManager.addEvent(new GameEvent_UntapCard(creature));
+        expect(creature.tapped).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentStepIndex).toBe(StepIndex.Upkeep);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice).toMatchObject({ player: controller, cost: "{U}" });
+        choice.submit(controller, ManaPaymentDecision.Pay);
+        expect(paymentLand.tapped).toBe(true);
+        expect(controller.graveyard.objects).toHaveLength(0);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        passPriorityRound();
+        expect(paymentLand.tapped).toBe(true);
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(controller.graveyard.objects.at(-1).card).toBe(stasis.card);
+    });
+
+    test("declining payment restores untap starting with the following turn", () => {
+        const paymentLand = addTestCard(island, controller, controller.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        creature.tapped = true;
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        passPriorityRound();
+        game.pendingManaPaymentChoice.submit(controller, ManaPaymentDecision.Decline);
+        expect(controller.graveyard.objects.at(-1).card).toBe(stasis.card);
+        expect(paymentLand.tapped).toBe(false);
+        expect(creature.tapped).toBe(true);
+
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        expect(game.currentStepIndex).toBe(StepIndex.Untap);
+        expect(creature.tapped).toBe(false);
+    });
+});

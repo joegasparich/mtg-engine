@@ -1,5 +1,5 @@
 import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
-import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
+import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DrawCard,GameEvent_GoToNextPhase,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_StepEnd,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { StackAbility } from "@engine/GameObject";
@@ -64,6 +64,31 @@ test("advancing to first strike damage stops at regular damage when first strike
 
     expect(game.turnNumber).toBe(0);
     expect(game.currentStepIndex).toBe(StepIndex.CombatDamage);
+});
+
+test("skipped steps perform no actions and emit no step boundaries, including on the opening turn", () => {
+    const skip = (step: keyof typeof StepIndex) => ({ parts: { AbilityPart_SkipStep: { step } } });
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [skip("Untap"), skip("Upkeep"), skip("Draw")],
+    }, player, player.battlefield);
+    source.tapped = true;
+    const starts: StepIndex[] = [];
+    const ends: StepIndex[] = [];
+    gameEventManager.onGamePerformed(GameEventType.StepStart, (event: GameEvent_StepStart) => starts.push(event.stepIndex));
+    gameEventManager.onGamePerformed(GameEventType.StepEnd, (event: GameEvent_StepEnd) => ends.push(event.stepIndex));
+
+    game.startGame();
+    expect(starts).toEqual([StepIndex.Main]);
+    expect(ends).toEqual([]);
+    expect(source.tapped).toBe(true);
+    expect(player.hand.objects).toHaveLength(7);
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Draw));
+    expect(game.turnNumber).toBe(1);
+    expect(game.currentStepIndex).toBe(StepIndex.Main);
+    expect(player.hand.objects).toHaveLength(7);
+    expect([...starts, ...ends].every(step => step >= StepIndex.Main)).toBe(true);
 });
 
 test("should change turns", () => {

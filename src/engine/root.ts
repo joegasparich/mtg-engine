@@ -15,12 +15,12 @@ declare global {
 }
 
 const playtestDeck = Object.entries({
-    Island: 24,
-    "Spell Blast": 12,
+    Island: 26,
+    Stasis: 8,
     "Merfolk of the Pearl Trident": 8,
-    "Prodigal Sorcerer": 6,
+    "Prodigal Sorcerer": 8,
     "Phantom Monster": 6,
-    "Power Sink": 4,
+    "Mana Short": 4,
 }).flatMap(([name, copies]) => {
     const index = cardData.findIndex(card => card.name === name);
     if (index < 0)

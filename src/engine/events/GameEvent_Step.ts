@@ -91,6 +91,15 @@ export class GameEvent_TurnStart extends GameEvent {
     }
 }
 
+export class GameEvent_CheckStep extends GameEvent {
+    type = GameEventType.CheckStep;
+    label = "";
+
+    constructor(readonly player: Player, readonly stepIndex: StepIndex) {
+        super();
+    }
+}
+
 export class GameEvent_StepStart extends GameEvent {
     type = GameEventType.StepStart;
 

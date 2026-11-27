@@ -2,7 +2,7 @@ import type { Ability } from "@engine/abilities";
 import playerActionManager,{ Targeter } from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { DamageAllocationAction } from "@engine/effects/DamagePrevention";
-import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
+import { GameEvent_CheckStep,GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import {
     type CardChoice,CardChoicePresentation,CardChoiceVisibility,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,
@@ -279,7 +279,7 @@ export default class Game {
 
         this.startTurn();
 
-        this.startStep(this.currentStepIndex);
+        this.startStep();
         this.autoAdvance = this.options.allowAutoSkip;
         this.checkState();
     }
@@ -369,7 +369,7 @@ export default class Game {
         if (this.currentStepIndex === StepIndex.Cleanup) {
             // 514.3a: Priority in cleanup is followed by another cleanup step.
             this.endStep(this.currentStepIndex);
-            this.startStep(this.currentStepIndex);
+            this.startStep();
             return true;
         }
         return this.nextStep(this.autoAdvance, true);
@@ -405,6 +405,12 @@ export default class Game {
         this.passes = 0;
         this.autoAdvance = doAutoSkip;
         this.endStep(this.currentStepIndex);
+        this.advanceStepIndex(skipEmptyCombat);
+        this.startStep();
+        return true;
+    }
+
+    private advanceStepIndex(skipEmptyCombat = false) {
         // 508.8: Without attackers, go straight from declare attackers to end of combat.
         if (skipEmptyCombat && this.currentStepIndex === StepIndex.DeclareAttackers
             && !CombatManager.declaredAnyAttackers && !CombatManager.attackingCreatures.size) {
@@ -417,22 +423,15 @@ export default class Game {
             this.currentStepIndex++;
         }
 
-        // 103.8a
-        if (this.currentStepIndex === StepIndex.Draw && this.turnNumber === 0 && this.players.length === 2)
-            this.currentStepIndex++;
-
         if (this.currentStepIndex > StepIndex.Cleanup)
         {
             this.currentTurnPlayerID = (this.currentTurnPlayerID + 1) % this.players.length;
             this.turnNumber++;
-            this.currentStepIndex = 0;
+            this.currentStepIndex = StepIndex.Untap;
             this.landPlayedThisTurn = false;
 
             this.startTurn();
         }
-
-        this.startStep(this.currentStepIndex);
-        return true;
     }
 
     private startTurn() {
@@ -449,13 +448,13 @@ export default class Game {
         return this.goToStep(Step.phaseStart(nextPhaseIndex));
     }
     goToStep(index: StepIndex, autoSkip = false): boolean {
+        const targetTurn = index > this.currentStepIndex ? this.turnNumber : this.turnNumber + 1;
         if (!Step.all[index] || !this.nextStep(false))
             return false;
 
         const advance = () => {
-            // A request for the optional first strike step stops at regular damage if it was skipped.
-            if (this.currentStepIndex === index
-                || (index === StepIndex.FirstStrikeDamage && this.currentStepIndex === StepIndex.CombatDamage)) {
+            // When the requested step is skipped, stop at the first step that follows it.
+            if (this.turnNumber > targetTurn || (this.turnNumber === targetTurn && this.currentStepIndex >= index)) {
                 this.autoAdvance = autoSkip;
                 return;
             }
@@ -484,7 +483,13 @@ export default class Game {
         }
         return this.advance(null);
     }
-    private startStep(index: StepIndex) {
+    private startStep() {
+        // 103.8a, 614.10: Skip a step before its turn-based actions or step-start triggers.
+        while ((this.currentStepIndex === StepIndex.Draw && this.turnNumber === 0 && this.players.length === 2)
+            || !gameEventManager.checkEvent(new GameEvent_CheckStep(this.currentTurnPlayer(), this.currentStepIndex)))
+            this.advanceStepIndex();
+
+        const index = this.currentStepIndex;
         const player = this.currentTurnPlayer();
         const step = Step.all[index];
         this.cleanupNeedsPriority = false;

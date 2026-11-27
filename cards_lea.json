@@ -1707,5 +1707,20 @@
             "AbilityPart_Target": { "saveAs": "SPELL", "validTargets": ["Spell"], "targetValidator": { "manaValueEquals": "THIS.chosenX" } },
             "AbilityPart_Effect_ChangeZones": { "inSignal": "SPELL_RESOLVE", "target": "SPELL", "destination": "graveyard" }
         } }]
+    },
+    {
+        "name": "Stasis",
+        "image_url": "https://cards.scryfall.io/large/front/7/4/7436c28f-d45c-46b0-801d-ff72bf9c3865.jpg",
+        "oracle_text": "Players skip their untap steps.\nAt the beginning of your upkeep, sacrifice this enchantment unless you pay {U}.",
+        "types": ["Enchantment"],
+        "cost": "{1}{U}",
+        "abilities": [
+            { "parts": { "AbilityPart_SkipStep": { "step": "Untap" } } },
+            { "parts": {
+                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.controller" },
+                "AbilityPart_Effect_ChooseManaPayment": { "cost": "{U}", "onDeclineSignal": "SACRIFICE" },
+                "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
+            } }
+        ]
     }
 ]
