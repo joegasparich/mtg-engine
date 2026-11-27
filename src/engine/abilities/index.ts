@@ -12,7 +12,7 @@ export { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_Ad
 export { AbilityPart_Trigger } from "./parts/trigger/AbilityPart_Trigger";
 
 import { keywordData } from "~/index";
-import { AbilityParts } from "./registry";
+import { createAbilityPart } from "./registry";
 import { bindPartConfig } from "./bindPartConfig";
 
 // Ensures all parts are imported, since we are instantiating them by reflection
@@ -49,15 +49,9 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
 
     const boundConfigs = new WeakMap<object, object>();
     for (const [className, config] of expandParts(ability.def.parts)) {
-        const ctor = AbilityParts[className];
-        if (!ctor)
-            continue;
-
-        const part = new ctor();
-        const bound = bindPartConfig(config, ability, boundConfigs);
-        Object.defineProperties(part, Object.getOwnPropertyDescriptors(bound));
-
-        ability.addPart(part);
+        const part = createAbilityPart(className, bindPartConfig(config, ability, boundConfigs));
+        if (part)
+            ability.addPart(part);
     }
 
     return ability;

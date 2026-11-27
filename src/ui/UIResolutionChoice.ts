@@ -73,7 +73,7 @@ export class UIResolutionChoice {
             return;
         }
         if (choice.kind === ResolutionChoiceKind.BasicLandType || choice.kind === ResolutionChoiceKind.Colour || choice.kind === ResolutionChoiceKind.DamagePreventionOrder
-            || choice.kind === ResolutionChoiceKind.ManaAbility) {
+            || choice.kind === ResolutionChoiceKind.ManaAbility || choice.kind === ResolutionChoiceKind.Option) {
             const prompt = document.createElement("p");
             const prompts = {
                 [ResolutionChoiceKind.DamagePreventionOrder]: "Choose a damage effect to apply next.",

@@ -5201,3 +5201,85 @@ describe("Timetwister", () => {
         expect(exiled.zone).toBe(game.exile);
     });
 });
+
+describe("Twiddle", () => {
+    let caster: Player;
+    let opponent: Player;
+    let card: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        card = addTestCard(cardData.find(def => def.name === "Twiddle"), caster, caster.hand);
+    });
+
+    test("pays {U}, targets an artifact, creature, or land, and can tap it", () => {
+        const prism = addTestCard(cardData.find(def => def.name === "Celestial Prism"), opponent, opponent.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const castle = addTestCard(cardData.find(def => def.name === "Castle"), caster, caster.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        const targeter = game.pendingTargeter;
+        for (const target of [prism, bears, land])
+            expect(targeter.validateTargets([target])).toBe(true);
+        expect(targeter.validateTargets([castle])).toBe(false);
+        expect(targeter.validateTargets([opponent])).toBe(false);
+        targeter.onTargeted([prism]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(game.pendingOptionChoice).toBeNull();
+
+        passPriorityRound();
+        expect(game.pendingOptionChoice).toMatchObject({ player: caster, options: ["Tap", "Leave unchanged"] });
+        game.pendingOptionChoice.submit(caster, 0);
+        expect(prism.tapped).toBe(true);
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+    });
+
+    test.each(["Untap", "Leave unchanged"])("offers %s when the opponent taps the land in response", label => {
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, card, [land])).toBe(true);
+        gameEventManager.addEvent(new GameEvent_TapCard(land));
+        passPriorityRound();
+        expect(game.pendingOptionChoice).toMatchObject({ player: caster, options: ["Untap", "Leave unchanged"] });
+        const choice = game.pendingOptionChoice;
+        choice.submit(caster, choice.options.indexOf(label));
+        expect(land.tapped).toBe(label === "Leave unchanged");
+    });
+
+    test("offers no choice when the target has left the battlefield", () => {
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, card, [bears])).toBe(true);
+        moveTestCard(bears, opponent.hand);
+        passPriorityRound();
+        expect(game.pendingOptionChoice).toBeNull();
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+    });
+});
+
+describe("Unsummon", () => {
+    test("pays {U} and returns a borrowed creature to its owner's hand", () => {
+        Game.init();
+        const caster = game.addPlayer([]);
+        const owner = game.addPlayer([]);
+        startMainPhase();
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], owner, owner.hand);
+        const enter = new GameEvent_ChangeCardZone(bears, caster.battlefield, { controller: caster });
+        gameEventManager.addEvent(enter);
+        const land = addTestCard(cardData[FOREST], owner, owner.battlefield);
+        const card = addTestCard(cardData.find(def => def.name === "Unsummon"), caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        expect(enter.newObject.controller).toBe(caster);
+        game.pendingTargeter.onTargeted([enter.newObject]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+
+        expect(owner.hand.objects.map(object => object.card)).toEqual([bears.card]);
+        expect(caster.battlefield.objects).toHaveLength(0);
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+    });
+});

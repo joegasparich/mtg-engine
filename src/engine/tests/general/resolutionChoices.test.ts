@@ -11,6 +11,7 @@ import { Spell,StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
+import { ZoneKind } from "@engine/Zone";
 import { addTestCard,chooseEarliestTimestamps,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
@@ -329,4 +330,74 @@ test("an optional payment combines fixed mana and the spell's X and charges the 
     expect(game.pendingManaPaymentChoice).toBeNull();
     expect(payer.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
     expect(forest.tapped).toBe(true);
+});
+
+test.each([0, 1, 2])("a three-option choice resolves only the selected effect on the original slate (%i)", index => {
+    const caster = game.addPlayer([]);
+    const recipient = game.addPlayer([]);
+    startMainPhase();
+    const spell = addTestCard({ ...testSpell, abilities: [{ parts: {
+        AbilityPart_Target: { saveAs: "RECIPIENT", validTargets: [TargetTypeKeys.Player] },
+        AbilityPart_Choice: { inSignal: "SPELL_RESOLVE", options: [1, 2, 3].map(amount => ({
+            label: `Gain ${amount} life`, effect: { AbilityPart_Effect_GainLife: { target: "RECIPIENT", amount } },
+        })) },
+    } }] }, caster, caster.hand);
+    expect(game.stack.spellCast(caster, spell, [recipient])).toBe(true);
+    passPriorityRound();
+
+    const choice = game.pendingOptionChoice;
+    expect(choice.options).toEqual(["Gain 1 life", "Gain 2 life", "Gain 3 life"]);
+    expect(game.priorityPlayer).toBeNull();
+    choice.submit(recipient, index);
+    choice.submit(caster, 3);
+    expect(game.pendingOptionChoice).toBe(choice);
+    expect(recipient.life).toBe(20);
+
+    choice.submit(caster, index);
+    choice.submit(caster, index);
+    expect(recipient.life).toBe(21 + index);
+    expect(caster.life).toBe(20);
+    expect(game.stack.objects).toHaveLength(0);
+});
+
+test("a chosen effect can pause for input and signal a follow-up on the same slate", () => {
+    const caster = game.addPlayer([]);
+    game.addPlayer([]);
+    startMainPhase();
+    const spell = addTestCard({ ...testSpell, abilities: [{ parts: {
+        AbilityPart_Choice: { inSignal: "SPELL_RESOLVE", options: [
+            { label: "Choose mana", effect: { AbilityPart_Effect_ChooseColour: {
+                chooser: "THIS.controller", saveAs: "COLOUR", outSignal: "ADD_MANA",
+            } } },
+            { label: "Pass" },
+        ] },
+        AbilityPart_Effect_AddMana: { inSignal: "ADD_MANA", target: "THIS.controller", colourFrom: "COLOUR" },
+    } }] }, caster, caster.hand);
+    expect(game.stack.spellCast(caster, spell)).toBe(true);
+    passPriorityRound();
+    game.pendingOptionChoice.submit(caster, 0);
+    expect(game.stack.objects.at(-1)).toMatchObject({ card: spell.card });
+    game.pendingColourChoice.submit(caster, "G");
+    expect(caster.manaPool[ManaColour.G]).toBe(1);
+    expect(game.stack.objects).toHaveLength(0);
+});
+
+test.each([false, true])("continues without a prompt with zero or one legal option (land present: %s)", hasLand => {
+    const caster = game.addPlayer([]);
+    game.addPlayer([]);
+    startMainPhase();
+    if (hasLand)
+        lands(caster, 1);
+    const spell = addTestCard({ ...testSpell, abilities: [{ parts: {
+        AbilityPart_Choice: { inSignal: "SPELL_RESOLVE", options: [CardType.Land, CardType.Creature].map(cardType => ({
+            label: cardType,
+            when: { zone: ZoneKind.Battlefield, targetValidator: { cardType } },
+            effect: { AbilityPart_Effect_GainLife: { target: "THIS.controller", amount: 1 } },
+        })) },
+    } }] }, caster, caster.hand);
+    expect(game.stack.spellCast(caster, spell)).toBe(true);
+    passPriorityRound();
+    expect(caster.life).toBe(hasLand ? 21 : 20);
+    expect(game.pendingOptionChoice).toBeNull();
+    expect(game.stack.objects).toHaveLength(0);
 });

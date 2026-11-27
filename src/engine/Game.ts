@@ -73,6 +73,9 @@ export default class Game {
     get pendingOptionalChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.Optional ? this.resolutionChoice : null;
     }
+    get pendingOptionChoice() {
+        return this.resolutionChoice?.kind === ResolutionChoiceKind.Option ? this.resolutionChoice : null;
+    }
     get pendingSpellXChoice() {
         return this.resolutionChoice?.kind === ResolutionChoiceKind.SpellX ? this.resolutionChoice : null;
     }

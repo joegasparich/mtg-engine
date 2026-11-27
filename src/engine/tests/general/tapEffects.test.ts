@@ -1,6 +1,7 @@
 import { makeAbility } from "@engine/abilities";
+import { GameEvent_UntapCard } from "@engine/events/GameEvent_UntapCard";
 import { GameEvent_TapCard } from "@engine/events/GameEvent_TapCard";
-import gameEventManager from "@engine/events/GameEventManager";
+import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import { RulesEventType } from "@engine/events/RulesEvent";
 import Game,{ game } from "@engine/Game";
 import { type Permanent,StackAbility } from "@engine/GameObject";
@@ -44,4 +45,23 @@ test("tapping a selection produces one simultaneous batch for its untapped perma
 
     expect(batches).toEqual([[first, second]]);
     expect(first.tapped && second.tapped && tapped.tapped).toBe(true);
+});
+
+test("untapping a selection emits events only for tapped permanents on the battlefield", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const creature = cardData[GRIZZLY_BEARS];
+    const first = addTestCard(creature, player, player.battlefield);
+    const second = addTestCard(creature, player, player.battlefield);
+    const untapped = addTestCard(creature, player, player.battlefield);
+    const inHand = addTestCard(creature, player, player.hand);
+    gameEventManager.performSimultaneous([new GameEvent_TapCard(first), new GameEvent_TapCard(second)]);
+    const events: Permanent[] = [];
+    gameEventManager.onGamePerformed<GameEvent_UntapCard>(GameEventType.UntapCard, event => events.push(event.permanent));
+    const ability = makeAbility({ parts: { AbilityPart_Effect_UntapPermanents: { permanentsFrom: "SELECTED" } } }, first);
+    ability.slate.SELECTED = [first, inHand, untapped, second];
+    ability.fireSignal("default");
+
+    expect(events).toEqual([first, second]);
+    expect(first.tapped || second.tapped || untapped.tapped).toBe(false);
 });

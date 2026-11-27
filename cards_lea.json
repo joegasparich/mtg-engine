@@ -1776,5 +1776,33 @@
             "AbilityPart_Effect_ShuffleLibrary": { "inSignal": "SHUFFLE", "playersFrom": "PLAYERS", "outSignal": "DRAW" },
             "AbilityPart_Effect_DrawCards": { "inSignal": "DRAW", "playersFrom": "PLAYERS", "count": 7 }
         } }]
+    },
+    {
+        "name": "Twiddle",
+        "image_url": "https://cards.scryfall.io/large/front/e/9/e93ce0a0-8f26-409e-93a1-07253b620b1a.jpg?1783919544",
+        "oracle_text": "You may tap or untap target artifact, creature, or land.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "saveAs": "TARGET", "validTargets": ["Permanent"], "targetValidator": { "cardTypes": ["Artifact", "Creature", "Land"] } },
+            "AbilityPart_Choice": { "inSignal": "SPELL_RESOLVE", "prompt": "Tap or untap the targeted permanent?", "options": [
+                { "label": "Tap", "when": { "target": "TARGET", "targetValidator": { "tapped": false } },
+                    "effect": { "AbilityPart_Effect_TapPermanents": { "permanentsFrom": "TARGET" } } },
+                { "label": "Untap", "when": { "target": "TARGET", "targetValidator": { "tapped": true } },
+                    "effect": { "AbilityPart_Effect_UntapPermanents": { "permanentsFrom": "TARGET" } } },
+                { "label": "Leave unchanged" }
+            ] }
+        } }]
+    },
+    {
+        "name": "Unsummon",
+        "image_url": "https://cards.scryfall.io/large/front/a/1/a15f9246-46c1-47fd-a739-8c73b06be8be.jpg?1783919541",
+        "oracle_text": "Return target creature to its owner's hand.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "saveAs": "TARGET", "validTargets": ["Permanent"], "targetValidator": { "cardType": "Creature" } },
+            "AbilityPart_Effect_ChangeZones": { "inSignal": "SPELL_RESOLVE", "target": "TARGET", "destination": "hand" }
+        } }]
     }
 ]
