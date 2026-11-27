@@ -1,5 +1,5 @@
 import type { Targeter } from "@engine/actions";
-import type { GameEvent_ChangeCardZone } from "@engine/events";
+import type { ZoneChanged } from "@engine/events";
 import type { CardObject } from "@engine/GameObject";
 import { Exile,type Zone } from "@engine/Zone";
 
@@ -50,7 +50,7 @@ export class UICardPiles {
         return button;
     }
 
-    onCardChangedZone(event: GameEvent_ChangeCardZone) {
+    onCardChangedZone(event: ZoneChanged) {
         for (const pile of this.piles) {
             if (event.oldZone === pile.zone || event.newZone === pile.zone)
                 this.updateButton(pile);

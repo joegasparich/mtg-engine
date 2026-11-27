@@ -1,6 +1,7 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import { selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
 import { GameEvent_DestroyPermanent,GameEvent_DrawCard,GameEvent_DrawCards } from "@engine/events";
-import gameEventManager,{ type EventCheck,GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager,{ type EventCheck } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { addTestCard,ANCESTRAL_RECALL,FOREST,GRIZZLY_BEARS,moveTestCard } from "@engine/tests/testData";
@@ -44,7 +45,7 @@ test("changing control preserves the permanent and its pending battlefield depar
     const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
     const destroy = new GameEvent_DestroyPermanent(land);
     const moves = vi.fn();
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, moves);
+    gameEventManager.rules.on(RulesEventType.ZoneChanged, moves);
 
     land.controller = player;
     expect(moves).not.toHaveBeenCalled();
@@ -55,7 +56,9 @@ test("changing control preserves the permanent and its pending battlefield depar
     expect(land.getPotentialMana(opponent)).not.toContain(1);
 
     gameEventManager.addEvent(destroy);
-    expect(moves).toHaveBeenCalledTimes(1);
+    expect(moves).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        oldZone: player.battlefield, newZone: opponent.graveyard, cause: destroy,
+    }));
     expect(player.battlefield.objects).toEqual([]);
     expect(opponent.graveyard.objects[0].card).toBe(land.card);
 });

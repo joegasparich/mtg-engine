@@ -3,7 +3,7 @@ import type Player from "@engine/Player";
 import type { Ability } from "@engine/abilities";
 import type { DamagePreventionChoices } from "@engine/effects/DamagePrevention";
 import { type CheckListener,type CheckRemovalOverride,type CheckSource,type ContinuousEffect,EffectSystem,EventCheckPhase,type OneShotEffect } from "@engine/effects/EffectSystem";
-import type { GameEvent_ChangeCardZone } from "./GameEvent_ChangeCardZone";
+import { type RecordRulesEvent,type RulesBatchListener,type RulesEvent,RulesEventStream } from "./RulesEvent";
 import type { GameEvent_DealDamage } from "./GameEvent_DealDamage";
 
 export type { CheckSource,EventCheck } from "@engine/effects/EffectSystem";
@@ -69,9 +69,8 @@ export abstract class GameEvent {
 
     get timestampAssignment(): TimestampAssignment | undefined { return undefined; }
     get entryPreparation(): { player: Player; prepare(resume: () => void): void } | undefined { return undefined; }
-    get additionalPerformedTypes(): readonly GameEventType[] { return []; }
 
-    perform(): boolean {
+    perform(_record: RecordRulesEvent): boolean {
         return true;
     }
     then(callback: () => void) {
@@ -104,6 +103,8 @@ interface GameSubscriptionOptions<T extends GameEvent> {
 }
 
 class GameEventManager {
+    readonly rules = new RulesEventStream();
+    private simultaneousRules?: { events: RulesEvent[]; captured: RulesBatchListener[] };
     readonly effects = new EffectSystem(this);
     private readonly eventPerformedListenersByType = new Map<GameEventType, Set<Listener>>();
     private readonly gameListenersByType = new Map<GameEventType, Set<GameSubscription>>();
@@ -132,6 +133,7 @@ class GameEventManager {
         for (const listeners of this.gameListenersByType.values())
             listeners.clear();
         this.gameListenersByType.clear();
+        this.rules.reset();
         this.effects.layers.reset();
         this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
@@ -195,21 +197,6 @@ class GameEventManager {
         const cancel = () => { listeners.delete(subscription); };
         listeners.add(subscription);
         return cancel;
-    }
-
-    // Prepare against the battlefield before the first move. A successful move runs its callback after the batch.
-    beforeZoneChange(prepare: (move: GameEvent_ChangeCardZone) => (() => void) | undefined) {
-        const captureBeforeBatch = (moves: readonly GameEvent_ChangeCardZone[]) => {
-            const callbacks = new Map<GameEvent_ChangeCardZone, () => void>();
-            for (const move of moves) {
-                const callback = prepare(move);
-                if (callback)
-                    callbacks.set(move, callback);
-            }
-            return callbacks;
-        };
-        return this.onGamePerformed(GameEventType.ChangeCardZone,
-            (move: GameEvent_ChangeCardZone, callbacks) => callbacks.get(move)?.(), { captureBeforeBatch });
     }
 
     onCheck(listener: CheckListener) {
@@ -404,6 +391,9 @@ class GameEventManager {
                 return portions;
             }) : events;
             const captured = this.captureGameListeners(pending);
+            const enclosingRules = this.simultaneousRules;
+            const batch = enclosingRules ?? { events: [], captured: [] };
+            batch.captured.push(...this.rules.capture(pending));
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
             const previousBatch = this.afterBatch;
@@ -413,14 +403,17 @@ class GameEventManager {
                 this.afterBatch = new Set();
                 if (pending.length > 1) layers.beginSimultaneousChanges();
             }
+            // Nested immediate actions contribute outcomes to the enclosing simultaneous event (CR 700.1).
+            if (pending.length > 1) this.simultaneousRules = batch;
             try {
                 for (const event of pending) {
-                    if (event.perform()) {
+                    if (event.perform(outcome => batch.events.push(outcome))) {
                         performed.push(event);
                         checkedPerformed ||= event === checked || checkedPortions.includes(event);
                     }
                 }
             } finally {
+                this.simultaneousRules = enclosingRules;
                 if (!enclosingSimultaneous && pending.length > 1) layers.endSimultaneousChanges();
                 layers.changed();
                 const updates = this.afterBatch;
@@ -428,6 +421,7 @@ class GameEventManager {
                 if (!enclosingSimultaneous)
                     updates?.forEach(update => update());
             }
+            if (!enclosingRules) this.rules.publish(batch.events, batch.captured);
             // 615.5: Additional prevention effects follow the damage event, before priority or state checks.
             for (const followUp of afterDamage)
                 followUp();
@@ -504,7 +498,7 @@ class GameEventManager {
 
     private getGameListeners(event: GameEvent): Listener[] {
         // 603.7a: A registration made during dispatch starts with a later event.
-        return [...this.getPerformedTypes(event)].flatMap(type => [...(this.gameListenersByType.get(type) ?? [])]
+        return [event.type, GameEventType.All].flatMap(type => [...(this.gameListenersByType.get(type) ?? [])]
             .flatMap(subscription => "notify" in subscription ? [subscription.notify] : []));
     }
 
@@ -515,8 +509,7 @@ class GameEventManager {
             const lookbacks = [...subscriptions].filter(subscription => "capture" in subscription);
             if (!lookbacks.length)
                 continue;
-            const candidates = pending.filter(event => type === GameEventType.All || type === event.type
-                || event.additionalPerformedTypes.includes(type));
+            const candidates = pending.filter(event => type === GameEventType.All || type === event.type);
             if (candidates.length)
                 captured.set(type, lookbacks.map(subscription => subscription.capture(candidates)));
         }
@@ -528,15 +521,11 @@ class GameEventManager {
             return;
 
         for (const event of performed) {
-            for (const type of this.getPerformedTypes(event)) {
+            for (const type of [event.type, GameEventType.All]) {
                 for (const listener of captured.get(type) ?? [])
                     listener(event);
             }
         }
-    }
-
-    private getPerformedTypes(event: GameEvent) {
-        return new Set([event.type, ...event.additionalPerformedTypes, GameEventType.All]);
     }
 
     private notifyPerformed(event: GameEvent, gameListeners = this.getGameListeners(event)) {
@@ -544,8 +533,6 @@ class GameEventManager {
             listener(event);
 
         this.eventPerformedListenersByType.get(event.type)?.forEach(listener => listener(event));
-        for (const type of event.additionalPerformedTypes)
-            this.eventPerformedListenersByType.get(type)?.forEach(listener => listener(event));
         this.eventPerformedListenersByType.get(GameEventType.All)?.forEach(listener => listener(event));
 
         console.log(`%cGameEvent: ${event.label}`, "color: cyan;");

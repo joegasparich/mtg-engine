@@ -12,6 +12,7 @@
 Request permission when modifying the engines or doing something that does not follow one of these rules.
 - Implement card mechanics using abilities rather than modifying the engine. Add hooks as needed.
 - Prefer implement behaviour by interacting with the gameEventManager
+- Add typed rules events as cards need them, one outcome at a time. In the same change, emit the event from every path that produces that outcome, migrate all listeners that observe it, and test the relevant rules interactions.
 - Prefer not adding new ContinuousEffectKinds, unless absolutely necesarry. 
 - If the card has a very unique effect, it's okay to "script" the card with a single bespoke ability part that just handles everything.
 - Each ability part should be completely decoupled from other ability parts. They should be atomic and reusable

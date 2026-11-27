@@ -1,9 +1,10 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { makeAbility } from "@engine/abilities";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { modifyPowerToughness } from "@engine/effects/PowerToughness";
-import { type GameEvent_ChangeCardZone,GameEvent_DeclareAttacker } from "@engine/events";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { GameEvent_DeclareAttacker } from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { Permanent } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
@@ -209,11 +210,11 @@ test("a continuous grant follows battlefield membership and card types before en
     Game.init();
     const player = game.addPlayer([]);
     const bearsDef = cardData[GRIZZLY_BEARS];
-    const observeEntry = vi.fn((event: GameEvent_ChangeCardZone) => {
+    const observeEntry = vi.fn((event: ZoneChanged) => {
         expect(event.newObject).toBeInstanceOf(Permanent);
         expect(event.newObject.hasKeyword(Keyword.Flying)).toBe(true);
     });
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, observeEntry, {
+    gameEventManager.rules.on(RulesEventType.ZoneChanged, observeEntry, {
         matches: event => event.newZone === player.battlefield && event.oldObject.def === bearsDef,
     });
     const source = addTestCard({

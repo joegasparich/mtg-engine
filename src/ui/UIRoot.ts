@@ -1,9 +1,10 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import * as PIXI from "pixi.js";
 
 import { ActionTarget,getTargetTypeKey,Targeter,TargetType,TargetTypesMap } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CardObject,Permanent } from "@engine/GameObject";
-import { GameEvent_Advance,GameEvent_ChangeCardZone,type GameEvent_TurnStart } from "@engine/events";
+import { GameEvent_Advance,type GameEvent_TurnStart } from "@engine/events";
 import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { GameEvent_StartTargeting } from "@engine/events/GameEvent_StartTargeting";
 import type { GameEvent_RequestResolutionChoice } from "@engine/events/GameEvent_ResolutionChoice";
@@ -52,6 +53,7 @@ type UITarget = UICard | UIPlayer;
 
 export class UITargeter {
     source: UICard;
+    private readonly stopWatchingSource: () => void;
     private readonly sourceObject?: CardObject;
     targetType: TargetType;
     count: number;
@@ -108,7 +110,7 @@ export class UITargeter {
 
         pixi.stage.on('pointerup', this.onStagePointerUp);
         gameEventManager.onPerformed(GameEventType.StepEnd, this.remove);
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onSourceMoved);
+        this.stopWatchingSource = gameEventManager.rules.on(RulesEventType.ZoneChanged, this.onSourceMoved);
     }
 
     @autobind
@@ -120,7 +122,7 @@ export class UITargeter {
     }
 
     @autobind
-    private onSourceMoved(event: GameEvent_ChangeCardZone) {
+    private onSourceMoved(event: ZoneChanged) {
         if (event.oldObject === this.sourceObject) {
             this.remove();
             this.onCancelled?.();
@@ -159,7 +161,7 @@ export class UITargeter {
     @autobind
     remove() {
         gameEventManager.offPerformed(GameEventType.StepEnd, this.remove);
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, this.onSourceMoved);
+        this.stopWatchingSource();
         pixi.stage.off('pointerup', this.onStagePointerUp);
         pixi.stage.removeChild(this.arrow);
 
@@ -210,7 +212,7 @@ export default class UIRoot extends PIXI.Container {
 
         this.cardOverlay.eventMode = 'none';
         pixi.stage.addChild(this.cardOverlay);
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.onCardChangedZone);
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, this.onCardChangedZone, { acrossGames: true });
         pixi.renderer.on('resize', this.layoutBoard);
         this.combat = new UICombat(this);
         this.stack = new UIStack(game.stack, this);
@@ -341,7 +343,7 @@ export default class UIRoot extends PIXI.Container {
             syncTurnControls();
         });
         gameEventManager.onPerformed(GameEventType.SubmitCombatDamageChoice, syncTurnControls);
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, syncTurnControls);
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, syncTurnControls, { acrossGames: true });
         gameEventManager.onPerformed(GameEventType.StackAbilityChanged, syncTurnControls);
         gameEventManager.onPerformed(GameEventType.StepStart, () => {
             this.announceCardSelection();
@@ -432,7 +434,7 @@ export default class UIRoot extends PIXI.Container {
         dialog.append(heading);
 
         const close = () => {
-            gameEventManager.offPerformed(GameEventType.ChangeCardZone, onSourceMoved);
+            stopWatchingSource();
             dialog.close();
             dialog.remove();
         };
@@ -441,7 +443,7 @@ export default class UIRoot extends PIXI.Container {
             request.onCancelled();
             this.syncSpecialActions();
         };
-        const onSourceMoved = (event: GameEvent_ChangeCardZone) => {
+        const onSourceMoved = (event: ZoneChanged) => {
             if (event.oldObject === request.source)
                 cancel();
         };
@@ -473,7 +475,7 @@ export default class UIRoot extends PIXI.Container {
 
         dialog.append(choices);
         document.body.append(dialog);
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, onSourceMoved);
+        const stopWatchingSource = gameEventManager.rules.on(RulesEventType.ZoneChanged, onSourceMoved);
         dialog.showModal();
     }
 
@@ -543,7 +545,7 @@ export default class UIRoot extends PIXI.Container {
     }
 
     @autobind
-    private onCardChangedZone(event: GameEvent_ChangeCardZone) {
+    private onCardChangedZone(event: ZoneChanged) {
         const { oldObject, newObject } = event;
         let view = this.getCardView(oldObject);
         const source = view?.battlefieldGroup?.battlefield ?? this.zones.get(event.oldZone);

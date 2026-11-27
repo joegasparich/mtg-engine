@@ -1398,5 +1398,20 @@
                 }
             }
         }]
+    },
+    {
+        "name": "Lifetap",
+        "image_url": "https://cards.scryfall.io/large/front/7/3/73e68f01-3699-4682-a3c0-c70a45246c76.jpg?1783919556",
+        "oracle_text": "Whenever a Forest an opponent controls becomes tapped, you gain 1 life.",
+        "types": ["Enchantment"],
+        "cost": "{U}{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_Trigger_BecomesTapped": {
+                    "targetValidator": { "cardType": "Land", "cardSubtype": "Forest" }, "opponentOnly": true
+                },
+                "AbilityPart_Effect_GainLife": { "target": "CONTROLLER", "amount": 1 }
+            }
+        }]
     }
 ]

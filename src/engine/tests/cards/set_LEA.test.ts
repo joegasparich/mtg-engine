@@ -1,3 +1,5 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
+import { makeAbility } from "@engine/abilities";
 import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { PlayerActions } from "@engine/actions";
 import { type CardObject,type Permanent,type Spell,StackAbility } from "@engine/GameObject";
@@ -773,7 +775,7 @@ describe("Ancestral Recall", () => {
         const first = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.library);
         const inserted = addTestCard(cardData[FOREST], opponent, opponent.hand);
         const drawn: CardObject["card"][] = [];
-        const afterDraw = (event: GameEvent_ChangeCardZone) => {
+        const afterDraw = (event: ZoneChanged) => {
             if (event.oldZone !== opponent.library || event.newZone !== opponent.hand)
                 return;
 
@@ -784,12 +786,12 @@ describe("Ancestral Recall", () => {
                 });
             }
         };
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, afterDraw);
+        const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, afterDraw);
         try {
             beginCasting().onTargeted([opponent]);
             passPriorityRound();
         } finally {
-            gameEventManager.offPerformed(GameEventType.ChangeCardZone, afterDraw);
+            stopObservingMoves();
         }
 
         expect(drawn).toEqual([first.card, inserted.card, next.card]);
@@ -2379,11 +2381,11 @@ describe("Purelace", () => {
 
         passPriorityRound();
         expect(spell).toMatchObject({ colours: new Set(["W"]) });
-        const onEntry = vi.fn((event: GameEvent_ChangeCardZone) => {
+        const onEntry = vi.fn((event: ZoneChanged) => {
             expect(event.newObject.colours).toEqual(new Set(["W"]));
             expect(event.newObject.cost).toEqual(inHand.cost);
         });
-        gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, onEntry, {
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, onEntry, {
             matches: event => event.oldObject === spell && event.newZone === opponent.battlefield,
         });
         passPriorityRound();
@@ -2707,7 +2709,7 @@ describe("Swords to Plowshares", () => {
         target.controller = opponent;
         addTestCard(cardData.find(card => card.name === "Crusade"), opponent, opponent.battlefield);
         expect(target.power).toBe(7);
-        gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, (event: GameEvent_ChangeCardZone) => {
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, (event: ZoneChanged) => {
             if (event.oldObject === target)
                 expect(opponent.life).toBe(20);
         });
@@ -3898,5 +3900,90 @@ describe("Jump", () => {
 
         gameEventManager.addEvent(new GameEvent_Cleanup(caster));
         expect(creature.hasKeyword(Keyword.Flying)).toBe(false);
+    });
+});
+
+describe("Lifetap", () => {
+    const def = cardData.find(card => card.name === "Lifetap");
+    const forest = cardData[FOREST];
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    test("costs {U}{U} and triggers when a Forest an opponent controls is tapped for mana", () => {
+        const card = addTestCard(def, caster, caster.hand);
+        const opposingForest = addTestCard(forest, caster, caster.battlefield);
+        opposingForest.controller = opponent;
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.G] = 1;
+        expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+        const lifetap = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(lifetap).toBeDefined();
+
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        new PlayerActions.ActivateAbility(opposingForest, opposingForest.abilities[0]).perform(opponent);
+        expect(opponent.manaPool[ManaColour.G]).toBe(1);
+        expect(game.stack.objects).toHaveLength(1);
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        expect(game.stack.objects[0]).toMatchObject({ source: lifetap, controller: caster });
+        expect(caster.life).toBe(20);
+        passPriorityRound();
+        expect([caster.life, opponent.life]).toEqual([21, 20]);
+    });
+
+    test("sees a Forest regenerate as Lifetap enters, and ignores regeneration of the already tapped Forest", () => {
+        const lifetap = addTestCard(def, caster, caster.hand);
+        const land = addTestCard(forest, opponent, opponent.battlefield);
+        const shield = makeAbility({ parts: { AbilityPart_Effect_Regenerate: { recipient: "THIS" } } }, land);
+        shield.fireSignal("default");
+        gameEventManager.performSimultaneous([
+            new GameEvent_DestroyPermanent(land),
+            new GameEvent_ChangeCardZone(lifetap, caster.battlefield),
+        ]);
+        game.checkState();
+        expect(land.zone).toBe(opponent.battlefield);
+        expect(land.tapped).toBe(true);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(caster.life).toBe(21);
+
+        shield.fireSignal("default");
+        gameEventManager.addEvent(new GameEvent_DestroyPermanent(land));
+        expect(land.zone).toBe(opponent.battlefield);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("triggers once per opposing Forest tapped without activating a mana ability", () => {
+        addTestCard(def, caster, caster.battlefield);
+        const ownForest = addTestCard(forest, opponent, opponent.battlefield);
+        ownForest.controller = caster;
+        const opposingIsland = addTestCard(island, opponent, opponent.battlefield);
+        const first = addTestCard(forest, opponent, opponent.battlefield);
+        const second = addTestCard(forest, opponent, opponent.battlefield);
+        second.subtypes = [BasicLandType.Island, BasicLandType.Forest];
+
+        gameEventManager.addEvents([new GameEvent_TapCard(ownForest), new GameEvent_TapCard(opposingIsland)]);
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.performSimultaneous([new GameEvent_TapCard(first), new GameEvent_TapCard(second)]);
+        game.checkState();
+        expect(game.stack.objects).toHaveLength(2);
+        passPriorityRound();
+        passPriorityRound();
+        expect(caster.life).toBe(22);
+
+        gameEventManager.addEvent(new GameEvent_TapCard(first));
+        expect(game.stack.objects).toHaveLength(0);
     });
 });

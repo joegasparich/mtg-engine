@@ -1,3 +1,4 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import playerActionManager,{ TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import {
     CardChoiceVisibility,GameEvent_ActivateAbility,GameEvent_CastSpell,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,
@@ -251,7 +252,7 @@ test("sacrifice uses the controller, moves to the owner's graveyard, and bypasse
     const onChange = vi.fn();
     const onDestroy = vi.fn();
     gameEventManager.onCheck(preventDestroy);
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onChange);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onChange);
     gameEventManager.onPerformed(GameEventType.DestroyPermanent, onDestroy);
     try {
         expect(gameEventManager.performImmediate(new GameEvent_DestroyPermanent(permanent))).toBe(false);
@@ -263,11 +264,11 @@ test("sacrifice uses the controller, moves to the owner's graveyard, and bypasse
         expect(permanent.retired).toBe(true);
         expect(owner.graveyard.objects).toEqual([sacrifice.newObject]);
         expect(sacrifice.newObject.card).toBe(inHand.card);
-        expect(onChange).toHaveBeenCalledExactlyOnceWith(sacrifice);
+        expect(onChange).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ cause: sacrifice, oldObject: permanent, newObject: sacrifice.newObject }));
         expect(onDestroy).not.toHaveBeenCalled();
     } finally {
         gameEventManager.offCheck(preventDestroy);
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onChange);
+        stopObservingMoves();
         gameEventManager.offPerformed(GameEventType.DestroyPermanent, onDestroy);
     }
 });

@@ -6,6 +6,27 @@ import { CardObject,Permanent,Spell } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Battlefield,type Graveyard,type Zone } from "@engine/Zone";
+import { type RecordRulesEvent,RulesEventType,type ZoneChanged } from "./RulesEvent";
+
+// CR 603.10a: Read the battlefield before any move, then confirm which moves actually occurred.
+export function beforeZoneChange(prepare: (move: GameEvent_ChangeCardZone) => ((event: ZoneChanged) => void) | undefined) {
+    return gameEventManager.rules.beforeBatch(actions => {
+        const callbacks = new Map<GameEvent_ChangeCardZone, (event: ZoneChanged) => void>();
+        for (const action of actions) {
+            if (action instanceof GameEvent_ChangeCardZone) {
+                const callback = prepare(action);
+                if (callback) callbacks.set(action, callback);
+            }
+        }
+        if (!callbacks.size) return;
+        return events => {
+            for (const event of events) {
+                if (event.type === RulesEventType.ZoneChanged)
+                    callbacks.get(event.cause)?.(event);
+            }
+        };
+    });
+}
 
 type ZoneChangeOptions = {
     controller?: Player;
@@ -27,10 +48,6 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         super();
         this.oldZone = oldObject.zone;
         this.label = `Card ${oldObject.logName} changed zones from ${this.oldZone?.name} to ${newZone.name}`;
-    }
-
-    override get additionalPerformedTypes(): readonly GameEventType[] {
-        return this.type === GameEventType.ChangeCardZone ? [] : [GameEventType.ChangeCardZone];
     }
 
     private entering?: Permanent;
@@ -91,7 +108,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         next();
     }
 
-    perform(): boolean {
+    perform(record: RecordRulesEvent): boolean {
         const { oldObject, oldZone, newZone, options } = this;
         const origin = oldObject.zone;
         if (!this.canMove)
@@ -134,6 +151,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
         if (this.timestamp !== undefined) this.newObject.timestamp = this.timestamp;
         this.newZone.onEnter(this.newObject);
+        record({ type: RulesEventType.ZoneChanged, oldObject, oldZone: origin, newObject: this.newObject, newZone: this.newZone, cause: this });
         this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${this.newZone.name}`;
         return true;
     }
@@ -147,8 +165,8 @@ export class GameEvent_DestroyPermanent extends GameEvent_ChangeCardZone {
         this.label = `Permanent ${permanent.logName} destroyed`;
     }
 
-    perform(): boolean {
-        if (!(this.permanent.zone instanceof Battlefield) || !super.perform())
+    perform(record: RecordRulesEvent): boolean {
+        if (!(this.permanent.zone instanceof Battlefield) || !super.perform(record))
             return false;
         this.label = `Permanent ${this.permanent.logName} destroyed`;
         return true;
@@ -167,8 +185,8 @@ export class GameEvent_SacrificePermanent extends GameEvent_ChangeCardZone {
         return this.permanent.controller === this.player && this.permanent.zone instanceof Battlefield && super.canMove;
     }
 
-    perform(): boolean {
-        if (!super.perform())
+    perform(record: RecordRulesEvent): boolean {
+        if (!super.perform(record))
             return false;
 
         this.label = `Player ${this.player.id} sacrificed ${this.permanent.logName}`;
@@ -188,8 +206,8 @@ export class GameEvent_DiscardCard extends GameEvent_ChangeCardZone {
         return this.cardObject.owner === this.player && this.cardObject.zone === this.player.hand && super.canMove;
     }
 
-    perform(): boolean {
-        if (!super.perform())
+    perform(record: RecordRulesEvent): boolean {
+        if (!super.perform(record))
             return false;
 
         this.label = `Player ${this.player.id} discarded ${this.cardObject.logName}`;

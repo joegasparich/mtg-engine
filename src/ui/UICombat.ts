@@ -1,3 +1,4 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
@@ -94,7 +95,7 @@ export class UICombat {
         });
         gameEventManager.onPerformed(GameEventType.StepEnd, this.onStepEnd);
         gameEventManager.onPerformed(GameEventType.PriorityChanged, this.sync);
-        gameEventManager.onPerformed(GameEventType.ChangeCardZone, this.sync);
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, this.sync, { acrossGames: true });
         gameEventManager.onPerformed(GameEventType.RegeneratePermanent, this.sync);
         gameEventManager.onPerformed(GameEventType.TapCard, this.sync);
         gameEventManager.onPerformed(GameEventType.UntapCard, this.sync);

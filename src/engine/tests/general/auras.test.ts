@@ -1,3 +1,4 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { makeAbility } from "@engine/abilities";
 import { CardObject,Permanent } from "@engine/GameObject";
 import { GameEvent_ChangeCardZone } from "@engine/events";
@@ -131,17 +132,17 @@ test("an Aura goes straight to its owner's graveyard if its attachment becomes i
             target.types = [CardType.Land];
     };
     const moves = vi.fn();
-    const onMove = (event: GameEvent_ChangeCardZone) => {
+    const onMove = (event: ZoneChanged) => {
         if (event.oldObject === spell)
             moves(event.newZone);
     };
     gameEventManager.onCheck(beforeEntry);
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onMove);
     try {
         game.stack.resolveAll();
     } finally {
         gameEventManager.offCheck(beforeEntry);
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+        stopObservingMoves();
     }
 
     expect(moves.mock.calls).toEqual([[caster.graveyard]]);
@@ -156,16 +157,16 @@ test("an Aura waits for pending zone changes before it starts resolving", () => 
         game.stack.resolveAll();
     });
     const auraMoves = vi.fn();
-    const onMove = (event: GameEvent_ChangeCardZone) => {
+    const onMove = (event: ZoneChanged) => {
         if (event.newObject.card === aura.card)
             auraMoves(event.newZone);
     };
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onMove);
     try {
         gameEventManager.addEvent(moveThenResolve);
         expect(auraMoves.mock.calls).toEqual([[caster.graveyard]]);
         } finally {
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+        stopObservingMoves();
     }
 });
 
@@ -175,7 +176,7 @@ test("the next spell waits for events and follow-ups from the top spell", () => 
     expect(game.stack.spellCast(caster, top)).toBe(true);
 
     const moves = vi.fn();
-    const onMove = (event: GameEvent_ChangeCardZone) => {
+    const onMove = (event: ZoneChanged) => {
         moves(event.newObject.card, event.newZone, event.newObject instanceof Permanent ? event.newObject.attachedTo : undefined);
         if (event.newObject.card === top.card && event.newZone === caster.battlefield) {
             const followUp = new GameEvent_Log(GameEventType.Log, "Queue the follow-up zone change");
@@ -185,7 +186,7 @@ test("the next spell waits for events and follow-ups from the top spell", () => 
             gameEventManager.addEvent(followUp);
         }
     };
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onMove);
     try {
         game.stack.resolveAll();
         expect(moves.mock.calls).toEqual([
@@ -195,7 +196,7 @@ test("the next spell waits for events and follow-ups from the top spell", () => 
         ]);
         expect(game.stack.objects).toHaveLength(0);
     } finally {
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+        stopObservingMoves();
     }
 });
 

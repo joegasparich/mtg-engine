@@ -11,3 +11,4 @@ export * from "./GameEvent_Step";
 export * from "./GameEvent_TapCard";
 export * from "./GameEvent_UntapCard";
 export * from "./GameEventManager";
+export * from "./RulesEvent";

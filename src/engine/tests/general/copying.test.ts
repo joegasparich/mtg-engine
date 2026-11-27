@@ -1,8 +1,9 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { Ability } from "@engine/abilities";
 import { AbilityPart } from "@engine/abilities/parts/AbilityPart";
 import { AbilityParts } from "@engine/abilities/registry";
 import { GameEvent_ChangeCardZone,OptionalDecision } from "@engine/events";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import type { Permanent } from "@engine/GameObject";
 import type Player from "@engine/Player";
@@ -29,7 +30,7 @@ test("entry previews are side-effect free and simultaneous choices see only exis
     expect(gameEventManager.checkEvent(moves[0])).toBe(true);
     expect(game.hasPendingPlayerInput).toBe(false);
     const observe = vi.fn(() => expect(player.battlefield.objects).toHaveLength(3));
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, observe);
+    gameEventManager.rules.on(RulesEventType.ZoneChanged, observe);
     gameEventManager.performSimultaneous(moves);
     for (const move of moves) {
         expect(move.newObject).toBeUndefined();
@@ -79,10 +80,10 @@ test("a copied entry replacement applies before observers and the copied enters 
         original.tapped = false;
         const life = player.life;
         const incoming = addTestCard(copier, player, player.hand);
-        const observe = vi.fn((event: GameEvent_ChangeCardZone) => {
+        const observe = vi.fn((event: ZoneChanged) => {
             expect(event.newObject).toMatchObject({ tapped: true, name: original.name });
         });
-        gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, observe, { matches: event => event.oldObject === incoming });
+        gameEventManager.rules.on(RulesEventType.ZoneChanged, observe, { matches: event => event.oldObject === incoming });
         gameEventManager.addEvent(new GameEvent_ChangeCardZone(incoming, player.battlefield));
         game.pendingOptionalChoice.submit(player, OptionalDecision.Accept);
         game.pendingResolutionChoice.submit(player, [original]);

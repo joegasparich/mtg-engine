@@ -1,11 +1,11 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import { resolveAbilityGrammar,type GrammarKey } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { Permanent } from "@engine/GameObject";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
-import type { GameEvent_ChangeCardZone } from "@engine/events/GameEvent_ChangeCardZone";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager from "@engine/events/GameEventManager";
 import { Battlefield } from "@engine/Zone";
 import type { TargetValidator } from "~/defs";
 import type { Ability } from "../Ability";
@@ -25,7 +25,7 @@ export class AbilityPart_Attach extends AbilityPart_Effect {
             return;
 
         // 701.3d: The attachment ends when the object changes zones.
-        this.stopListening ??= gameEventManager.onGamePerformed<GameEvent_ChangeCardZone>(GameEventType.ChangeCardZone,
+        this.stopListening ??= gameEventManager.rules.on(RulesEventType.ZoneChanged,
             () => { source.attachedTo = undefined; }, { matches: event => event.oldObject === source.attachedTo });
     }
 

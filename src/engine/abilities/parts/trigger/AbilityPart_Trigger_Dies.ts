@@ -2,7 +2,7 @@ import type { Ability } from "@engine/abilities/Ability";
 import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
-import gameEventManager from "@engine/events/GameEventManager";
+import { beforeZoneChange } from "@engine/events/GameEvent_ChangeCardZone";
 import { game } from "@engine/Game";
 import { StackAbility } from "@engine/GameObject";
 import { Battlefield,Graveyard } from "@engine/Zone";
@@ -21,7 +21,7 @@ export class AbilityPart_Trigger_Dies extends AbilityPart_Trigger {
         if (!(ability.source.zone instanceof Battlefield))
             return;
 
-        this.stopListening ??= gameEventManager.beforeZoneChange(move => {
+        this.stopListening ??= beforeZoneChange(move => {
             const dying = move.departingPermanent;
             if (!dying || !(move.newZone instanceof Graveyard))
                 return;

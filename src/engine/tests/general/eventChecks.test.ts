@@ -1,10 +1,82 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import Card from "@engine/Card";
+import { GameEvent_DrawCard,GameEvent_RegeneratePermanent,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import { GameEvent_DeclareAttacker } from "@engine/events/GameEvent_CardInteractionChecks";
 import { Permanent } from "@engine/GameObject";
 import gameEventManager,{ type CheckSource,type EventCheck,type GameEvent,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
+import { addTestCard,GRIZZLY_BEARS } from "@engine/tests/testData";
 import { Keyword } from "~/defs";
 import { cardData } from "~/index";
+
+test("becomes-tapped listeners observe only actual tap transitions", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const creature = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const other = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const tap = new GameEvent_TapCard(creature);
+    const regenerate = new GameEvent_RegeneratePermanent(other, vi.fn());
+    const listener = vi.fn();
+    const batch = vi.fn();
+    gameEventManager.rules.onBatch(batch);
+    gameEventManager.rules.on(RulesEventType.BecomesTapped, listener);
+    const firstTap = { type: RulesEventType.BecomesTapped, permanent: creature };
+    const secondTap = { type: RulesEventType.BecomesTapped, permanent: other };
+
+    gameEventManager.performSimultaneous([tap, new GameEvent_TapCard(creature), regenerate]);
+    expect(listener.mock.calls).toEqual([[firstTap], [secondTap]]);
+    expect(batch).toHaveBeenCalledExactlyOnceWith([firstTap, secondTap]);
+
+    gameEventManager.addEvent(new GameEvent_RegeneratePermanent(other, vi.fn()));
+    expect(listener).toHaveBeenCalledTimes(2);
+    gameEventManager.addEvent(new GameEvent_UntapCard(creature));
+    const retap = new GameEvent_TapCard(creature);
+    gameEventManager.addEvent(retap);
+    expect(listener.mock.calls).toEqual([[firstTap], [secondTap], [firstTap]]);
+});
+
+test("a draw's nested zone move and a simultaneous tap reach observers together", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const top = addTestCard(cardData[GRIZZLY_BEARS], player, player.library);
+    const permanent = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const batch = vi.fn(() => expect(permanent.tapped).toBe(true));
+    gameEventManager.rules.onBatch(batch);
+
+    gameEventManager.performSimultaneous([new GameEvent_DrawCard(player), new GameEvent_TapCard(permanent)]);
+
+    expect(batch).toHaveBeenCalledExactlyOnceWith([
+        expect.objectContaining({ type: RulesEventType.ZoneChanged, oldObject: top, oldZone: player.library,
+            newObject: player.hand.objects[0], newZone: player.hand }),
+        { type: RulesEventType.BecomesTapped, permanent },
+    ]);
+});
+
+test("sequential taps publish separate batches and game subscriptions expire on reset", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const first = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const second = addTestCard(cardData[GRIZZLY_BEARS], player, player.battlefield);
+    const batch = vi.fn();
+    const application = vi.fn();
+    gameEventManager.rules.onBatch(batch);
+    const stop = gameEventManager.rules.on(RulesEventType.BecomesTapped, application, { acrossGames: true });
+    try {
+        gameEventManager.addEvents([new GameEvent_TapCard(first), new GameEvent_TapCard(second)]);
+        expect(batch.mock.calls).toEqual([
+            [[{ type: RulesEventType.BecomesTapped, permanent: first }]],
+            [[{ type: RulesEventType.BecomesTapped, permanent: second }]],
+        ]);
+        Game.init();
+        const nextPlayer = game.addPlayer([]);
+        const third = addTestCard(cardData[GRIZZLY_BEARS], nextPlayer, nextPlayer.battlefield);
+        gameEventManager.addEvent(new GameEvent_TapCard(third));
+        expect(batch).toHaveBeenCalledTimes(2);
+        expect(application).toHaveBeenCalledTimes(3);
+    } finally {
+        stop();
+    }
+});
 
 test("a one-shot game listener waits for a matching event and cancels before calling back", () => {
     Game.init();

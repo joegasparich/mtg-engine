@@ -1,3 +1,4 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_GoToStep,GameEvent_StepStart } from "@engine/events";
 import gameEventManager,{ type EventCheck,GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -19,7 +20,7 @@ test("zero toughness and lethal damage are processed together outside combat", (
         expect(opponent.graveyard.objects.map(object => object.card)).toEqual([lethal.card]);
     });
     const onDestroy = vi.fn();
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onMove);
     gameEventManager.onPerformed(GameEventType.DestroyPermanent, onDestroy);
     try {
         const changeState = new GameEvent_Log(GameEventType.Log, "Change toughness and mark damage");
@@ -31,7 +32,7 @@ test("zero toughness and lethal damage are processed together outside combat", (
         expect(onMove).toHaveBeenCalledTimes(2);
         expect(onDestroy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ permanent: lethal }));
     } finally {
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+        stopObservingMoves();
         gameEventManager.offPerformed(GameEventType.DestroyPermanent, onDestroy);
     }
 });
@@ -100,7 +101,7 @@ test("a host and its Aura are dealt with before a waiting trigger is put on the 
     }, player, player.battlefield);
     const incoming = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
     const enter = new GameEvent_ChangeCardZone(incoming, player.battlefield);
-    const observeZoneChange = (event: GameEvent_ChangeCardZone) => {
+    const observeZoneChange = (event: ZoneChanged) => {
         if (event.newZone === player.graveyard) {
             expect(game.stack.objects).toHaveLength(0);
             removed.push(event.oldObject);
@@ -114,14 +115,14 @@ test("a host and its Aura are dealt with before a waiting trigger is put on the 
             expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
         });
     });
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, observeZoneChange);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, observeZoneChange);
     try {
         gameEventManager.addEvent(enter);
         expect(removed).toEqual([host, attached]);
         game.stack.resolveAll();
         expect(player.hand.objects).toHaveLength(1);
     } finally {
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, observeZoneChange);
+        stopObservingMoves();
     }
 });
 

@@ -1,3 +1,4 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import { makeAbility } from "@engine/abilities";
 import { PlayerActions } from "@engine/actions";
 import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
@@ -240,12 +241,12 @@ test.each([StepIndex.Main, StepIndex.SecondMain])("plays the first land directly
     const onPlay = vi.fn();
     const onMove = vi.fn();
     gameEventManager.onPerformed(GameEventType.PlayLand, onPlay);
-    gameEventManager.onPerformed(GameEventType.ChangeCardZone, onMove);
+    const stopObservingMoves = gameEventManager.rules.on(RulesEventType.ZoneChanged, onMove);
     try {
         action.perform(player);
     } finally {
         gameEventManager.offPerformed(GameEventType.PlayLand, onPlay);
-        gameEventManager.offPerformed(GameEventType.ChangeCardZone, onMove);
+        stopObservingMoves();
     }
 
     expect(onPlay).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ player, handObject: forest }));

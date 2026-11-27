@@ -1,6 +1,7 @@
+import { RulesEventType,type ZoneChanged } from "@engine/events/RulesEvent";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
-import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_SacrificePermanent } from "@engine/events";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import { beforeZoneChange,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_SacrificePermanent } from "@engine/events";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { addTestCard,chooseEarliestTimestamps,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { StackAbility } from "@engine/GameObject";
@@ -19,7 +20,7 @@ test("beforeZoneChange prepares each candidate before the batch and confirms onl
     const returnToHand = new GameEvent_ChangeCardZone(returned, player.hand);
     const obsolete = new GameEvent_ChangeCardZone(destroyed, player.hand);
     const discard = new GameEvent_ChangeCardZone(inHand, player.graveyard);
-    const departures = vi.fn((event: GameEvent_ChangeCardZone, battlefieldSize: number) => {
+    const departures = vi.fn((event: ZoneChanged, battlefieldSize: number) => {
         expect(player.battlefield.objects).toHaveLength(0);
         expect(event.newObject.zone).toBe(event.newZone);
         expect(battlefieldSize).toBe(2);
@@ -29,17 +30,17 @@ test("beforeZoneChange prepares each candidate before the batch and confirms onl
         const battlefieldSize = player.battlefield.objects.length;
         expect(battlefieldSize).toBe(2);
         if (event.oldZone instanceof Battlefield)
-            return () => departures(event, battlefieldSize);
+            return (outcome: ZoneChanged) => departures(outcome, battlefieldSize);
     });
-    gameEventManager.beforeZoneChange(prepare);
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, moves);
+    beforeZoneChange(prepare);
+    gameEventManager.rules.on(RulesEventType.ZoneChanged, moves);
 
     gameEventManager.performSimultaneous([destroy, obsolete, returnToHand, discard]);
     chooseEarliestTimestamps(player, returned, destroyed);
 
     expect(prepare.mock.calls.map(([event]) => event)).toEqual([destroy, obsolete, returnToHand, discard]);
-    expect(departures.mock.calls.map(([event]) => event)).toEqual([destroy, returnToHand]);
-    expect(moves.mock.calls).toEqual([[destroy], [returnToHand], [discard]]);
+    expect(departures.mock.calls.map(([event]) => event.cause)).toEqual([destroy, returnToHand]);
+    expect(moves.mock.calls.map(([event]) => event.cause)).toEqual([destroy, returnToHand, discard]);
 });
 
 test("a death trigger is captured even if the permanent granting it dies in the same batch", () => {

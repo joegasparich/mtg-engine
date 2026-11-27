@@ -1,3 +1,4 @@
+import { RulesEventType } from "@engine/events/RulesEvent";
 import { AbilityPart,makeAbility } from "@engine/abilities";
 import { AbilityParts } from "@engine/abilities/registry";
 import { abilityGrant,AbilityRemoval,removeAbilities } from "@engine/effects/AbilityGrant";
@@ -5,7 +6,7 @@ import { change,type Characteristics,Layer,type LayerEffect } from "@engine/effe
 import { statModifier } from "@engine/effects/PowerToughness";
 import { CardChoicePresentation,CardChoiceVisibility,GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_SacrificePermanent,OptionalDecision,GameEvent_TapCard,GameEvent_UntapCard } from "@engine/events";
 import { GameEvent_AttachPermanent } from "@engine/events/GameEvent_AttachPermanent";
-import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
+import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import type { CardObject,Spell } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
@@ -213,7 +214,7 @@ test("tapping and untapping reconcile a shared ability grant and stat modifier b
         AbilityPart_GrantAbilityContinuously: { permanentsFrom: "TAPPED", grant: { keyword: Keyword.Flying } },
     } }] }, player, player.battlefield);
     const observed: number[] = [];
-    gameEventManager.onGamePerformed(GameEventType.TapCard, () => {
+    gameEventManager.rules.on(RulesEventType.BecomesTapped, () => {
         expect(target.hasKeyword(Keyword.Flying)).toBe(true);
         observed.push(target.power);
     });
@@ -265,7 +266,7 @@ test("simultaneous entry assigns timestamps in APNAP and each controller's chose
     const cards = [other, active, other, active].map(p => addTestCard(bears, p, p.hand));
     const moves = cards.map(card => new GameEvent_ChangeCardZone(card, card.owner.battlefield));
     const observed = vi.fn();
-    gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, observed);
+    gameEventManager.rules.on(RulesEventType.ZoneChanged, observed);
     gameEventManager.performSimultaneous(moves);
     expect(game.pendingResolutionChoice.player).toBe(active);
     game.pendingResolutionChoice.submit(other, [cards[3]]);
