@@ -4417,3 +4417,105 @@ describe("Power Leak", () => {
         expect([caster.life, opponent.life]).toEqual([20, 18]);
     });
 });
+
+describe("Power Sink", () => {
+    const def = cardData.find(card => card.name === "Power Sink");
+    let caster: Player;
+    let opponent: Player;
+    let sink: CardObject;
+    let target: Spell;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        sink = addTestCard(def, caster, caster.hand);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, bears)).toBe(true);
+        target = game.stack.objects[0] as Spell;
+    });
+
+    test("casts for {X}{U} and lets the target's controller pay X to keep their spell", () => {
+        caster.manaPool[ManaColour.U] = 3;
+        opponent.manaPool[ManaColour.R] = 3;
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        playerActionManager.getCardActions(sink, caster)[0].perform(caster);
+        expect(game.pendingSpellXChoice.max).toBe(2);
+        game.pendingSpellXChoice.submit(caster, 2);
+        expect(game.pendingTargeter.validateTargets([land])).toBe(false);
+        game.pendingTargeter.onTargeted([target]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+
+        passPriorityRound();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice.player).toBe(opponent);
+        expect(choice.cost).toBe("{2}");
+        choice.submit(opponent, ManaPaymentDecision.Pay);
+        expect(opponent.manaPool[ManaColour.R]).toBe(1);
+        expect(land.tapped).toBe(false);
+        expect(game.stack.objects).toEqual([target]);
+        passPriorityRound();
+        expect(opponent.battlefield.objects.some(card => card.card === target.card)).toBe(true);
+    });
+
+    test.each([1, 8])("declining or being unable to pay X = %i taps only the payer's mana lands", x => {
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const nonManaLand = addTestCard({ ...cardData[FOREST], subtypes: [], abilities: [] }, opponent, opponent.battlefield);
+        const artifact = addTestCard(cardData.find(card => card.name === "Black Lotus"), opponent, opponent.battlefield);
+        const otherLand = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        opponent.manaPool[ManaColour.R] = 2;
+        const manaAdded = vi.fn();
+        gameEventManager.onGamePerformed(GameEventType.AddMana, manaAdded);
+        expect(game.stack.spellCast(caster, sink, [target], x)).toBe(true);
+        passPriorityRound();
+        if (x === 1)
+            game.pendingManaPaymentChoice.submit(opponent, ManaPaymentDecision.Decline);
+
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(opponent.graveyard.objects.map(card => card.card)).toEqual([target.card]);
+        expect([land.tapped, nonManaLand.tapped, artifact.tapped, otherLand.tapped]).toEqual([true, false, false, false]);
+        expect(manaAdded).not.toHaveBeenCalled();
+        expect(opponent.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        expect(caster.manaPool[ManaColour.U]).toBe(1);
+    });
+
+    test.each([ManaPaymentDecision.Pay, ManaPaymentDecision.Decline])("paying zero is still optional (%s)", decision => {
+        expect(game.stack.spellCast(caster, sink, [target], 0)).toBe(true);
+        passPriorityRound();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice.cost).toBe("{0}");
+        choice.submit(opponent, decision);
+        expect(game.stack.objects.includes(target)).toBe(decision === ManaPaymentDecision.Pay);
+    });
+
+    test("still taps lands and clears mana when the counter is prevented", () => {
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        opponent.manaPool[ManaColour.R] = 1;
+        const preventCounter = (check: EventCheck) => check.removeWhere(event =>
+            event instanceof GameEvent_ChangeCardZone && event.oldObject === target && event.newZone === opponent.graveyard);
+        gameEventManager.onCheck(preventCounter);
+        try {
+            expect(game.stack.spellCast(caster, sink, [target], 3)).toBe(true);
+            passPriorityRound();
+            expect(game.stack.objects).toEqual([target]);
+            expect(land.tapped).toBe(true);
+            expect(opponent.manaPool[ManaColour.R]).toBe(0);
+        } finally {
+            gameEventManager.offCheck(preventCounter);
+        }
+    });
+
+    test("leaves mana and lands alone when the target has left the stack", () => {
+        const land = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        opponent.manaPool[ManaColour.R] = 1;
+        expect(game.stack.spellCast(caster, sink, [target], 2)).toBe(true);
+        moveTestCard(target, opponent.hand);
+        passPriorityRound();
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(land.tapped).toBe(false);
+        expect(opponent.manaPool[ManaColour.R]).toBe(1);
+        expect(caster.graveyard.objects.map(card => card.card)).toEqual([sink.card]);
+    });
+});

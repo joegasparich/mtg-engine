@@ -52,6 +52,7 @@ export type TargetValidator = {
     // Match the subtype before continuous type changes are applied.
     baseSubtype?: string;
     tapped?: boolean;
+    hasManaAbility?: boolean;
     blocking?: boolean;
     unblocked?: boolean;
 };

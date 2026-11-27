@@ -308,3 +308,25 @@ test("sacrifice uses the controller, moves to the owner's graveyard, and bypasse
         gameEventManager.offPerformed(GameEventType.DestroyPermanent, onDestroy);
     }
 });
+
+test("an optional payment combines fixed mana and the spell's X and charges the specified player", () => {
+    const caster = game.addPlayer([]);
+    const payer = game.addPlayer([]);
+    startMainPhase();
+    const [forest] = lands(payer, 1);
+    payer.manaPool[ManaColour.R] = 2;
+    const spell = addTestCard({ ...testSpell, cost: "{X}", abilities: [{ parts: {
+        AbilityPart_Target: { saveAs: "PAYER", validTargets: [TargetTypeKeys.Player] },
+        AbilityPart_Effect_ChooseManaPayment: { inSignal: "SPELL_RESOLVE", player: "PAYER", cost: "{X}{G}" },
+    } }] }, caster, caster.hand);
+    expect(game.stack.spellCast(caster, spell, [payer], 2)).toBe(true);
+    passPriorityRound();
+    const choice = game.pendingManaPaymentChoice;
+    expect(choice.cost).toBe("{2}{G}");
+    choice.submit(caster, ManaPaymentDecision.Pay);
+    expect(game.pendingManaPaymentChoice).toBe(choice);
+    choice.submit(payer, ManaPaymentDecision.Pay);
+    expect(game.pendingManaPaymentChoice).toBeNull();
+    expect(payer.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(forest.tapped).toBe(true);
+});

@@ -1,3 +1,4 @@
+import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
 import { getObjectsFromSlateInZones,selectObjectsFromZone } from "@engine/abilities/ZoneSelection";
 import { PlayerAction_ActivateAbility,TargetType,TargetTypeKeys } from "@engine/actions";
 import { GameEvent_CheckTarget } from "@engine/events/GameEvent_CardInteractionChecks";
@@ -7,8 +8,28 @@ import { type Spell,StackAbility } from "@engine/GameObject";
 import { Stack } from "@engine/Stack";
 import { addTestCard,BASIC_DECK,FOREST,GRIZZLY_BEARS,moveTestCard,startMainPhase } from "@engine/tests/testData";
 import { Battlefield,Hand,ZoneKind } from "@engine/Zone";
-import { CardType } from "~/defs";
+import { BasicLandType,CardType } from "~/defs";
 import { cardData } from "~/index";
+
+test("selecting lands with mana abilities follows grants even when the ability cannot activate", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const land = addTestCard({ ...cardData[FOREST], subtypes: [] }, player, player.battlefield);
+    const source = addTestCard({ ...cardData[GRIZZLY_BEARS], abilities: [{ parts: {
+        AbilityPart_SelectObjectsContinuously: {
+            zone: ZoneKind.Battlefield, targetValidator: { cardType: CardType.Land }, saveAs: "LANDS",
+        },
+        AbilityPart_GrantAbilityContinuously: { permanentsFrom: "LANDS", grant: getBasicLandMana(BasicLandType.Forest) },
+    } }] }, player, player.battlefield);
+    const [ability] = source.abilities;
+    const select = () => selectObjectsFromZone(ability, {
+        zone: ZoneKind.Battlefield, targetValidator: { cardType: CardType.Land, hasManaAbility: true },
+    });
+    land.tapped = true;
+    expect(select()).toEqual([land]);
+    moveTestCard(source, player.graveyard);
+    expect(select()).toEqual([]);
+});
 
 test("reference selections can read the same object once on a signal or live as the reference changes", () => {
     Game.init();

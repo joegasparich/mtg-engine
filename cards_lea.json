@@ -1565,5 +1565,30 @@
                 "AbilityPart_Effect_PreventDamage": { "inSignal": "PREVENT_DAMAGE", "target": "UPKEEP_DAMAGE", "amount": "MANA_PAID" }
             } }
         ]
+    },
+    {
+        "name": "Power Sink",
+        "image_url": "https://api.scryfall.com/cards/30a/72?format=image&version=large",
+        "oracle_text": "Counter target spell unless its controller pays {X}. If that player doesn't, they tap all lands with mana abilities they control and lose all unspent mana.",
+        "types": ["Instant"],
+        "cost": "{X}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "saveAs": "SPELL", "validTargets": ["Spell"] },
+            "AbilityPart_ReadValue": {
+                "inSignal": "SPELL_RESOLVE", "value": "SPELL.controller", "saveAs": "PAYER", "outSignal": "OFFER_PAYMENT"
+            },
+            "AbilityPart_Effect_ChooseManaPayment": {
+                "inSignal": "OFFER_PAYMENT", "player": "PAYER", "cost": "{X}", "onDeclineSignal": "COUNTER"
+            },
+            "AbilityPart_Effect_ChangeZones": {
+                "inSignal": "COUNTER", "target": "SPELL", "destination": "graveyard", "outSignal": "SELECT_LANDS"
+            },
+            "AbilityPart_SelectObjects": {
+                "inSignal": "SELECT_LANDS", "zone": "battlefield", "controlledBy": "PAYER",
+                "targetValidator": { "cardType": "Land", "hasManaAbility": true }, "saveAs": "LANDS", "outSignal": "TAP_LANDS"
+            },
+            "AbilityPart_Effect_TapPermanents": { "inSignal": "TAP_LANDS", "permanentsFrom": "LANDS", "outSignal": "CLEAR_POOL" },
+            "AbilityPart_Effect_ClearManaPool": { "inSignal": "CLEAR_POOL", "target": "PAYER" }
+        } }]
     }
 ]
