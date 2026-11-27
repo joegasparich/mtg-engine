@@ -1567,7 +1567,7 @@
     },
     {
         "name": "Power Sink",
-        "image_url": "https://api.scryfall.com/cards/30a/72?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/4/d/4df5efec-b7a2-49ed-b8cf-28233ac8a472.jpg",
         "oracle_text": "Counter target spell unless its controller pays {X}. If that player doesn't, they tap all lands with mana abilities they control and lose all unspent mana.",
         "types": ["Instant"],
         "cost": "{X}{U}",
@@ -1592,7 +1592,7 @@
     },
     {
         "name": "Prodigal Sorcerer",
-        "image_url": "https://api.scryfall.com/cards/30a/73?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/0/4/04e24fc6-e48c-48b9-89da-886f3af7e9cc.jpg",
         "oracle_text": "{T}: This creature deals 1 damage to any target.",
         "types": ["Creature"],
         "subtypes": ["Human", "Wizard", "Sorcerer"],
@@ -1609,7 +1609,7 @@
     },
     {
         "name": "Psionic Blast",
-        "image_url": "https://api.scryfall.com/cards/30a/74?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/5/d/5d164617-f8da-4033-b2a5-9659a0a5698e.jpg",
         "oracle_text": "Psionic Blast deals 4 damage to any target and 2 damage to you.",
         "types": ["Instant"],
         "cost": "{2}{U}",
@@ -1625,7 +1625,7 @@
     },
     {
         "name": "Psychic Venom",
-        "image_url": "https://api.scryfall.com/cards/30a/75?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/0/b/0b521bf4-ea71-406c-b244-babc4f7a23e1.jpg",
         "oracle_text": "Enchant land\nWhenever enchanted land becomes tapped, this Aura deals 2 damage to that land's controller.",
         "types": ["Enchantment"],
         "subtypes": ["Aura"],
@@ -1640,7 +1640,7 @@
     },
     {
         "name": "Sea Serpent",
-        "image_url": "https://api.scryfall.com/cards/30a/76?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/a/c/ace0de16-8c4d-4c6b-a68c-86137b7690fa.jpg",
         "rulesTextTemplate": "This creature can't attack unless defending player controls {land:Island:article}.\nWhen you control no {land:Island:plural}, sacrifice this creature.",
         "types": ["Creature"],
         "subtypes": ["Serpent"],
@@ -1665,7 +1665,7 @@
     },
     {
         "name": "Siren's Call",
-        "image_url": "https://api.scryfall.com/cards/30a/77?format=image&version=large",
+        "image_url": "https://cards.scryfall.io/large/front/9/a/9ab8421f-fbaa-4baa-ba0a-c85a70ddd097.jpg",
         "oracle_text": "Cast this spell only during an opponent's turn, before attackers are declared.\nCreatures the active player controls attack this turn if able.\nAt the beginning of the next end step, destroy all non-Wall creatures that player controls that didn't attack this turn. Ignore this effect for each creature the player didn't control continuously since the beginning of the turn.",
         "types": ["Instant"],
         "cost": "{U}",
