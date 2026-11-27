@@ -111,10 +111,11 @@ test("two nonmana activations of one permanent create independent stack objects"
         }],
     }, player, player.battlefield);
     const [ability] = source.abilities;
-    ability.slate.RECIPIENT = [player];
+    const recipients = [player];
+    ability.slate.RECIPIENT = recipients;
 
     const first = new GameEvent_ActivateAbility(player, source, ability);
-    first.then(() => { ability.slate.RECIPIENT[0] = opponent; });
+    first.then(() => { recipients[0] = opponent; });
     const second = new GameEvent_ActivateAbility(player, source, ability);
     let occurrences: StackAbility[];
     second.then(() => { occurrences = game.stack.objects.filter(object => object instanceof StackAbility); });

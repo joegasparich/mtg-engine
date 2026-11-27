@@ -1,8 +1,6 @@
 import { CardObject,Permanent } from "@engine/GameObject";
-import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { game } from "@engine/Game";
 import { CombatManager } from "@engine/CombatManager";
-import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
 import { Ability } from ".";
 
@@ -21,7 +19,6 @@ import { bindPartConfig } from "./bindPartConfig";
 import.meta.glob("./parts/**/*.ts", { eager: true });
 
 export type GrammarKey = string;
-export type SlateVar = "THIS" | "CONTROLLER";
 export const HardcodedSignals = {
     SpellResolve: "SPELL_RESOLVE",
 };
@@ -66,8 +63,6 @@ export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: Car
     return ability;
 }
 
-type GrammarValue = ActionTarget | GameEvent_DealDamage | number | undefined;
-
 enum GrammarProperty {
     Controller = "controller",
     Owner = "owner",
@@ -77,10 +72,10 @@ enum GrammarProperty {
     ChosenX = "chosenX",
 }
 
-export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
+export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): unknown {
     const [variable, ...properties] = key.split(".");
     // CR 506.2: The defending player is known before attackers are declared.
-    let result: GrammarValue = ability.slate[variable]?.[0];
+    let result: unknown = ability.slate[variable]?.[0];
     if (variable === "DEFENDING_PLAYER") result = CombatManager.defendingPlayer ?? undefined;
     if (variable === "ACTIVE_PLAYER") result = game.currentTurnPlayer();
     for (const property of properties) {

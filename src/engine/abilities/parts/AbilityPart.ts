@@ -27,7 +27,7 @@ export abstract class AbilityPart {
         this.ability = ability;
     }
 
-    cleanup(ability: Ability) {}
+    cleanup(_ability: Ability) {}
 
-    onSignalFired(signal: string) {}
+    onSignalFired(_signal: string) {}
 }

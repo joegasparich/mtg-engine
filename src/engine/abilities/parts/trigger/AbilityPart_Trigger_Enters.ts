@@ -8,7 +8,7 @@ import { RegisterAbilityPart } from "../../registry";
 import { AbilityPart_Trigger } from "./AbilityPart_Trigger";
 
 @RegisterAbilityPart
-class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
+export class AbilityPart_Trigger_Enters extends AbilityPart_Trigger {
     type: CardType;
     storeAs: GrammarKey;
     private stopListening?: () => void;

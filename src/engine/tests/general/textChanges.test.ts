@@ -107,3 +107,14 @@ test("a whole-domain substitution merges duplicate land types and preserves othe
     expect(land.subtypes).toEqual(["Gate", Island, Forest]);
     expect(land.abilities).toHaveLength(3);
 });
+
+test("a colour-setting spell resolves using its edited colour word", () => {
+    const creature = addTestCard(cardData.find(def => def.name === "Grizzly Bears"), player, player.battlefield);
+    const card = addTestCard(cardData.find(def => def.name === "Thoughtlace"), player, player.hand);
+    expect(game.stack.spellCast(player, card, [creature])).toBe(true);
+    const spell = game.stack.objects[0] as Spell;
+    layers.registerResolved({ select: () => [spell], changes: [replaceRulesWord({ kind: WordKind.Colour, from: "U", to: "R" })] });
+    expect(spell.characteristics.rulesText).toContain("becomes red");
+    game.stack.resolveAll();
+    expect(creature.colours).toEqual(new Set(["R"]));
+});

@@ -1722,5 +1722,35 @@
                 "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
             } }
         ]
+    },
+    {
+        "name": "Steal Artifact",
+        "image_url": "https://cards.scryfall.io/large/front/3/b/3bc89e33-1827-4b14-b39b-717f08e88901.jpg?1783919545",
+        "oracle_text": "Enchant artifact\nYou control enchanted artifact.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{2}{U}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Artifact" } } } },
+            { "parts": {
+                "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_ARTIFACT" },
+                "AbilityPart_ControlPermanents": { "permanentsFrom": "ENCHANTED_ARTIFACT" }
+            } }
+        ]
+    },
+    {
+        "name": "Thoughtlace",
+        "image_url": "https://cards.scryfall.io/large/front/f/0/f059df8d-b9ff-452e-b144-2c4eb7694fcb.jpg?1783919547",
+        "rulesTextTemplate": "Target spell or permanent becomes {color:U}. (Mana symbols on that permanent remain unchanged.)",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [
+            {
+                "parts": {
+                    "AbilityPart_Target": { "saveAs": "TARGET", "validTargets": ["Spell", "Permanent"] },
+                    "AbilityPart_Effect_SetColour": { "inSignal": "SPELL_RESOLVE", "target": "TARGET", "colour": "U" }
+                }
+            }
+        ]
     }
 ]

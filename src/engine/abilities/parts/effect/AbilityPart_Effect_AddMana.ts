@@ -2,10 +2,15 @@ import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_AddMana } from "@engine/events/GameEvent_AddMana";
 import Player from "@engine/Player";
 import { type ManaAmount,ManaColour,ManaUtility } from "@engine/mana";
-import { type CardColour,cardColours } from "~/defs";
+import { isCardColour } from "~/defs";
 import { GrammarKey,resolveAbilityGrammar } from "../..";
 import { RegisterAbilityPart } from "../../registry";
 import { AbilityPart_Effect } from "./AbilityPart_Effect";
+
+function isManaAmount(value: unknown): value is Readonly<ManaAmount> {
+    return Array.isArray(value) && value.length === ManaColour.Generic
+        && value.every(amount => Number.isSafeInteger(amount) && amount >= 0);
+}
 
 @RegisterAbilityPart
 export class AbilityPart_Effect_AddMana extends AbilityPart_Effect {
@@ -22,14 +27,13 @@ export class AbilityPart_Effect_AddMana extends AbilityPart_Effect {
 
         let mana: Readonly<ManaAmount>;
         if (this.manaFrom) {
-            const stored: Readonly<ManaAmount> | undefined = this.ability.slate[this.manaFrom]?.[0];
-            if (!Array.isArray(stored) || stored.length !== ManaColour.Generic
-                || !stored.every(amount => Number.isSafeInteger(amount) && amount >= 0))
+            const stored = this.ability.slate[this.manaFrom]?.[0];
+            if (!isManaAmount(stored))
                 return;
             mana = stored;
         } else if (this.colourFrom) {
-            const colour: CardColour | undefined = this.ability.slate[this.colourFrom]?.[0];
-            if (!cardColours.includes(colour) || !Number.isSafeInteger(this.amount) || this.amount <= 0)
+            const colour = this.ability.slate[this.colourFrom]?.[0];
+            if (!isCardColour(colour) || !Number.isSafeInteger(this.amount) || this.amount <= 0)
                 return;
             const chosen: ManaAmount = [0, 0, 0, 0, 0, 0];
             chosen[ManaColour[colour]] = this.amount;

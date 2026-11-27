@@ -1,5 +1,3 @@
-import * as PIXI from 'pixi.js';
-
 import { GameEvent_Advance } from "@engine/events";
 import gameEventManager from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
@@ -15,12 +13,14 @@ declare global {
 }
 
 const playtestDeck = Object.entries({
-    Island: 26,
-    Stasis: 8,
-    "Merfolk of the Pearl Trident": 8,
-    "Prodigal Sorcerer": 8,
-    "Phantom Monster": 6,
-    "Mana Short": 4,
+    Island: 16,
+    Mountain: 8,
+    "Steal Artifact": 6,
+    Thoughtlace: 6,
+    "Celestial Prism": 8,
+    "Black Lotus": 4,
+    "Mons's Goblin Raiders": 8,
+    "Blue Elemental Blast": 4,
 }).flatMap(([name, copies]) => {
     const index = cardData.findIndex(card => card.name === name);
     if (index < 0)
@@ -48,8 +48,4 @@ export async function startGame() {
     uiRoot.onPlayerAdded(playerTwo);
 
     game.startGame({allowAutoSkip: true});
-}
-
-function tick(time: PIXI.Ticker) {
-
 }

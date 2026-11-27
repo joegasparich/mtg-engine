@@ -7,11 +7,16 @@ import { ManaAmount,ManaUtility } from "@engine/mana";
 import type { LayerEffect,TimedEffect } from "@engine/effects/Layers";
 import type Player from "@engine/Player";
 import { AbilityActivator,AbilityDef } from "~/defs";
-import { SlateVar } from ".";
 import { AbilityPart_Activate } from "./parts/activate/AbilityPart_Activate";
 import { AbilityPart_Activate_Mana } from "./parts/activate/AbilityPart_Activate_Mana";
 import { AbilityPart_Activate_Tap } from "./parts/activate/AbilityPart_Activate_Tap";
 import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_AddMana";
+
+interface AbilitySlate {
+    [key: string]: readonly unknown[];
+    THIS?: readonly CardObject[];
+    CONTROLLER?: readonly Player[];
+}
 
 // Architecture:
 // Abilities are made up of several parts, which communicate with signals
@@ -28,7 +33,7 @@ export class Ability {
     def: AbilityDef;
     originalDefinition: AbilityDef;
     parts: AbilityPart[] = [];
-    slate: Record<SlateVar | string, any> = {};
+    slate: AbilitySlate = {};
     source: CardObject;
 
     constructor(source: CardObject, readonly grantedBy?: CardObject) {

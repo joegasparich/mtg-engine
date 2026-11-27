@@ -1,3 +1,5 @@
+import type { CardColour } from "./defs";
+
 export interface SFSet {
     object: string
     id: string
@@ -37,9 +39,9 @@ export interface SFCard {
     cmc: number
     type_line: string
     oracle_text: string
-    colors: any[]
-    color_identity: string[]
-    keywords: any[]
+    colors: CardColour[]
+    color_identity: CardColour[]
+    keywords: string[]
     produced_mana: string[]
     legalities: SFLegalities
     games: string[]
@@ -114,12 +116,12 @@ export interface SFLegalities {
 }
 
 export interface SFPrices {
-    usd: string
-    usd_foil: string
-    usd_etched: any
-    eur: any
-    eur_foil: any
-    tix: string
+    usd: string | null
+    usd_foil: string | null
+    usd_etched: string | null
+    eur: string | null
+    eur_foil: string | null
+    tix: string | null
 }
 
 export interface SFRelatedUris {

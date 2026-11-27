@@ -5,7 +5,7 @@ import { Keyword } from "~/defs";
 import { AbilityPart_ContinuousEffect } from "./AbilityPart_ContinuousEffect";
 
 @RegisterAbilityPart
-class AbilityPart_Flying extends AbilityPart_ContinuousEffect {
+export class AbilityPart_Flying extends AbilityPart_ContinuousEffect {
     protected getContinuousEffect(): ContinuousEffect {
         // 702.9b: A creature with flying can be blocked only by creatures with flying or reach.
         return {

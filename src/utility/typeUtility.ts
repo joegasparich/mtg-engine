@@ -1,5 +1,5 @@
-export function autobind<F extends (...args: Array<any>) => any>(
-    _target: any,
+export function autobind<F extends (...args: never[]) => unknown>(
+    _target: object,
     name: string,
     descriptor: TypedPropertyDescriptor<F>,
 ): TypedPropertyDescriptor<F> {
@@ -11,7 +11,7 @@ export function autobind<F extends (...args: Array<any>) => any>(
         enumerable,
         configurable,
 
-        get(this: { [boundMethod]: any }) {
+        get(this: { [boundMethod]?: F }) {
             return this[boundMethod] || (this[boundMethod] = value!.bind(this));
         },
 

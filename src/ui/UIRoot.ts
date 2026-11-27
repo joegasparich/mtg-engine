@@ -80,7 +80,7 @@ export class UITargeter {
         this.arrow.eventMode = "none";
         pixi.stage.addChild(this.arrow);
 
-        this.arrow.onRender = (renderer: PIXI.Renderer) => {
+        this.arrow.onRender = () => {
             const p1 = this.source?.getGlobalPosition() ?? new PIXI.Point(pixi.screen.width / 2, pixi.screen.height / 2);
             const p2 = this.target ? this.target.getGlobalPosition() : uiRoot.mousePos;
 

@@ -14,14 +14,14 @@ export class AbilityPart_ModifyCardDefinition extends AbilityPart {
     onSignalFired(signal: string) {
         if (signal !== this.inSignal)
             return;
-        const draft: CardDef | CardObject | undefined = this.ability.slate[this.on]?.[0];
-        if (!draft || draft instanceof CardObject || !Array.isArray(draft.types))
+        const draft = this.ability.slate[this.on]?.[0];
+        if (!draft || typeof draft !== "object" || draft instanceof CardObject || !("types" in draft) || !Array.isArray(draft.types))
             return;
         if (this.addTypes.length)
             draft.types = [...new Set([...draft.types, ...this.addTypes])];
         if (this.powerToughness) {
-            draft.power = this.powerToughness.power;
-            draft.toughness = this.powerToughness.toughness;
+            const { power, toughness } = this.powerToughness;
+            Object.assign(draft, { power, toughness });
         }
     }
 }

@@ -5044,3 +5044,67 @@ describe("Stasis", () => {
         expect(creature.tapped).toBe(false);
     });
 });
+
+describe("Steal Artifact", () => {
+    test("takes control of an artifact while attached and returns it when the Aura leaves", () => {
+        Game.init();
+        const caster = game.addPlayer([]);
+        const opponent = game.addPlayer([]);
+        startMainPhase();
+        const card = addTestCard(cardData.find(def => def.name === "Steal Artifact"), caster, caster.hand);
+        const prism = addTestCard(cardData.find(def => def.name === "Celestial Prism"), opponent, opponent.battlefield);
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 4;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([bears])).toBe(false);
+        game.pendingTargeter.onTargeted([prism]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(prism);
+        expect(prism).toMatchObject({ controller: caster, owner: opponent });
+        moveTestCard(aura, caster.graveyard);
+        expect(prism.controller).toBe(opponent);
+        expect(opponent.battlefield.objects).toContain(prism);
+    });
+});
+
+describe("Thoughtlace", () => {
+    const def = cardData.find(card => card.name === "Thoughtlace");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+    });
+
+    test("pays {U} and makes a permanent blue through cleanup", () => {
+        const card = addTestCard(def, caster, caster.hand);
+        const target = addTestCard(cardData[MONS_GOBLIN_RAIDERS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        playerActionManager.getCardActions(card, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([opponent])).toBe(false);
+        game.pendingTargeter.onTargeted([target]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+        gameEventManager.addEvent(new GameEvent_Cleanup(caster));
+        expect(target.colours).toEqual(new Set(["U"]));
+        expect(moveTestCard(target, opponent.hand).colours).toEqual(new Set(["R"]));
+    });
+
+    test("a creature spell made blue enters the battlefield blue", () => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, creature)).toBe(true);
+        const [spell] = game.stack.objects;
+        const card = addTestCard(def, caster, caster.hand);
+        expect(game.stack.spellCast(caster, card, [spell])).toBe(true);
+        passPriorityRound();
+        expect(spell).toMatchObject({ colours: new Set(["U"]) });
+        passPriorityRound();
+        expect(opponent.battlefield.objects[0]).toMatchObject({ card: creature.card, colours: new Set(["U"]), cost: creature.cost });
+    });
+});

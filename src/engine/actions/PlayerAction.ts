@@ -14,6 +14,5 @@ export abstract class PlayerAction<T extends CardObject = CardObject> {
         return "";
     }
 
-    perform(owner: Player, targets?: ActionTarget[]): void {
-    }
+    abstract perform(owner: Player, targets?: ActionTarget[]): void;
 }

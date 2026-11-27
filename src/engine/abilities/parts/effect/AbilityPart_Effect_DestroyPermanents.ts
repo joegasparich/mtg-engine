@@ -1,4 +1,3 @@
-import type { ActionTarget } from "@engine/actions";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_DestroyPermanent } from "@engine/events";
@@ -11,7 +10,7 @@ export class AbilityPart_Effect_DestroyPermanents extends AbilityPart_Effect {
     permanentsFrom: string;
 
     perform(effect: OneShotEffect) {
-        const objects: readonly ActionTarget[] = this.ability.slate[this.permanentsFrom] ?? [];
+        const objects = this.ability.slate[this.permanentsFrom] ?? [];
         const events = objects
             .filter((object): object is Permanent => object instanceof Permanent && object.zone instanceof Battlefield)
             .map(permanent => new GameEvent_DestroyPermanent(permanent));

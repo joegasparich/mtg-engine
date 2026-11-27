@@ -1,4 +1,3 @@
-import type { Ability } from "@engine/abilities/Ability";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { type ContinuousEffect,ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
@@ -16,7 +15,7 @@ export class AbilityPart_KeepGrantingAuraAttached extends AbilityPart_Continuous
             kind: ContinuousEffectKind.CheckOverride,
             // 702.16n: Exempt this Aura's current attachment from only the specified grants.
             allow: (event, checkSource) => {
-                const grants: readonly Ability[] | undefined = slate[this.grantsFrom];
+                const grants = slate[this.grantsFrom];
                 return event instanceof GameEvent_CheckAttachment && source instanceof Permanent
                     && event.attachment === source && event.recipient === source.attachedTo
                     && source.subtypes.includes(AttachmentSubtype.Aura)
