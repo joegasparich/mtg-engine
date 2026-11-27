@@ -4140,3 +4140,101 @@ describe("Magical Hack", () => {
         expect(caster.life).toBe(19);
     });
 });
+
+describe("Mana Short", () => {
+    const def = cardData.find(card => card.name === "Mana Short");
+    let caster: Player;
+    let opponent: Player;
+    let spell: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        spell = addTestCard(def, caster, caster.hand);
+    });
+
+    test("taps the target's lands without activating them and clears mana floated in response", () => {
+        const ownLand = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const borrowed = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        borrowed.controller = opponent;
+        const nonManaLand = addTestCard({ ...cardData[FOREST], subtypes: [], abilities: [] }, opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.Colourless] = 2;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([creature])).toBe(false);
+        game.pendingTargeter.onTargeted([opponent]);
+
+        gameEventManager.addEvent(new GameEvent_Advance(caster));
+        playerActionManager.getCardActions(forest, opponent)[0].perform(opponent);
+        expect(opponent.manaPool[ManaColour.G]).toBe(1);
+        const activations = vi.fn();
+        gameEventManager.onGamePerformed(GameEventType.ActivateAbility, activations);
+        passPriorityRound();
+
+        expect([borrowed.tapped, nonManaLand.tapped, forest.tapped]).toEqual([true, true, true]);
+        expect([ownLand.tapped, creature.tapped]).toEqual([false, false]);
+        expect(activations).not.toHaveBeenCalled();
+        expect(opponent.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+        expect(caster.manaPool).toEqual([0, 0, 0, 0, 0, 0]);
+    });
+
+    test("can target its caster and clear unspent mana even with no lands", () => {
+        caster.manaPool[ManaColour.U] = 4;
+        opponent.manaPool[ManaColour.B] = 2;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        game.pendingTargeter.onTargeted([caster]);
+        expect(caster.manaPool[ManaColour.U]).toBe(1);
+        passPriorityRound();
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(opponent.manaPool[ManaColour.B]).toBe(2);
+    });
+});
+
+describe("Phantasmal Forces", () => {
+    const def = cardData.find(card => card.name === "Phantasmal Forces");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+    let controller: Player;
+    let forces: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        controller = game.addPlayer(BASIC_DECK);
+        game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        forces = addTestCard(def, controller, controller.battlefield);
+    });
+
+    function resolveUpkeepTrigger() {
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.stack.objects).toHaveLength(0);
+        gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+    }
+
+    test.each([ManaPaymentDecision.Pay, ManaPaymentDecision.Decline])("offers the controller the upkeep payment (%s)", decision => {
+        const land = addTestCard(island, controller, controller.battlefield);
+        expect(forces.hasKeyword(Keyword.Flying)).toBe(true);
+        resolveUpkeepTrigger();
+        const choice = game.pendingManaPaymentChoice;
+        expect(choice).toMatchObject({ player: controller, cost: "{U}" });
+        choice.submit(controller, decision);
+        const paid = decision === ManaPaymentDecision.Pay;
+        expect(land.tapped).toBe(paid);
+        expect(controller.battlefield.objects.includes(forces)).toBe(paid);
+        expect(controller.graveyard.objects.some(object => object.card === forces.card)).toBe(!paid);
+    });
+
+    test("sacrifices the creature when the controller cannot pay blue", () => {
+        addTestCard(cardData[FOREST], controller, controller.battlefield);
+        resolveUpkeepTrigger();
+        expect(game.pendingManaPaymentChoice).toBeNull();
+        expect(controller.graveyard.objects.at(-1).card).toBe(forces.card);
+    });
+});

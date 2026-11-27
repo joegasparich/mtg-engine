@@ -1428,5 +1428,60 @@
             ],
             "AbilityPart_Effect_ReplaceBasicLandTypeWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
         } }]
+    },
+    {
+        "name": "Mahamoti Djinn",
+        "image_url": "https://cards.scryfall.io/large/front/7/7/7773dfdb-1bef-40f0-b041-7d72cc5ee162.jpg",
+        "oracle_text": "Flying",
+        "types": ["Creature"],
+        "subtypes": ["Djinn"],
+        "cost": "{4}{U}{U}",
+        "power": 5,
+        "toughness": 6,
+        "abilities": [{ "keyword": "flying" }]
+    },
+    {
+        "name": "Mana Short",
+        "image_url": "https://cards.scryfall.io/large/front/5/3/537fb06c-a078-49a2-adf7-c64e950bf5ec.jpg",
+        "oracle_text": "Tap all lands target player controls and that player loses all unspent mana.",
+        "types": ["Instant"],
+        "cost": "{2}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "saveAs": "TARGET_PLAYER", "validTargets": ["Player"] },
+            "AbilityPart_SelectObjects": {
+                "inSignal": "SPELL_RESOLVE", "zone": "battlefield", "controlledBy": "TARGET_PLAYER",
+                "targetValidator": { "cardType": "Land" }, "saveAs": "LANDS", "outSignal": "TAP_LANDS"
+            },
+            "AbilityPart_Effect_TapPermanents": { "inSignal": "TAP_LANDS", "permanentsFrom": "LANDS", "outSignal": "CLEAR_POOL" },
+            "AbilityPart_Effect_ClearManaPool": { "inSignal": "CLEAR_POOL", "target": "TARGET_PLAYER" }
+        } }]
+    },
+    {
+        "name": "Merfolk of the Pearl Trident",
+        "image_url": "https://cards.scryfall.io/large/front/9/f/9fd246a4-ea46-4e02-a1bd-5e78f5f141c3.jpg",
+        "oracle_text": "",
+        "types": ["Creature"],
+        "subtypes": ["Merfolk"],
+        "cost": "{U}",
+        "power": 1,
+        "toughness": 1
+    },
+    {
+        "name": "Phantasmal Forces",
+        "image_url": "https://cards.scryfall.io/large/front/3/1/3187c204-990e-4ee4-8a65-6ed8debd0a28.jpg",
+        "oracle_text": "Flying\nAt the beginning of your upkeep, sacrifice this creature unless you pay {U}.",
+        "types": ["Creature"],
+        "subtypes": ["Illusion"],
+        "cost": "{3}{U}",
+        "power": 4,
+        "toughness": 1,
+        "abilities": [
+            { "keyword": "flying" },
+            { "parts": {
+                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.controller" },
+                "AbilityPart_Effect_ChooseManaPayment": { "cost": "{U}", "onDeclineSignal": "SACRIFICE" },
+                "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
+            } }
+        ]
     }
 ]
