@@ -27,7 +27,7 @@ type CardChoiceDetails = {
     readonly options: readonly CardObject[];
 } & (
     { readonly count: number; readonly presentation?: CardChoicePresentation.Board }
-    | { readonly count: 1; readonly presentation: CardChoicePresentation.SingleCardList }
+    | { readonly count: 1; readonly presentation: CardChoicePresentation.SingleCardList; optionName?(card: CardObject): string }
 );
 
 export type CardChoice = CardChoiceDetails & (

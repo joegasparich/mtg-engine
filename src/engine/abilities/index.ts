@@ -1,4 +1,5 @@
 import { CardObject,Permanent,Spell } from "@engine/GameObject";
+import { CombatManager } from "@engine/CombatManager";
 import { ActionTarget } from "@engine/actions";
 import { AbilityDef } from "~/defs";
 import { Ability } from ".";
@@ -41,7 +42,7 @@ function expandParts(parts: AbilityDef["parts"]): [string, object][] {
 export function makeAbility(def: AbilityDef, source: CardObject, grantedBy?: CardObject): Ability {
     const ability = new Ability(source, grantedBy);
 
-    ability.def = def;
+    ability.originalDefinition = ability.def = def;
 
     if (def.keyword)
         ability.def = keywordData[def.keyword];
@@ -73,7 +74,8 @@ enum GrammarProperty {
 
 export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): GrammarValue {
     const [variable, ...properties] = key.split(".");
-    let result: GrammarValue = ability.slate[variable]?.[0];
+    // CR 506.2: The defending player is known before attackers are declared.
+    let result: GrammarValue = variable === "DEFENDING_PLAYER" ? CombatManager.defendingPlayer ?? undefined : ability.slate[variable]?.[0];
     for (const property of properties) {
         if (!(result instanceof CardObject))
             return undefined;

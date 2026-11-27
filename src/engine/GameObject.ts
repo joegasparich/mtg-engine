@@ -5,7 +5,9 @@ import { getBasicLandMana } from "@engine/abilities/BasicLandMana";
 import type { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent } from "@engine/events";
-import { type CardCharacteristics,GameEvent_CheckAttachment,GameEvent_CheckCharacteristics,GameEvent_CheckPowerToughness } from "@engine/events/GameEvent_CardInteractionChecks";
+import { abilityGrant } from "@engine/effects/AbilityGrant";
+import { change,Layer,type Characteristics,type LayerChange,type TimedEffect } from "@engine/effects/Layers";
+import { GameEvent_CheckAttachment } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ type GameEvent } from "@engine/events/GameEventManager";
 import { game } from "@engine/Game";
 import { ManaAmount,ManaColour,ManaCost,ManaUtility } from "@engine/mana";
@@ -29,6 +31,8 @@ export abstract class GameObject {
         this.currentZone = zone;
     }
 
+    captureBeforeLeaving?(): void;
+
     retire() {
         this.currentZone = undefined;
         this.hasRetired = true;
@@ -36,204 +40,147 @@ export abstract class GameObject {
 }
 
 export class CardObject extends GameObject {
-    get controller(): Player | undefined { return undefined; }
+    get controller(): Player | undefined { return this.characteristics.controller; }
+    protected get initialController(): Player | undefined { return undefined; }
     get owner() { return this.card.owner; }
-    get def(): Readonly<CardDef> { return this.card.def; }
+    get def() { return this.characteristics.definition; }
     get logName() { return `${this.name} (${this.id})`; }
     get resolvedDamageSource(): Permanent | undefined { return undefined; }
 
-    name: string;
-    private baseTypes: readonly CardType[];
-    private baseSubtypes: readonly string[];
-    cost?: ManaCost;
-    get variableManaSymbols() { return ManaUtility.countVariableSymbols(this.def.cost); }
-    private baseColours: ReadonlySet<CardColour>;
-    private colourOverride?: ReadonlySet<CardColour>;
-    get colours() { return this.colourOverride ?? this.baseColours; }
-    set colours(colours: ReadonlySet<CardColour>) { this.colourOverride = colours; }
-    get changedColours() { return this.colourOverride; }
-    private basePower: number;
-    private baseToughness: number;
-    private baseAbilities: readonly Ability[];
+    timestamp = 0;
+    private readonly localEffects = new Set<TimedEffect & { followsResolution?: boolean }>();
+    get objectEffects(): Iterable<TimedEffect> { return this.localEffects; }
+    private readonly printed: Characteristics;
+    protected copiedValues?: Characteristics;
+    private get baseValues() { return this.copiedValues ?? this.printed; }
+    private lastKnown?: Readonly<Characteristics>;
     private spellModeAbilities?: Map<number, readonly Ability[]>;
-    private readonly activeBaseAbilities = new Set<Ability>();
-    private basicLandAbilities?: Map<AbilityDef, Ability>;
-    private readonly grantedAbilities = new Set<Ability>();
+    private readonly activeAbilities = new Set<Ability>();
+    private readonly basicLandAbilities = new Map<AbilityDef, Ability>();
 
     constructor(readonly card: Card, chosenMode?: number) {
         super();
-        this.applyDefinition(card.def);
+        this.printed = this.bindDefinition(card.def);
         if (chosenMode !== undefined)
-            this.baseAbilities = [...this.baseAbilities, ...this.getSpellModeAbilities(chosenMode)];
+            this.printed.abilities = [...this.printed.abilities, ...this.getSpellModeAbilities(chosenMode)];
     }
 
-    protected applyDefinition(def: Readonly<CardDef>) {
-        this.name = def.name;
-        this.baseTypes = [...def.types];
-        this.baseSubtypes = [...(def.subtypes ?? [])];
-        this.power = def.power;
-        this.toughness = def.toughness;
-        this.cost = def.cost ? [...ManaUtility.parseManaString<ManaCost>(def.cost)] : undefined;
-        // 202.2: The coloured symbols in the mana cost determine the object's starting colours.
-        this.baseColours = new Set(cardColours.filter(colour => this.cost?.[ManaColour[colour]] > 0));
-        this.baseAbilities = (def.abilities ?? []).map(ability => makeAbility(ability, this));
+    createAbility(def: AbilityDef, grantedBy?: CardObject) { return makeAbility(def, this, grantedBy); }
+
+    protected bindDefinition(def: Readonly<CardDef>): Characteristics {
+        const cost = def.cost ? [...ManaUtility.parseManaString<ManaCost>(def.cost)] as ManaCost : undefined;
+        return { definition: def, name: def.name, rulesText: def.oracle_text, types: def.types, subtypes: def.subtypes ?? [], cost,
+            colours: new Set(cardColours.filter(colour => cost?.[ManaColour[colour]] > 0)),
+            power: def.power, toughness: def.toughness, basePower: def.power, baseToughness: def.toughness,
+            abilities: (def.abilities ?? []).map(ability => this.createAbility(ability)) };
     }
 
-    get characteristics(): Readonly<CardCharacteristics> {
-        const base = {
-            types: this.baseTypes,
-            subtypes: this.baseSubtypes,
-            basePower: this.basePower,
-            baseToughness: this.baseToughness,
-            nativeAbilities: this.baseAbilities,
-        };
-        return this.zone instanceof Battlefield ? GameEvent_CheckCharacteristics.evaluate(this, base) : base;
+    startingCharacteristics(): Characteristics { return { ...this.printed, controller: this.initialController }; }
+    get characteristics(): Readonly<Characteristics> {
+        return this.retired && this.lastKnown ? this.lastKnown : gameEventManager.effects.layers.read(this);
     }
 
-    get types(): readonly CardType[] {
-        return this.characteristics.types;
+    captureBeforeLeaving() { this.lastKnown = this.characteristics; }
+    get name() { return this.characteristics.name; }
+    get cost() { return this.characteristics.cost; }
+    set cost(cost: ManaCost) { this.baseValues.cost = cost; this.changed(); }
+    get variableManaSymbols() { return ManaUtility.countVariableSymbols(this.def.cost); }
+    get colours() { return this.characteristics.colours; }
+    set colours(value: ReadonlySet<CardColour>) {
+        const colours = new Set(value);
+        this.addObjectEffect([change(Layer.Colour, () => [colours] as const,
+            (state, replacement) => { state.colours = replacement; })], true);
     }
 
-    set types(types: readonly CardType[]) {
-        // 506.4: A creature that stops being a creature leaves combat immediately.
-        const wasCreature = this.hasType(CardType.Creature);
-        this.baseTypes = [...types];
-        if (this instanceof Permanent && wasCreature && !this.hasType(CardType.Creature))
-            CombatManager.removeFromCombat(this);
-        this.refreshBaseAbilities();
-        if (this.zone instanceof Battlefield)
-            gameEventManager.effects.refreshAbilityGrants();
+    // 400.7a: A characteristic-changing resolution follows a permanent spell into play,
+    // retaining its original timestamp. Other zone changes create a fresh rules object.
+    carryResolutionEffectsTo(entering: Permanent) {
+        gameEventManager.effects.layers.continuesFromSpell(entering, this);
+        for (const effect of this.localEffects)
+            if (effect.followsResolution) entering.addObjectEffect(effect.changes, false, effect.timestamp());
     }
 
-    hasType(type: CardType): boolean {
-        return this.types.includes(type);
+    protected addObjectEffect(changes: readonly LayerChange[], followsResolution = false,
+        timestamp = gameEventManager.effects.layers.nextTimestamp()) {
+        const effect = { changes, select: () => [this], timestamp: () => timestamp, followsResolution };
+        this.localEffects.add(effect);
+        this.changed();
+        return () => { if (this.localEffects.delete(effect)) this.changed(); };
     }
 
-    get subtypes(): readonly string[] {
-        return this.characteristics.subtypes;
-    }
+    protected changed() { if (this.zone) gameEventManager.effects.layers.changed(); }
+    get types() { return this.characteristics.types; }
+    set types(types: readonly CardType[]) { this.baseValues.types = [...types]; this.changed(); }
+    hasType(type: CardType) { return this.types.includes(type); }
+    get subtypes() { return this.characteristics.subtypes; }
+    set subtypes(subtypes: readonly string[]) { this.baseValues.subtypes = [...subtypes]; this.changed(); }
+    hasBaseSubtype(subtype: string) { return this.baseValues.subtypes.includes(subtype); }
 
-    set subtypes(subtypes: readonly string[]) {
-        this.baseSubtypes = subtypes;
-        this.refreshBaseAbilities();
-        if (this.zone instanceof Battlefield)
-            gameEventManager.effects.refreshAbilityGrants();
-    }
-
-    hasBaseSubtype(subtype: string): boolean {
-        return this.baseSubtypes.includes(subtype);
-    }
-
-    getPowerToughness(base = this.characteristics): { power: number; toughness: number } {
-        if (!(this instanceof Permanent))
-            return { power: base.basePower, toughness: base.baseToughness };
-
-        const check = new GameEvent_CheckPowerToughness(this, base);
-        gameEventManager.checkEvent(check);
-        return { power: check.power, toughness: check.toughness };
-    }
-
-    get power(): number {
-        return this.getPowerToughness().power;
-    }
-
-    set power(power: number) { this.basePower = power; }
-
-    get toughness(): number {
-        return this.getPowerToughness().toughness;
-    }
-
-    set toughness(toughness: number) { this.baseToughness = toughness; }
-
-    get abilities(): readonly Ability[] {
-        const abilities = this.effectiveBaseAbilities;
-        return this.grantedAbilities.size > 0 ? [...abilities, ...this.grantedAbilities] : abilities;
-    }
-
+    getPowerToughness({ power, toughness } = this.characteristics) { return { power, toughness }; }
+    get power() { return this.characteristics.power; }
+    set power(power: number) { this.baseValues.basePower = this.baseValues.power = power; this.changed(); }
+    get toughness() { return this.characteristics.toughness; }
+    set toughness(toughness: number) { this.baseValues.baseToughness = this.baseValues.toughness = toughness; this.changed(); }
+    get abilities() { return this.characteristics.abilities; }
     set abilities(abilities: readonly Ability[]) {
-        this.baseAbilities = abilities.filter(ability => !this.grantedAbilities.has(ability)
-            && this.basicLandAbilities?.get(ability.def) !== ability);
-        this.refreshBaseAbilities();
+        this.baseValues.abilities = abilities.filter(ability => !ability.grantedBy && this.basicLandAbilities.get(ability.def) !== ability);
+        this.changed();
     }
 
-    private get effectiveBaseAbilities(): readonly Ability[] {
-        const base = this.characteristics;
-        if (!base.types.includes(CardType.Land))
-            return base.nativeAbilities;
-
-        // 305.6–7: Land subtypes give intrinsic mana abilities. Setting a basic land type replaces
-        // the old subtypes and rules-text abilities, while externally granted abilities still apply.
-        const abilities = [...base.nativeAbilities];
-        for (const subtype of new Set(base.subtypes)) {
+    withLandAbilities(state: Characteristics) {
+        const abilities = this.basicLandAbilities.size
+            ? state.abilities.filter(ability => this.basicLandAbilities.get(ability.def) !== ability)
+            : [...state.abilities];
+        if (!state.types.includes(CardType.Land))
+            return abilities.length === state.abilities.length ? state.abilities : abilities;
+        for (const subtype of new Set(state.subtypes)) {
             const def = getBasicLandMana(subtype);
-            if (!def)
-                continue;
-
-            const intrinsic = this.basicLandAbilities ??= new Map();
-            if (!intrinsic.has(def))
-                intrinsic.set(def, makeAbility(def, this));
-            abilities.push(intrinsic.get(def));
+            if (!def) continue;
+            if (!this.basicLandAbilities.has(def)) this.basicLandAbilities.set(def, this.createAbility(def));
+            abilities.push(this.basicLandAbilities.get(def));
         }
-        return abilities;
+        return abilities.length === state.abilities.length && abilities.every((ability, i) => ability === state.abilities[i])
+            ? state.abilities : abilities;
     }
 
-    refreshBaseAbilities() {
-        if (!this.zone)
-            return;
-
-        const abilities = this.effectiveBaseAbilities;
-        for (const ability of this.activeBaseAbilities) {
-            if (!abilities.includes(ability)) {
-                this.activeBaseAbilities.delete(ability);
+    reconcileCharacteristics(state: Characteristics, states: ReadonlyMap<CardObject, Characteristics>): (() => void) | void {
+        for (const ability of this.activeAbilities) {
+            if (!state.abilities.includes(ability)) {
+                this.activeAbilities.delete(ability);
                 ability.cleanup();
+                // The source can lose this ability in layer 6 after its effect has already
+                // begun. Reconcile any continuing grants against the same final snapshot.
+                for (const part of ability.parts) part.reconcileLayers?.(states);
             }
         }
-        for (const ability of abilities) {
-            if (!this.activeBaseAbilities.has(ability)) {
-                this.activeBaseAbilities.add(ability);
+        for (const ability of state.abilities) {
+            if (!this.activeAbilities.has(ability)) {
+                this.activeAbilities.add(ability);
                 ability.setup();
             }
+            for (const part of ability.parts) part.reconcileLayers?.(states);
         }
     }
 
-    grantAbility(def: AbilityDef, grantedBy: CardObject): { ability: Ability; revoke: () => void } {
-        // 613.1f: Each continuous effect contributes its own ability instance.
-        const ability = makeAbility(def, this, grantedBy);
-        this.grantedAbilities.add(ability);
-        if (this.zone)
-            ability.setup();
-
-        return {
-            ability,
-            revoke: () => {
-                if (this.grantedAbilities.delete(ability))
-                    ability.cleanup();
-            },
-        };
+    grantAbility(def: AbilityDef, source: CardObject) {
+        const timestamp = gameEventManager.effects.layers.nextTimestamp();
+        const grant = abilityGrant(def, source, () => timestamp);
+        const ability = grant.forObject(this);
+        const revoke = grant.change.canStartOn(this) ? this.addObjectEffect([grant.change], false, timestamp) : () => {};
+        return { ability, revoke };
     }
 
     enterZone(zone: Zone) {
         super.enterZone(zone);
-        const grants = [...this.grantedAbilities];
-        this.refreshBaseAbilities();
-        grants.forEach(ability => {
-            if (this.grantedAbilities.has(ability))
-                ability.setup();
-        });
-        // 611.3c: Grant abilities before a permanent's entry is observed by triggers.
-        if (zone instanceof Battlefield)
-            gameEventManager.effects.refreshAbilityGrants();
+        this.timestamp ||= gameEventManager.effects.layers.nextTimestamp();
+        gameEventManager.effects.layers.track(this);
     }
 
     retire() {
-        const wasOnBattlefield = this.zone instanceof Battlefield;
-        this.activeBaseAbilities.forEach(ability => ability.cleanup());
-        this.activeBaseAbilities.clear();
-        this.grantedAbilities.forEach(ability => ability.cleanup());
-        this.grantedAbilities.clear();
         super.retire();
-        if (wasOnBattlefield)
-            gameEventManager.effects.refreshAbilityGrants();
+        for (const ability of this.activeAbilities) ability.cleanup();
+        this.activeAbilities.clear();
+        gameEventManager.effects.layers.forget(this);
     }
 
     canPlay() {
@@ -312,78 +259,85 @@ export class CardObject extends GameObject {
 
 
 export class Permanent extends CardObject {
-    private copiedDefinition?: Readonly<CardDef>;
     private copiedFace?: Readonly<CardDef>;
-    override get def() { return this.copiedDefinition ?? super.def; }
     get printedFace() { return this.copiedFace ?? this.card.def; }
     get isCopy() { return this.copiedFace !== undefined; }
+
+    get copiableDefinition(): Readonly<CardDef> {
+        const { definition, name, rulesText, types, subtypes, power, toughness, abilities } = gameEventManager.effects.layers.copiable(this);
+        const definitions = abilities.map(ability => ability.originalDefinition);
+        const same = <T>(a: readonly T[], b: readonly T[] = []) => a.length === b.length && a.every((value, i) => value === b[i]);
+        if (name === definition.name && rulesText === definition.oracle_text && power === definition.power && toughness === definition.toughness
+            && same(types, definition.types) && same(subtypes, definition.subtypes) && same(definitions, definition.abilities))
+            return definition;
+        return { ...definition, name, oracle_text: rulesText, types, subtypes: [...subtypes], power, toughness, abilities: definitions };
+    }
 
     enterAsCopyOf(original: Permanent, definition: Readonly<CardDef>) {
         if (this.zone || this.retired)
             throw new Error("Only a permanent preparing to enter can enter as a copy");
         // 613.2a, 707.2–3: Capture the layer-one definition, including earlier copies.
         // Fresh ability instances bind their source, slate and listeners to this permanent.
-        this.copiedDefinition = definition;
+        const values = gameEventManager.effects.layers.copiable(original);
+        const copy = this.copiedValues = this.bindDefinition(definition);
+        if (definition.cost === values.definition.cost) {
+            copy.colours = values.colours;
+            copy.cost = values.cost;
+        }
         this.copiedFace = original.printedFace;
-        this.applyDefinition(definition);
+        this.addObjectEffect([change(Layer.Copy, () => [copy] as const,
+            (state, values) => { Object.assign(state, values); })]);
     }
 
     private attachment?: Permanent;
+    private observedAttachment?: Permanent;
     private baseController: Player;
     private currentController: Player;
-    private readonly controlEffects = new Map<Ability, Player>();
     private readonly controlOrAttachmentListeners = new Set<() => void>();
     private controlledSinceTurn: number;
-    tapped = false;
+    private isTapped = false;
+    get tapped() { return this.isTapped; }
+    set tapped(value: boolean) { this.isTapped = value; this.changed(); }
     damageTaken = 0;
 
     constructor(card: Card, controller: Player, attachedTo?: Permanent) {
         super(card);
-        this.controller = controller;
+        this.baseController = this.currentController = controller;
+        this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
         this.attachment = attachedTo;
     }
 
-    override get controller() { return this.currentController; }
+    protected override get initialController() { return this.retired ? this.currentController : this.baseController; }
+    override get controller() { return super.controller; }
+    override set controller(player: Player) { this.baseController = player; this.changed(); }
 
-    override set controller(player: Player) {
-        this.baseController = player;
-        this.updateController();
-    }
-
-    setControlEffect(ability: Ability, controller?: Player) {
-        if (controller)
-            this.controlEffects.set(ability, controller);
-        else
-            this.controlEffects.delete(ability);
-        // Reconcile overlapping effects once, before observers see a simultaneous batch.
-        gameEventManager.afterSimultaneousChanges(this.refreshBattlefieldController);
-    }
-
-    private readonly refreshBattlefieldController = () => {
-        if (this.zone instanceof Battlefield)
-            this.updateController();
-    };
-
-    private updateController() {
-        // 613.1b, 613.7: The most recently applied control effect wins in layer 2.
-        const controller = [...this.controlEffects.values()].at(-1) ?? this.baseController;
-        if (controller === this.currentController)
-            return;
-        this.currentController = controller;
-        this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
-        const zone = this.zone;
-        if (zone instanceof Battlefield) {
-            // 400.1, 506.4: Control changes on the same battlefield, but the permanent leaves combat.
+    override reconcileCharacteristics(state: Characteristics, states: ReadonlyMap<CardObject, Characteristics>) {
+        super.reconcileCharacteristics(state, states);
+        if (!state.types.includes(CardType.Creature))
             CombatManager.removeFromCombat(this);
-            if (zone !== controller.battlefield) {
-                removeItem(zone.objects, this);
-                controller.battlefield.objects.push(this);
-                this.currentZone = controller.battlefield;
-            }
-            this.controlOrAttachmentListeners.forEach(update => update());
-            gameEventManager.effects.refreshAbilityGrants();
+        const controller = state.controller;
+        const controlChanged = controller !== this.currentController;
+        const attachmentChanged = this.observedAttachment !== this.attachment;
+        this.observedAttachment = this.attachment;
+        if (controlChanged) {
+            this.currentController = controller;
+            this.controlledSinceTurn = game?.options ? game.turnNumber : -1;
+            CombatManager.removeFromCombat(this);
         }
+        const zone = this.zone;
+        if (zone instanceof Battlefield && zone !== controller.battlefield) {
+            // 400.1: A control change moves the object between partitions of the same battlefield.
+            removeItem(zone.objects, this);
+            controller.battlefield.objects.push(this);
+            this.currentZone = controller.battlefield;
+        }
+        if (controlChanged || attachmentChanged)
+            return this.notifyControlOrAttachmentChanged;
     }
+
+    private readonly notifyControlOrAttachmentChanged = () => {
+        for (const update of this.controlOrAttachmentListeners) update();
+    };
 
     onControlOrAttachmentChanged(update: () => void) {
         this.controlOrAttachmentListeners.add(update);
@@ -402,14 +356,16 @@ export class Permanent extends CardObject {
 
     get attachedTo() { return this.attachment; }
 
-    set attachedTo(target: Permanent | undefined) {
+    set attachedTo(target: Permanent | undefined) { this.attachTo(target); }
+
+    attachTo(target: Permanent | undefined, timestamp?: number) {
         if (this.attachment === target)
             return;
 
         this.attachment = target;
         if (this.zone instanceof Battlefield) {
-            this.controlOrAttachmentListeners.forEach(update => update());
-            gameEventManager.effects.refreshAbilityGrants();
+            if (target) this.timestamp = timestamp ?? gameEventManager.effects.layers.nextTimestamp();
+            this.changed();
         }
     }
 
@@ -474,7 +430,7 @@ export class Spell extends CardObject {
     resolvedPermanent?: Permanent;
     override get resolvedDamageSource() { return this.resolvedPermanent; }
 
-    constructor(card: Card, private readonly spellController: Player, targets: readonly ActionTarget[],
+    constructor(card: Card, readonly caster: Player, targets: readonly ActionTarget[],
         readonly chosenX = 0, readonly chosenMode?: number) {
         super(card, chosenMode);
         this.targets = [...targets];
@@ -483,7 +439,7 @@ export class Spell extends CardObject {
             this.cost = ManaUtility.withX(this.cost, this.variableManaSymbols, chosenX);
     }
 
-    override get controller() { return this.spellController; }
+    protected override get initialController() { return this.caster; }
 
     get isPermanent(): boolean {
         // 110.4b: Permanent spells enter the battlefield as part of resolution.

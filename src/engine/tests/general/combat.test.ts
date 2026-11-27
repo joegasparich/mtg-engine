@@ -7,7 +7,7 @@ import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
 import type { CardObject,Permanent } from "@engine/GameObject";
-import { addTestCard,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard,passPriorityRound } from "@engine/tests/testData";
+import { addTestCard,chooseEarliestTimestamps,AIR_ELEMENTAL,BASIC_DECK,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,MOUNTAIN,moveTestCard,passPriorityRound } from "@engine/tests/testData";
 import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -654,6 +654,8 @@ test("collects and validates normal damage splits before dealing all assigned da
     expect(game.pendingCombatDamageChoice).toBe(next);
 
     next.submit(playerA, [0, 2]);
+    chooseEarliestTimestamps(playerA, second);
+    chooseEarliestTimestamps(playerB, blockers[3]);
     expect(game.pendingCombatDamageChoice).toBeNull();
     expect(game.currentStepIndex).toBe(StepIndex.EndOfCombat);
     expect(blockers.map(blocker => blocker.damageTaken)).toEqual([2, 1, 0, 2]);

@@ -10,7 +10,7 @@ import { Spell,StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import type Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { addTestCard,chooseEarliestTimestamps,FOREST,GRIZZLY_BEARS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
@@ -152,6 +152,7 @@ test("collects multiplayer choices in turn order and commits each batch simultan
         expect(game.pendingResolutionChoice).toBe(second);
         expect(onSacrifice).not.toHaveBeenCalled();
         second.submit(next, nextLands.slice(0, 2));
+        chooseEarliestTimestamps(active, activeLands[3]);
         expect(onSacrifice).toHaveBeenCalledTimes(3);
 
         const privateFirst = game.pendingResolutionChoice;

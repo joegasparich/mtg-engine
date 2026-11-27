@@ -9,6 +9,32 @@ import { ZoneKind } from "@engine/Zone";
 import { CardType } from "~/defs";
 import { cardData } from "~/index";
 
+test("reference selections can read the same object once on a signal or live as the reference changes", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const bears = cardData[GRIZZLY_BEARS];
+    const reference = { target: "MARKED", targetValidator: { cardType: CardType.Creature } };
+    const source = addTestCard({ ...bears, abilities: [{ parts: {
+        AbilityPart_SelectObjects: { ...reference, inSignal: "CAPTURE", saveAs: "SNAPSHOT" },
+        AbilityPart_SelectObjectsContinuously: { ...reference, saveAs: "LIVE" },
+    } }] }, player, player.battlefield);
+    const [ability] = source.abilities;
+    const { slate } = ability;
+    expect(slate.LIVE).toEqual([]);
+    expect(slate.SNAPSHOT).toBeUndefined();
+
+    slate.MARKED = [source];
+    ability.fireSignal("CAPTURE");
+    expect(slate.SNAPSHOT).toEqual([source]);
+    expect(slate.LIVE).toEqual([source]);
+
+    slate.MARKED = [addTestCard(cardData[FOREST], player, player.battlefield)];
+    expect(slate.SNAPSHOT).toEqual([source]);
+    expect(slate.LIVE).toEqual([]);
+    ability.fireSignal("CAPTURE");
+    expect(slate.SNAPSHOT).toEqual([]);
+});
+
 test("a signalled selection stores a snapshot of matching cards in the chosen player's hand", () => {
     Game.init();
     const player = game.addPlayer([]);
@@ -20,7 +46,7 @@ test("a signalled selection stores a snapshot of matching cards in the chosen pl
     const source = addTestCard({
         ...creature,
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZone: {
+            AbilityPart_SelectObjects: {
                 inSignal: "SELECT",
                 saveAs: "CHOSEN",
                 zone: ZoneKind.Hand,
@@ -84,7 +110,7 @@ test("a live graveyard selection sees cards from every player enter and leave", 
     const source = addTestCard({
         ...creature,
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "GRAVEYARD_CARDS",
                 zone: ZoneKind.Graveyard,
             },

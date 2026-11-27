@@ -1,3 +1,4 @@
+import type { CardObject } from "@engine/GameObject";
 import type Player from "@engine/Player";
 import type { Ability } from "@engine/abilities";
 import type { DamagePreventionChoices } from "@engine/effects/DamagePrevention";
@@ -47,11 +48,16 @@ export enum GameEventType {
     AddMana,
     AttachPermanent,
     DrawCards,
-    CheckCharacteristics,
-    CheckPowerToughness,
     RegeneratePermanent,
     TakeSpecialAction,
 }
+
+export interface TimestampAssignment {
+    card: CardObject;
+    player: Player;
+    assign(timestamp: number): void;
+}
+type ChooseTimestamp = (player: Player, cards: CardObject[], next: (card: CardObject) => void) => void;
 
 export abstract class GameEvent {
     type: GameEventType;
@@ -60,6 +66,7 @@ export abstract class GameEvent {
     effect?: OneShotEffect;
     callback: () => void;
 
+    get timestampAssignment(): TimestampAssignment | undefined { return undefined; }
     get entryPreparation(): { player: Player; prepare(resume: () => void): void } | undefined { return undefined; }
     get additionalPerformedTypes(): readonly GameEventType[] { return []; }
 
@@ -107,6 +114,7 @@ class GameEventManager {
     private waitingForChoice?: () => boolean;
     private advanceWhileIdle?: () => boolean;
     private choices: DamagePreventionChoices;
+    private chooseTimestamp: ChooseTimestamp;
     private commitPending = false;
     private currentBatch: GameEvent[] = [];
     private afterBatch?: Set<() => void>;
@@ -119,10 +127,11 @@ class GameEventManager {
     }
 
     startGame(settle: () => boolean, waitingForChoice: () => boolean, advanceWhileIdle: () => boolean,
-        damageChoices: DamagePreventionChoices) {
+        damageChoices: DamagePreventionChoices, chooseTimestamp: ChooseTimestamp) {
         for (const listeners of this.gameListenersByType.values())
             listeners.clear();
         this.gameListenersByType.clear();
+        this.effects.layers.reset();
         this.effects.endContinuousEffects();
         this.activeEvents.length = 0;
         this.currentBatch.length = 0;
@@ -134,6 +143,7 @@ class GameEventManager {
         this.waitingForChoice = waitingForChoice;
         this.advanceWhileIdle = advanceWhileIdle;
         this.choices = damageChoices;
+        this.chooseTimestamp = chooseTimestamp;
     }
 
     onPerformed(eventType: GameEventType, listener: Listener) {
@@ -396,8 +406,12 @@ class GameEventManager {
             const performed: GameEvent[] = [];
             let checkedPerformed = false;
             const previousBatch = this.afterBatch;
-            if (events.length > 1)
-                this.afterBatch ??= new Set();
+            const layers = this.effects.layers;
+            const enclosingSimultaneous = layers.duringSimultaneousChanges;
+            if (!enclosingSimultaneous) {
+                this.afterBatch = new Set();
+                if (pending.length > 1) layers.beginSimultaneousChanges();
+            }
             try {
                 for (const event of pending) {
                     if (event.perform()) {
@@ -406,9 +420,11 @@ class GameEventManager {
                     }
                 }
             } finally {
+                if (!enclosingSimultaneous && pending.length > 1) layers.endSimultaneousChanges();
+                layers.changed();
                 const updates = this.afterBatch;
                 this.afterBatch = previousBatch;
-                if (!previousBatch)
+                if (!enclosingSimultaneous)
                     updates?.forEach(update => update());
             }
             // 615.5: Additional prevention effects follow the damage event, before priority or state checks.
@@ -434,7 +450,7 @@ class GameEventManager {
         // Prepare every entrant against the same pre-event battlefield (707.5).
         const entries = events.map(event => event.entryPreparation).filter(entry => entry !== undefined);
         if (!entries.length) {
-            resolveDamage();
+            this.orderTimestamps(events, resolveDamage);
             return;
         }
         if (entries.length > 1) {
@@ -449,9 +465,40 @@ class GameEventManager {
                 return;
             }
             this.commitPending = false;
-            resolveDamage();
+            this.orderTimestamps(events, resolveDamage);
         };
         next(0);
+    }
+
+    private orderTimestamps(events: GameEvent[], resume: () => void) {
+        if (events.length < 2) return resume();
+        // Several events can attempt to move the same object. Only one of those moves can succeed.
+        const byCard = Map.groupBy(events.map(event => event.timestampAssignment).filter(value => value !== undefined),
+            assignment => assignment.card);
+        if (byCard.size < 2) return resume();
+        const assignments = [...byCard.values()].map(([first]) => first);
+        // CR 613.7m: Each player orders their objects, in active-player-first turn order.
+        const ordered = this.choices.turnOrder().flatMap(player => assignments.filter(item => item.player === player));
+        const next = () => {
+            const first = ordered[0];
+            if (!first) {
+                this.commitPending = false;
+                return resume();
+            }
+            const group = ordered.filter(item => item.player === first.player);
+            const assign = (item: TimestampAssignment) => {
+                const timestamp = this.effects.layers.nextTimestamp();
+                for (const assignment of byCard.get(item.card)) assignment.assign(timestamp);
+                ordered.splice(ordered.indexOf(item), 1);
+                next();
+            };
+            if (group.length > 1) {
+                this.commitPending = true;
+                this.chooseTimestamp(first.player, group.map(item => item.card),
+                    card => assign(group.find(item => item.card === card)));
+            } else assign(first);
+        };
+        next();
     }
 
     private getGameListeners(event: GameEvent): Listener[] {

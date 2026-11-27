@@ -1,29 +1,42 @@
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { getBattlefieldPermanentsFromSlate } from "@engine/abilities/ZoneSelection";
-import { type ContinuousEffect,ContinuousEffectKind } from "@engine/effects/EffectSystem";
+import { abilityGrant } from "@engine/effects/AbilityGrant";
+import type { Characteristics } from "@engine/effects/Layers";
+import type { CardObject } from "@engine/GameObject";
 import type { AbilityDef } from "~/defs";
-import { AbilityPart_ContinuousEffect } from "./AbilityPart_ContinuousEffect";
+import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
-export class AbilityPart_GrantAbilityContinuously extends AbilityPart_ContinuousEffect {
+export class AbilityPart_GrantAbilityContinuously extends AbilityPart {
     permanentsFrom: string;
     grant: AbilityDef;
     saveAs?: string;
+    private activeRecipients = new Set<CardObject>();
+    private grants: ReturnType<typeof abilityGrant>;
 
-    protected getContinuousEffect(): ContinuousEffect {
-        const { slate } = this.ability;
-        const { saveAs } = this;
-        return {
-            kind: ContinuousEffectKind.AbilityGrant,
-            grant: this.grant,
-            // Refresh on battlefield entry or departure and when types, subtypes, or attachments change.
-            recipients: () => getBattlefieldPermanentsFromSlate(this.ability, this.permanentsFrom),
-            onGrantsUpdated: saveAs ? grants => {
-                if (grants.length)
-                    slate[saveAs] = grants;
-                else
-                    delete slate[saveAs];
-            } : undefined,
-        };
+    layerEffect() {
+        this.grants = abilityGrant(this.grant, this.ability.source, () => this.ability.timestamp);
+        return { selectionKey: this.permanentsFrom,
+            select: () => getBattlefieldPermanentsFromSlate(this.ability, this.permanentsFrom),
+            changes: [this.grants.change] };
+    }
+
+    reconcileLayers(states: ReadonlyMap<CardObject, Characteristics>) {
+        const active = new Set<CardObject>();
+        for (const [object, state] of states) {
+            const ability = this.grants.instances.get(object);
+            if (ability && state.abilities.includes(ability)) active.add(object);
+        }
+        for (const previous of this.activeRecipients)
+            if (!active.has(previous)) this.grants.instances.delete(previous);
+        this.activeRecipients = active;
+        if (this.saveAs) {
+            if (active.size && states.get(this.ability.source)?.abilities.includes(this.ability)) this.ability.slate[this.saveAs] = [...active].map(object => this.grants.instances.get(object));
+            else delete this.ability.slate[this.saveAs];
+        }
+    }
+
+    cleanup() {
+        if (this.saveAs) delete this.ability.slate[this.saveAs];
     }
 }

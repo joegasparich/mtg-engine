@@ -118,7 +118,7 @@ export class UIResolutionChoice {
                 const player = card.controller ?? card.owner;
                 const location = card.zone?.name.toLowerCase() ?? "left its zone";
                 const tapped = card instanceof Permanent && card.tapped && !card.retired ? ", tapped" : "";
-                option.textContent = `${card.name} · Player ${player.id}, ${location}${tapped}`;
+                option.textContent = `${choice.optionName?.(card) ?? card.name} · Player ${player.id}, ${location}${tapped}`;
                 option.addEventListener("click", () => select(card));
                 item.append(option);
                 list.append(item);

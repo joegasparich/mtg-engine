@@ -10,13 +10,21 @@ export class GameEvent_AttachPermanent extends GameEvent {
         this.label = `${permanent.logName} attached to ${target.logName}`;
     }
 
+    private timestamp?: number;
+    override get timestampAssignment() {
+        if (!(this.permanent.zone instanceof Battlefield) || this.permanent.attachedTo === this.target
+            || !this.permanent.canAttachTo(this.target)) return undefined;
+        return { card: this.permanent, player: this.permanent.controller,
+            assign: (timestamp: number) => { this.timestamp = timestamp; } };
+    }
+
     perform(): boolean {
         // 701.3a–b: An illegal attachment or reattachment to the same object does nothing.
         if (!(this.permanent.zone instanceof Battlefield) || this.permanent.attachedTo === this.target
             || !this.permanent.canAttachTo(this.target))
             return false;
 
-        this.permanent.attachedTo = this.target;
+        this.permanent.attachTo(this.target, this.timestamp);
         return true;
     }
 }

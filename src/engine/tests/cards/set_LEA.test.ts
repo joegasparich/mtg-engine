@@ -13,7 +13,7 @@ import Game,{ game } from "@engine/Game";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
-import { addTestCard,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { addTestCard,chooseEarliestTimestamps,ANCESTRAL_RECALL,BASIC_DECK,FOREST,GRIZZLY_BEARS,MONS_GOBLIN_RAIDERS,moveTestCard,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { BasicLandType,type CardColour,type CardDef,cardColours,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
@@ -1030,7 +1030,7 @@ describe.each([
             ...wardDef,
             cost: "{1}",
             abilities: [...wardDef.abilities, { parts: {
-                AbilityPart_SelectObjectContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
+                AbilityPart_SelectObjectsContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
                 AbilityPart_GrantAbilityContinuously: { permanentsFrom: "ENCHANTED_CREATURE", grant: protection },
             } }],
         }, caster, caster.hand);
@@ -1201,6 +1201,7 @@ describe("Armageddon", () => {
             action.perform(caster);
             passPriorityRound();
 
+            chooseEarliestTimestamps(caster, ...casterLands.slice(1));
             expect(onDestroy).toHaveBeenCalledTimes(casterLands.length + 1);
             expect(game.pendingTargeter).toBeNull();
             expect(game.stack.objects).toHaveLength(0);
@@ -1277,6 +1278,8 @@ describe("Balance", () => {
         expect(caster.battlefield.objects).toEqual([plains, bears]);
         expect(game.pendingResolutionChoice).toMatchObject({ player: caster, count: 2, visibility: CardChoiceVisibility.Private });
         game.pendingResolutionChoice.submit(caster, discard);
+        expect(game.pendingResolutionChoice.visibility).toBe(CardChoiceVisibility.Private);
+        chooseEarliestTimestamps(caster, discard[1]);
 
         expect(game.stack.objects).toEqual([spell]);
         expect(caster.hand.objects).toEqual([keepInHand]);
@@ -1414,6 +1417,7 @@ describe("Blaze of Glory", () => {
         passPriorityRound();
         expect(game.pendingCombatDamageChoice).toMatchObject({ player: defender, source: blocker, recipients: [first, second], total: 2 });
         game.pendingCombatDamageChoice.submit(defender, [1, 1]);
+        chooseEarliestTimestamps(attacker, second);
         expect(blocker.damageTaken).toBe(2);
         expect(attacker.graveyard.objects.map(object => object.card)).toEqual([first.card, second.card]);
 
@@ -1454,6 +1458,23 @@ describe("Blaze of Glory", () => {
         expect(game.priorityPlayer).toBe(attacker);
         expect(game.currentStepIndex).toBe(StepIndex.DeclareBlockers);
         expect(playerActionManager.getCardActions(lateBlaze, attacker)).toEqual([]);
+    });
+
+    test("a creature must still be controlled by the defending player when Blaze resolves", () => {
+        const blaze = addCard("Blaze of Glory", attacker, attacker.hand);
+        const blocker = addCard("Grizzly Bears", defender, defender.battlefield);
+        startMainPhase();
+        expect(blaze.spellTargeter.hasLegalTargets()).toBe(false);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.BeginningOfCombat));
+        expect(blaze.spellTargeter.hasLegalTargets()).toBe(true);
+        gameEventManager.addEvent(new GameEvent_CastSpell(attacker, blaze, [blocker]));
+        expect(game.stack.objects[0]).toMatchObject({ card: blaze.card, targets: [blocker] });
+
+        blocker.controller = attacker;
+        passPriorityRound();
+        expect(CombatManager.blockLimit(blocker)).toBe(1);
+        expect(blocker.abilities).toHaveLength(0);
+        expect(attacker.graveyard.objects.map(object => object.card)).toEqual([blaze.card]);
     });
 
     test("loses its target if the creature leaves and returns before resolution", () => {
@@ -3650,6 +3671,7 @@ describe("Creature Bond", () => {
             new GameEvent_DestroyPermanent(opponent.battlefield.objects.find(object => object.card === armor.card)),
             new GameEvent_DestroyPermanent(creature),
         ]);
+        chooseEarliestTimestamps(caster, creature);
         game.checkState();
         expect(game.stack.objects).toHaveLength(1);
         expect(game.stack.objects[0]).toMatchObject({ controller: caster, source: aura });

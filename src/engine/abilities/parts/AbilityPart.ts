@@ -1,6 +1,7 @@
 import type { Ability } from "@engine/abilities";
 import type { GameEvent } from "@engine/events/GameEventManager";
-import type { Permanent,Spell } from "@engine/GameObject";
+import type { Characteristics,LayerEffect } from "@engine/effects/Layers";
+import type { CardObject,Permanent,Spell } from "@engine/GameObject";
 
 // 616.1c: Copy replacements precede ordinary battlefield entry replacements.
 export enum EntryReplacementOrder {
@@ -10,6 +11,10 @@ export enum EntryReplacementOrder {
 
 export abstract class AbilityPart {
     ability: Ability;
+
+    layerEffect?(): LayerEffect;
+    reconcileLayers?(states: ReadonlyMap<CardObject, Characteristics>): void;
+    continuousSelection?(key: string): readonly unknown[] | undefined;
 
     resolvePermanentSpell?(spell: Spell): GameEvent;
     readonly entryReplacementOrder: EntryReplacementOrder = EntryReplacementOrder.Other;

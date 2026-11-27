@@ -2,7 +2,7 @@ import { makeAbility } from "@engine/abilities";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { modifyPowerToughness } from "@engine/effects/PowerToughness";
-import type { GameEvent_ChangeCardZone } from "@engine/events";
+import { type GameEvent_ChangeCardZone,GameEvent_DeclareAttacker } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import { Permanent } from "@engine/GameObject";
@@ -12,6 +12,39 @@ import { ZoneKind } from "@engine/Zone";
 import { BasicLandType,CardType,Keyword } from "~/defs";
 import { cardData } from "~/index";
 
+test("control and permission to attack with defender follow a live selection of multiple permanents", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const wall = cardData.find(card => card.name === "Wall of Swords");
+    const first = addTestCard(wall, opponent, opponent.battlefield);
+    const canDeclare = (creature: Permanent) => gameEventManager.checkEvent(new GameEvent_DeclareAttacker(creature));
+    expect(canDeclare(first)).toBe(false);
+
+    const source = addTestCard({ ...cardData[GRIZZLY_BEARS], abilities: [{ parts: {
+        AbilityPart_SelectObjectsContinuously: {
+            zone: ZoneKind.Battlefield, targetValidator: { cardSubtype: "Wall" }, saveAs: "WALLS",
+        },
+        AbilityPart_ControlPermanents: { permanentsFrom: "WALLS" },
+        AbilityPart_CanAttackWithDefender: { permanentsFrom: "WALLS" },
+    } }] }, player, player.battlefield);
+    const second = addTestCard(wall, opponent, opponent.battlefield);
+    for (const creature of [first, second]) {
+        expect(creature.controller).toBe(player);
+        expect(creature.hasKeyword(Keyword.Defender)).toBe(true);
+        expect(canDeclare(creature)).toBe(true);
+    }
+
+    first.subtypes = [];
+    expect(first.controller).toBe(opponent);
+    expect(canDeclare(first)).toBe(false);
+    expect(second.controller).toBe(player);
+    expect(canDeclare(second)).toBe(true);
+    moveTestCard(source, player.graveyard);
+    expect(second.controller).toBe(opponent);
+    expect(canDeclare(second)).toBe(false);
+});
+
 test("a continuous object selection resolves its configured reference on each read", () => {
     Game.init();
     const player = game.addPlayer([]);
@@ -19,7 +52,7 @@ test("a continuous object selection resolves its configured reference on each re
     const inHand = addTestCard({
         ...bearsDef,
         abilities: [{ parts: {
-            AbilityPart_SelectObjectContinuously: { target: "MARKED", saveAs: "SELECTED" },
+            AbilityPart_SelectObjectsContinuously: { target: "MARKED", saveAs: "SELECTED" },
         } }],
     }, player, player.hand);
     expect(inHand.abilities[0].slate).not.toHaveProperty("SELECTED");
@@ -54,7 +87,7 @@ test("a static modifier reads a live selection from the slate until the ability 
                 power: 1,
                 toughness: 3,
             },
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "TAPPED_BEARS",
                 zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature, cardSubtype: "Bear", tapped: true },
@@ -96,7 +129,7 @@ test("a continuous zone selection filters by current colour alongside card type"
         ...bearsDef,
         types: [CardType.Enchantment],
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "GREEN_CREATURES",
                 zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature, colour: "G" },
@@ -125,7 +158,7 @@ test("setting an object's colour updates colour-dependent ability grants", () =>
         ...bearsDef,
         types: [CardType.Enchantment],
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "BLUE_CREATURES",
                 zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature, colour: "U" },
@@ -157,7 +190,7 @@ test("a continuous zone selection can exclude its source across all battlefields
     const sourceDef = {
         ...bearsDef,
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "OTHER_CREATURES",
                 zone: ZoneKind.Battlefield,
                 excludeSource: true,
@@ -187,7 +220,7 @@ test("a continuous grant follows battlefield membership and card types before en
         ...bearsDef,
         types: [CardType.Enchantment],
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "CREATURES",
                 zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature },
@@ -291,12 +324,12 @@ test("setting a basic land type suppresses native abilities and leaves grants ac
         ...cardData[GRIZZLY_BEARS],
         types: [CardType.Enchantment],
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZoneContinuously: {
+            AbilityPart_SelectObjectsContinuously: {
                 saveAs: "MOUNTAINS",
                 zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Land, baseSubtype: BasicLandType.Mountain },
             },
-            AbilityPart_GiveBasicLandType: { landsFrom: "MOUNTAINS", landType: BasicLandType.Island },
+            AbilityPart_SetBasicLandType: { landsFrom: "MOUNTAINS", landType: BasicLandType.Island },
         } }],
     }, player, player.battlefield);
 

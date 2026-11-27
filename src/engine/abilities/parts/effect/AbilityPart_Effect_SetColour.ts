@@ -1,8 +1,6 @@
 import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
-import gameEventManager from "@engine/events/GameEventManager";
 import { CardObject } from "@engine/GameObject";
-import { Battlefield } from "@engine/Zone";
 import type { CardColour } from "~/defs";
 import { AbilityPart_Effect } from "./AbilityPart_Effect";
 
@@ -18,7 +16,5 @@ export class AbilityPart_Effect_SetColour extends AbilityPart_Effect {
 
         // 105.3 and 611.2a: Replace the object's colours with no turn-based expiration.
         recipient.colours = new Set([this.colour]);
-        if (recipient.zone instanceof Battlefield)
-            gameEventManager.effects.refreshAbilityGrants();
     }
 }

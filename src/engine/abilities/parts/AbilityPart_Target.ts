@@ -1,5 +1,5 @@
 import { type ActionTarget,getTargetTypeKey,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
-import type { GrammarKey } from "@engine/abilities";
+import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { getSelectionZones } from "@engine/abilities/ZoneSelection";
@@ -26,6 +26,7 @@ export class AbilityPart_Target extends AbilityPart {
     validTargets: TargetTypeKeys[] = [];
     zone?: TargetZone;
     zoneOf?: GrammarKey;
+    controlledBy?: GrammarKey;
     count = 1;
     targetValidator?: TargetValidator;
 
@@ -58,6 +59,11 @@ export class AbilityPart_Target extends AbilityPart {
     }
 
     protected canTarget(target: ActionTarget): boolean {
+        if (this.controlledBy) {
+            const controller = resolveAbilityGrammar(this.controlledBy, this.ability);
+            if (!controller || !(target instanceof CardObject) || target.controller !== controller)
+                return false;
+        }
         if (this.zone) {
             // 109.2a and 608.2b: A card target must remain in the specified zone.
             if (!(target instanceof CardObject) || !this.targetZones.includes(target.zone))

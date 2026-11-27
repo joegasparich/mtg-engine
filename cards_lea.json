@@ -90,7 +90,8 @@
                             "cardSubtype": "Wall"
                         }
                     },
-                    "AbilityPart_AttachedCreatureAttacksWithDefender": {}
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_WALL" },
+                    "AbilityPart_CanAttackWithDefender": { "permanentsFrom": "ENCHANTED_WALL" }
                 }
             }
         ]
@@ -104,7 +105,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZone": {
+                    "AbilityPart_SelectObjects": {
                         "inSignal": "SPELL_RESOLVE",
                         "saveAs": "LANDS",
                         "zone": "battlefield",
@@ -168,7 +169,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
@@ -195,7 +196,10 @@
             {
                 "parts": {
                     "AbilityPart_CastDuringSteps": { "steps": ["BeginningOfCombat", "DeclareAttackers"] },
-                    "AbilityPart_TargetDefendingCreature": { "saveAs": "BLOCKER" },
+                    "AbilityPart_Target": {
+                        "zone": "battlefield", "controlledBy": "DEFENDING_PLAYER",
+                        "targetValidator": { "cardType": "Creature" }, "saveAs": "BLOCKER"
+                    },
                     "AbilityPart_Effect_GrantAbilityUntilEndOfTurn": {
                         "inSignal": "SPELL_RESOLVE",
                         "target": "BLOCKER",
@@ -255,7 +259,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
@@ -281,7 +285,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                    "AbilityPart_SelectObjectsContinuously": {
                         "saveAs": "UNTAPPED_CREATURES",
                         "zone": "battlefield",
                         "targetValidator": { "cardType": "Creature", "tapped": false },
@@ -312,7 +316,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
@@ -346,7 +350,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
@@ -380,7 +384,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "saveAs": "GRANTED_PROTECTION",
@@ -478,7 +482,7 @@
                     "SimpleAura": {
                         "targetValidator": { "cardType": "Land" }
                     },
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_LAND",
                         "grant": { "keyword": "indestructible" }
@@ -504,12 +508,12 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                    "AbilityPart_SelectObjectsContinuously": {
                         "saveAs": "MOUNTAINS",
                         "zone": "battlefield",
-                        "targetValidator": { "cardType": "Land", "baseSubtype": "Mountain" }
+                        "targetValidator": { "cardType": "Land", "cardSubtype": "Mountain" }
                     },
-                    "AbilityPart_GiveBasicLandType": { "landsFrom": "MOUNTAINS", "landType": "Plains" }
+                    "AbilityPart_SetBasicLandType": { "landsFrom": "MOUNTAINS", "landType": "Plains" }
                 }
             }
         ]
@@ -523,7 +527,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                    "AbilityPart_SelectObjectsContinuously": {
                         "saveAs": "WHITE_CREATURES",
                         "zone": "battlefield",
                         "targetValidator": { "cardType": "Creature", "colour": "W" }
@@ -648,7 +652,7 @@
                     "SimpleAura": {
                         "targetValidator": { "cardType": "Land" }
                     },
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_LAND",
                         "grant": {
@@ -680,7 +684,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "ENCHANTED_CREATURE", "toughness": 2 }
                 }
             },
@@ -713,7 +717,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_ModifyPowerToughness": { "permanentsFrom": "ENCHANTED_CREATURE", "power": 1, "toughness": 2 }
                 }
             }
@@ -741,7 +745,7 @@
             {
                 "parts": {
                     "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "savePlayerAs": "UPKEEP_PLAYER" },
-                    "AbilityPart_SelectObjectsFromZone": {
+                    "AbilityPart_SelectObjects": {
                         "zone": "battlefield",
                         "controlledBy": "UPKEEP_PLAYER",
                         "targetValidator": { "cardType": "Land", "cardSubtype": "Swamp" },
@@ -770,7 +774,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZoneContinuously": {
+                    "AbilityPart_SelectObjectsContinuously": {
                         "saveAs": "OTHER_MERFOLK",
                         "zone": "battlefield",
                         "excludeSource": true,
@@ -802,7 +806,7 @@
             },
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                    "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
                     "AbilityPart_GrantAbilityContinuously": {
                         "permanentsFrom": "ENCHANTED_CREATURE",
                         "grant": { "keyword": "first strike" }
@@ -1051,12 +1055,10 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectContinuously": {
-                        "target": "THIS", "targetValidator": { "tapped": false }, "saveAs": "UNTAPPED_BODYGUARD"
-                    },
-                    "AbilityPart_SelectObjectsFromZoneContinuously": {
-                        "zone": "battlefield", "targetValidator": { "unblocked": true }, "saveAs": "UNBLOCKED_ATTACKERS"
-                    },
+                    "AbilityPart_SelectObjectsContinuously": [
+                        { "target": "THIS", "targetValidator": { "tapped": false }, "saveAs": "UNTAPPED_BODYGUARD" },
+                        { "zone": "battlefield", "targetValidator": { "unblocked": true }, "saveAs": "UNBLOCKED_ATTACKERS" }
+                    ],
                     "AbilityPart_Effect_RedirectDamage": {
                         "continuous": true, "from": "THIS.controller", "to": "UNTAPPED_BODYGUARD", "sourcesFrom": "UNBLOCKED_ATTACKERS"
                     }
@@ -1087,7 +1089,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_SelectObjectsFromZone": {
+                    "AbilityPart_SelectObjects": {
                         "inSignal": "SPELL_RESOLVE", "zone": "battlefield",
                         "targetValidator": { "cardType": "Creature" }, "saveAs": "CREATURES", "outSignal": "DESTROY_CREATURES"
                     },
@@ -1257,7 +1259,7 @@
                         "acceptLabel": "Choose artifact", "declineLabel": "Enter without copying"
                     }
                 },
-                "AbilityPart_SetCharacteristicsOn": {
+                "AbilityPart_ModifyCardDefinition": {
                     "inSignal": "APPLY_COPY_CHANGES", "on": "RESULT", "addTypes": ["Enchantment"]
                 }
             }
@@ -1272,7 +1274,10 @@
         "cost": "{2}{U}{U}",
         "abilities": [
             { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Creature" } } } },
-            { "parts": { "AbilityPart_ControlEnchantedPermanent": {} } }
+            { "parts": {
+                "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                "AbilityPart_ControlPermanents": { "permanentsFrom": "ENCHANTED_CREATURE" }
+            } }
         ]
     },
     {

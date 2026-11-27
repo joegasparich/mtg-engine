@@ -66,7 +66,7 @@ test("a black spell that destroys creatures without targeting still affects a pr
         types: [CardType.Sorcery],
         cost: "{B}",
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZone: {
+            AbilityPart_SelectObjects: {
                 inSignal: "SPELL_RESOLVE", saveAs: "CHOSEN", zone: ZoneKind.Battlefield,
                 targetValidator: { cardType: CardType.Creature },
             },
@@ -93,7 +93,7 @@ test("protection removes matching Auras and prevents new ones", () => {
 
     const protectionAura = addTestCard({
         ...aura, cost: "{W}", abilities: [enchantCreature, { parts: {
-            AbilityPart_SelectObjectContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
+            AbilityPart_SelectObjectsContinuously: { target: "THIS.attachedTo", saveAs: "ENCHANTED_CREATURE" },
             AbilityPart_GrantAbilityContinuously: { permanentsFrom: "ENCHANTED_CREATURE", grant: protection },
         } }],
     }, player, player.hand);

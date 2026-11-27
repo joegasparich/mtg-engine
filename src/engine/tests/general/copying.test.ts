@@ -38,6 +38,9 @@ test("entry previews are side-effect free and simultaneous choices see only exis
         expect(game.pendingResolutionChoice.options).toEqual([original]);
         game.pendingResolutionChoice.submit(player, [original]);
     }
+    expect(observe).not.toHaveBeenCalled();
+    game.pendingResolutionChoice.submit(player, [second]);
+    expect(moves[1].newObject.timestamp).toBeLessThan(moves[0].newObject.timestamp);
     expect(observe).toHaveBeenCalledTimes(2);
     expect(moves.map(move => move.newObject.name)).toEqual([bears.name, bears.name]);
 });
@@ -119,7 +122,7 @@ test("simultaneous entrants' controllers choose in turn order while other events
 test("entry can copy a permanent supplied by a different slate producer", () => {
     const original = addTestCard(bears, player, player.battlefield);
     const copy = addTestCard({ ...bears, name: "Test copier", abilities: [{ parts: {
-        AbilityPart_SelectObjectsFromZone: {
+        AbilityPart_SelectObjects: {
             inSignal: "SELECT", zone: ZoneKind.Battlefield, saveAs: "PERMANENTS", outSignal: "READY",
         },
         AbilityPart_EnterAsCopy: { outSignal: "SELECT", inSignal: "READY", copyFrom: "PERMANENTS" },
@@ -155,7 +158,7 @@ test("a copy exception sets characteristics once for the chosen copy and later c
         AbilityPart_EnterAsCopy: {
             ...parts.AbilityPart_EnterAsCopy, modify: { signal: "ADJUST", saveAs: "RESULT" },
         },
-        AbilityPart_SetCharacteristicsOn: {
+        AbilityPart_ModifyCardDefinition: {
             inSignal: "ADJUST", on: "RESULT",
             addTypes: [CardType.Enchantment], powerToughness: { power: 3, toughness: 4 },
         },
@@ -206,7 +209,7 @@ test("an ordinary entry ability can modify characteristics using its own signal 
     try {
         const printed = { ...bears, abilities: [{ parts: {
             SetEntryTypes: {},
-            AbilityPart_SetCharacteristicsOn: { inSignal: "SET_TYPES", on: "ENTRY", addTypes: [CardType.Artifact] },
+            AbilityPart_ModifyCardDefinition: { inSignal: "SET_TYPES", on: "ENTRY", addTypes: [CardType.Artifact] },
         } }] };
         const permanent = addTestCard(printed, player, player.battlefield);
         expect(permanent.isCopy).toBe(false);

@@ -3,10 +3,12 @@ import { type DamageEffect,DamagePreventionSystem } from "@engine/effects/Damage
 import type gameEventManager from "@engine/events/GameEventManager";
 import type { GameEvent } from "@engine/events/GameEventManager";
 import type { CardObject,Permanent } from "@engine/GameObject";
+import { LayerSystem,type LayerEffect } from "./Layers";
+import { abilityGrant } from "./AbilityGrant";
 import { removeIf } from "@utility/arrayUtility";
 import type { AbilityDef,Keyword } from "~/defs";
 
-type EventDispatcher = Pick<typeof gameEventManager, "addEvent" | "performImmediate" | "performSimultaneous" | "continueResolution">;
+type EventDispatcher = Pick<typeof gameEventManager, "addEvent" | "performImmediate" | "performSimultaneous" | "continueResolution" | "afterSimultaneousChanges">;
 
 export interface EventCheck {
     readonly events: readonly GameEvent[];
@@ -36,6 +38,7 @@ export enum ContinuousEffectKind {
     CheckOverride,
     AbilityGrant,
     DamageEffect,
+    Layered,
 }
 
 export type Recipients = readonly Permanent[] | (() => readonly Permanent[]);
@@ -48,11 +51,11 @@ type AbilityGrantEffect = {
     kind: ContinuousEffectKind.AbilityGrant;
     grant: AbilityDef;
     recipients: Recipients;
-    onGrantsUpdated?: (grants: readonly Ability[]) => void;
 };
 export type ContinuousEffect =
     | ({ kind: ContinuousEffectKind.EventCheck; check: CheckListener } & EventCheckOptions)
     | { kind: ContinuousEffectKind.CheckOverride; allow: CheckRemovalOverride }
+    | { kind: ContinuousEffectKind.Layered; effect: LayerEffect }
     | AbilityGrantEffect
     | { kind: ContinuousEffectKind.DamageEffect; rule: DamageEffect };
 
@@ -86,7 +89,7 @@ export class EffectSystem {
     private readonly eventChecks = new Map<CheckListener, EventCheckOptions & { source?: CheckSource }>();
     private readonly checkOverrides = new Set<CheckRemovalOverride>();
     private readonly activeContinuousEffects = new Set<() => void>();
-    private readonly updateAbilityGrants = new Set<() => void>();
+    readonly layers = new LayerSystem(callback => this.events.afterSimultaneousChanges(callback));
 
     constructor(private readonly events: EventDispatcher) {}
 
@@ -109,11 +112,6 @@ export class EffectSystem {
             end();
     }
 
-    refreshAbilityGrants() {
-        for (const update of this.updateAbilityGrants)
-            update();
-    }
-
     getEventCheckReferences(): CardObject[] {
         return [
             ...[...this.eventChecks.values()].flatMap(check => check.references?.() ?? []),
@@ -132,41 +130,17 @@ export class EffectSystem {
             case ContinuousEffectKind.DamageEffect:
                 return this.damagePrevention.register(effect.rule,
                     { object: ability.source, keyword: ability.def.keyword, ability });
-            case ContinuousEffectKind.AbilityGrant:
-                return this.applyAbilityGrant(ability, effect);
+            case ContinuousEffectKind.Layered:
+                return this.layers.registerResolved(effect.effect);
+            case ContinuousEffectKind.AbilityGrant: {
+                const recipients = typeof effect.recipients === "function" ? effect.recipients : [...effect.recipients];
+                const timestamp = this.layers.nextTimestamp();
+                const contribution = { select: () => getRecipients(recipients),
+                    changes: [abilityGrant(effect.grant, ability.source, () => timestamp).change] };
+                return typeof recipients === "function" ? this.layers.register(contribution, timestamp)
+                    : this.layers.registerResolved(contribution, timestamp);
+            }
         }
-    }
-
-    // TODO: When adding “loses all abilities” or “can't have flying”, resolve active abilities in layer 6 (613.1f).
-    // Reconcile that result here so continuing grants keep their identity and listeners start or stop as eligibility changes.
-    private applyAbilityGrant(ability: Ability, { recipients, grant, onGrantsUpdated }: AbilityGrantEffect): () => void {
-        const grants = new Map<Permanent, ReturnType<Permanent["grantAbility"]>>();
-        const update = () => {
-            // 611.3a, 613.1f: Keep the same grant instance while a permanent remains eligible.
-            const selected = new Set(getRecipients(recipients));
-            for (const [recipient, { revoke }] of grants) {
-                if (!selected.has(recipient)) {
-                    grants.delete(recipient);
-                    revoke();
-                }
-            }
-            for (const recipient of selected) {
-                if (!grants.has(recipient))
-                    grants.set(recipient, recipient.grantAbility(grant, ability.source));
-            }
-            onGrantsUpdated?.([...grants.values()].map(granted => granted.ability));
-        };
-
-        if (typeof recipients === "function")
-            this.updateAbilityGrants.add(update);
-        update();
-        return () => {
-            this.updateAbilityGrants.delete(update);
-            for (const { revoke } of grants.values())
-                revoke();
-            grants.clear();
-            onGrantsUpdated?.([]);
-        };
     }
 
     onCheck(check: CheckListener, source?: CheckSource, { beforeCommit, references }: EventCheckOptions = {}) {

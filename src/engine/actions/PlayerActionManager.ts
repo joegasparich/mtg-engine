@@ -151,7 +151,7 @@ class PlayerActionManager {
     }
 
     public maxAffordableX(object: CardObject, actor: Player): number {
-        const fixed = object.cost.reduce((total, amount) => total + amount, 0);
+        const fixed = ManaUtility.getManaValue(object.cost);
         const available: ManaAmount = [...actor.manaPool];
         ManaUtility.addMana(available, actor.getPotentialMana());
         if (!game.infiniteMana && !ManaUtility.canPay(object.cost, available))

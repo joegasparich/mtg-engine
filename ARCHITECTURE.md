@@ -35,11 +35,18 @@ When a player casts Ancestral Recall, the play action submits a cast event to pu
 | `EventCheck` | Registers a `check` callback. It can veto an event with `removeWhere`, substitute one with `replace`, or add one with `add`. A check can also update event data. Banding changes who assigns combat damage by setting the player on the damage assignment check. [Banding](src/engine/abilities/parts/AbilityPart_Banding.ts) |
 | `CheckOverride` | Registers an `allow(event, source)` callback that can preserve an event when a check tries to remove or replace it. `CheckSource` identifies the object and can also carry its keyword and exact ability instance. |
 | `AbilityGrant` | Grants an ability to a fixed list or a live selection of permanents. Each recipient keeps its ability instance while it qualifies. A continuous grant part can save those instances to its slate for another part to read. [Ability grants](src/engine/effects/EffectSystem.ts) |
+| `Layered` | Captures the recipients of a resolving characteristic or control change. Its contributions run in the specified layers and sublayers. |
 | `DamageEffect` | Registers a damage prevention or redirection rule. The affected player or permanent's controller chooses the order of competing rules and allocates limited effects among simultaneous sources. [Damage resolver](src/engine/effects/DamagePrevention.ts) |
 
-### Event check phases
+### Characteristics and control
 
-A permanent’s power and toughness are calculated together. `GameEvent_CheckCharacteristics` applies type changes and sets base stats. A subsequent `GameEvent_CheckPowerToughness` lets modifiers add to those values in layer 7c. Static abilities read their current recipients, while resolving effects capture their recipients at resolution. [Power and toughness](src/engine/effects/PowerToughness.ts)
+Card getters read a shared evaluation of objects in CR 613 order. A static ability part supplies a selection and one or more layer changes. Each change captures its operands from the current layer, then applies its instruction to a fresh snapshot. Keep game actions and listener registration out of these functions. Changes to collections replace the collection. Dependency checks compare the operation function and its operands. Reuse the same function for the same operation and capture variable inputs as operands. A fixed bonus then remains the same instruction when the starting power changes. [Layer evaluator](src/engine/effects/Layers.ts)
+
+Static selections are live between evaluations. Within an evaluation, all components of an effect use the objects selected in its first applicable layer (613.6). Parts of the same ability can share a slate selection key for this purpose. Within a sublayer the evaluator checks whether another effect changes an instruction, its recipients, or its existence, and reevaluates after each application (613.8). Copy replacements read the result of layer 1. [Animate Artifact](src/engine/abilities/parts/AbilityPart_AnimateArtifact.ts) · [Layer tests](src/engine/tests/general/layers.test.ts)
+
+The event manager reconciles effective ability subscriptions and battlefield controller partitions before publishing a committed batch. Death triggers can capture the pre-batch state. A characteristic read during preview or rendering never installs a listener. [Game objects](src/engine/GameObject.ts) · [Event manager](src/engine/events/GameEventManager.ts)
+
+### Event check phases
 
 | Phase | When it runs | What it is used for |
 | --- | --- | --- |
@@ -53,7 +60,7 @@ The UI gets available actions and validates targets through engine methods. Atta
 
 1. When a Wall is proposed as an attacker, `CombatManager.canAttack` checks its controller, zone, type, and tapped status, then checks a `GameEvent_DeclareAttacker`. [Combat manager](src/engine/CombatManager.ts)
 2. The Wall's defender ability tries to remove that event. A removed declaration fails the legality check. See rule 702.3b. [Defender](src/engine/abilities/parts/AbilityPart_Defender.ts)
-3. Animate Wall allows the event to survive that veto when the source of the check is defender on the creature it currently enchants. The exception applies only to that attack declaration and that restriction under rule 609.4. [Animate Wall override](src/engine/abilities/parts/AbilityPart_AttachedCreatureAttacksWithDefender.ts) · [Comprehensive Rules](ref/MagicCompRules.txt)
+3. Animate Wall allows the event to survive that veto when the source of the check is defender on the creature it currently enchants. The exception applies only to that attack declaration and that restriction under rule 609.4. [Animate Wall override](src/engine/abilities/parts/AbilityPart_CanAttackWithDefender.ts) · [Comprehensive Rules](ref/MagicCompRules.txt)
 
 Black Ward's attachment override reads the protection grant from the slate and exempts the Ward's current attachment from that instance. A separate instance of protection can still make the Aura fall off. See rule 702.16n. [Ward attachment override](src/engine/abilities/parts/AbilityPart_KeepGrantingAuraAttached.ts)
 

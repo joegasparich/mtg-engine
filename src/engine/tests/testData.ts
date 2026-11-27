@@ -30,6 +30,17 @@ export function passPriorityRound() {
     }
 }
 
+export function chooseEarliestTimestamps(player: Player, ...cards: CardObject[]) {
+    for (const card of cards) {
+        const choice = game.pendingResolutionChoice;
+        expect(choice?.sourceName).toBe("Simultaneous timestamps");
+        expect(choice.player).toBe(player);
+        expect(choice.options).toContain(card);
+        expect(new Set(choice.options).size).toBe(choice.options.length);
+        choice.submit(player, [card]);
+    }
+}
+
 export function moveTestCard<T extends CardObject>(object: CardObject, zone: Zone<T>): T {
     const event = new GameEvent_ChangeCardZone(object, zone);
     gameEventManager.addEvent(event);

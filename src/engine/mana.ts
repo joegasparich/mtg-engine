@@ -57,6 +57,11 @@ export namespace ManaUtility {
         return manaString?.match(/\{X\}/g)?.length ?? 0;
     }
 
+    // 202.3: Mana value totals the mana in the object's current mana cost.
+    export function getManaValue(cost?: Readonly<ManaCost>): number {
+        return cost?.reduce((total, amount) => total + amount, 0) ?? 0;
+    }
+
     export function withX(cost: Readonly<ManaCost>, symbols: number, x: number): ManaCost {
         const total: ManaCost = [...cost];
         total[ManaColour.Generic] += symbols * x;

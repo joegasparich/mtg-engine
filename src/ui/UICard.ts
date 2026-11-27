@@ -2,7 +2,7 @@ import * as PIXI from "pixi.js";
 
 import { PlayerAction_DeclareAttacker,PlayerAction_DeclareBlocker } from "@engine/actions";
 import playerActionManager,{ getTargetTypeKey,TargetType,TargetTypesMap } from "@engine/actions/PlayerActionManager";
-import type { CardCharacteristics } from "@engine/events/GameEvent_CardInteractionChecks";
+import type { Characteristics } from "@engine/effects/Layers";
 import { type CardObject,Permanent } from "@engine/GameObject";
 import { game } from "@engine/Game";
 import { PlayerAction_PlayCard } from "@engine/actions/PlayerAction_PlayCard";
@@ -182,7 +182,7 @@ export default class UICard extends PIXI.Container {
             uiRoot.cardOverlay.detach(this.artwork);
     }
 
-    private updatePowerToughness(base: Readonly<CardCharacteristics>) {
+    private updatePowerToughness(base: Readonly<Characteristics>) {
         const { object, art } = this;
         if (!(object instanceof Permanent) || !(object.zone instanceof Battlefield)
             || !base.types.includes(CardType.Creature)
@@ -212,7 +212,7 @@ export default class UICard extends PIXI.Container {
         this.powerToughness.scale.set(art.width / CARD_WIDTH, art.height / CARD_HEIGHT);
     }
 
-    private updateTypeLine({ types, subtypes }: Readonly<CardCharacteristics>) {
+    private updateTypeLine({ types, subtypes }: Readonly<Characteristics>) {
         const { art } = this;
         if (art.texture === PIXI.Texture.EMPTY)
             return;

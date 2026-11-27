@@ -34,6 +34,14 @@ export class GameEvent_ChangeCardZone extends GameEvent {
     }
 
     private entering?: Permanent;
+    private timestamp?: number;
+
+    override get timestampAssignment() {
+        if (!this.canMove) return undefined;
+        const card = this.oldObject;
+        const player = this.entering?.controller ?? (this.newZone instanceof Stack ? this.options?.controller : undefined) ?? card.owner;
+        return { card, player, assign: (timestamp: number) => { this.timestamp = timestamp; } };
+    }
 
     protected get canMove() {
         // 400.1: Both players' battlefield lists represent the same zone.
@@ -60,10 +68,11 @@ export class GameEvent_ChangeCardZone extends GameEvent {
 
     private prepareEntry(controller: Player, resume: () => void) {
         const { oldObject } = this;
-        const entering = new Permanent(oldObject.card, controller);
-        // 400.7a: Only an explicit colour change on the resolving spell carries over.
-        if (this.resolvesPermanentSpell && oldObject instanceof Spell && oldObject.changedColours)
-            entering.colours = new Set(oldObject.changedColours);
+        // 110.2b: A spell's caster remains the default controller if control of the spell changed.
+        const baseController = this.resolvesPermanentSpell && oldObject instanceof Spell ? oldObject.caster : controller;
+        const entering = new Permanent(oldObject.card, baseController);
+        if (this.resolvesPermanentSpell && oldObject instanceof Spell)
+            oldObject.carryResolutionEffectsTo(entering);
 
         // 614.5, 616.1c,f: Each replacement gets one opportunity. Copying can supply new ones.
         const applied = new Set<AbilityPart>();
@@ -123,6 +132,7 @@ export class GameEvent_ChangeCardZone extends GameEvent {
         if (this.resolvesPermanentSpell && oldObject instanceof Spell && this.newObject instanceof Permanent)
             oldObject.resolvedPermanent = this.newObject;
 
+        if (this.timestamp !== undefined) this.newObject.timestamp = this.timestamp;
         this.newZone.onEnter(this.newObject);
         this.label = `Card ${oldObject.logName} changed zones from ${oldZone?.name} to ${this.newZone.name}`;
         return true;

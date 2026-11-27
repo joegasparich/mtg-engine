@@ -2,7 +2,7 @@ import { ContinuousEffectKind } from "@engine/effects/EffectSystem";
 import { GameEvent_ChangeCardZone,GameEvent_DestroyPermanent,GameEvent_SacrificePermanent } from "@engine/events";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
-import { addTestCard,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
+import { addTestCard,chooseEarliestTimestamps,GRIZZLY_BEARS,passPriorityRound,startMainPhase } from "@engine/tests/testData";
 import { StackAbility } from "@engine/GameObject";
 import { Battlefield,ZoneKind } from "@engine/Zone";
 import { CardType } from "~/defs";
@@ -35,6 +35,7 @@ test("beforeZoneChange prepares each candidate before the batch and confirms onl
     gameEventManager.onGamePerformed(GameEventType.ChangeCardZone, moves);
 
     gameEventManager.performSimultaneous([destroy, obsolete, returnToHand, discard]);
+    chooseEarliestTimestamps(player, returned, destroyed);
 
     expect(prepare.mock.calls.map(([event]) => event)).toEqual([destroy, obsolete, returnToHand, discard]);
     expect(departures.mock.calls.map(([event]) => event)).toEqual([destroy, returnToHand]);
@@ -62,6 +63,7 @@ test("a death trigger is captured even if the permanent granting it dies in the 
         grantor.toughness = 0;
         recipient.toughness = 0;
         game.checkState();
+        chooseEarliestTimestamps(player, recipient);
 
         expect(game.stack.objects).toHaveLength(1);
         expect(game.stack.objects[0]).toMatchObject({ source: recipient });
@@ -99,7 +101,7 @@ test("three simultaneous deaths resolve independently using one pre-move slate p
                 { inSignal: "READ", value: "DYING.power", saveAs: "AMOUNT" },
                 { inSignal: "READ", value: "DYING.controller", saveAs: "PLAYER" },
             ],
-            AbilityPart_SelectObjectsFromZone: {
+            AbilityPart_SelectObjects: {
                 inSignal: "READ", zone: ZoneKind.Battlefield, targetValidator: { cardType: CardType.Creature }, saveAs: "CREATURES",
             },
             AbilityPart_Effect_DealDamage: { source: "THIS", target: "PLAYER", amount: "AMOUNT" },
@@ -122,6 +124,7 @@ test("three simultaneous deaths resolve independently using one pre-move slate p
         new GameEvent_DestroyPermanent(third),
         new GameEvent_DestroyPermanent(land),
     ]);
+    chooseEarliestTimestamps(player, watcher, land, third);
     game.checkState();
 
     const slates = game.stack.objects.map(object => {

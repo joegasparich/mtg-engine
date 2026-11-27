@@ -5,7 +5,7 @@ import { DamageAllocationAction } from "@engine/effects/DamagePrevention";
 import { GameEvent_DrawCards,GameEvent_PriorityChanged,GameEvent_StepEnd,GameEvent_StepStart,GameEvent_TurnStart } from "@engine/events";
 import { type CombatDamageAssignment,type CombatDamageChoice,GameEvent_RequestCombatDamageChoice,GameEvent_SubmitCombatDamageChoice } from "@engine/events/GameEvent_CombatDamageChoice";
 import {
-    type CardChoice,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,
+    type CardChoice,CardChoicePresentation,CardChoiceVisibility,type CardResolutionChoice,type DamagePreventionAllocationChoice,type DamagePreventionOrderChoice,
     GameEvent_RequestResolutionChoice,GameEvent_SubmitResolutionChoice,type OptionalChoiceDetails,OptionalDecision,
     type OptionalResolutionChoice,type ResolutionChoice,ResolutionChoiceKind,
 } from "@engine/events/GameEvent_ResolutionChoice";
@@ -16,7 +16,7 @@ import { type CardObject,Spell } from "@engine/GameObject";
 import Player from "@engine/Player";
 import { Stack } from "@engine/Stack";
 import { Step,StepIndex } from "@engine/Step";
-import { Exile } from "@engine/Zone";
+import { Exile,Hand,Library } from "@engine/Zone";
 
 class GameOptions {
     allowAutoSkip = false;
@@ -106,7 +106,19 @@ export default class Game {
                 turnOrder: () => [...game.players.slice(game.currentTurnPlayerID), ...game.players.slice(0, game.currentTurnPlayerID)],
                 chooseEffect: (player, options, resume) => game.chooseDamagePreventionEffect(player, options, resume),
                 allocate: (player, hits, total, action, resume) => game.allocateDamageEffect(player, hits, total, action, resume),
-            });
+            }, (player, options, next) => game.requestResolutionChoice({
+                player, options, sourceName: "Simultaneous timestamps", prompt: "Choose the object with the earliest remaining timestamp.",
+                count: 1, presentation: CardChoicePresentation.SingleCardList,
+                optionName: card => {
+                    if (card.zone instanceof Library)
+                        return `Card ${card.zone.objects.length - card.zone.objects.indexOf(card)} from the top`;
+                    if (card.zone instanceof Hand && card.owner !== player)
+                        return `Card ${card.zone.objects.indexOf(card) + 1}`;
+                    return card.name;
+                },
+                ...(options.some(card => card.zone instanceof Hand || card.zone instanceof Library)
+                    ? { visibility: CardChoiceVisibility.Private } : { visibility: CardChoiceVisibility.Public, earlierChoices: [] }),
+            }, ([card]) => next(card), card => !card.retired));
     }
 
     requestResolutionChoice(details: CardChoice, resume: (cards: readonly CardObject[]) => void,
@@ -509,11 +521,11 @@ export default class Game {
         }
 
         // 117.5 and 704.3: Repeat the checks before putting waiting triggers on the stack.
-        const stateChanged = actions.length > 0 && gameEventManager.performSimultaneous(actions);
-        const triggersAdded = !stateChanged && !this.declarationPlayer && this.stack.putWaitingTriggersOnStack();
-        if (this.options && this.currentStepIndex === StepIndex.Cleanup && (stateChanged || triggersAdded))
+        const handlingActions = actions.length > 0 && (gameEventManager.performSimultaneous(actions) || this.hasPendingResolutionChoice);
+        const triggersAdded = !handlingActions && !this.declarationPlayer && this.stack.putWaitingTriggersOnStack();
+        if (this.options && this.currentStepIndex === StepIndex.Cleanup && (handlingActions || triggersAdded))
             this.cleanupNeedsPriority = true;
-        if (stateChanged || triggersAdded)
+        if (handlingActions || triggersAdded)
             return true;
 
         if (this.stack.isResolving)

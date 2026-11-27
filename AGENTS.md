@@ -1,6 +1,7 @@
 - You can find the official rules under ref/MagicCompRules.txt
 - Where appropriate, reference the magic rule number in a comment
 - Please use enums instead of strings where applicable
+- When renaming or replacing an API or card configuration, migrate all callers, definitions, and tests in the same change. Remove obsolete implementations and names. Do not add backward-compatibility code.
 
 # Implementing Cards
 - We are implementing Limited Edition Alpha cards, but use artwork from the 30th anniversary set since the text is accurate https://scryfall.com/sets/30a

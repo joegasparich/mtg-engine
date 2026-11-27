@@ -5,7 +5,7 @@ import type { CardDef,CardType } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
 
 @RegisterAbilityPart
-export class AbilityPart_SetCharacteristicsOn extends AbilityPart {
+export class AbilityPart_ModifyCardDefinition extends AbilityPart {
     inSignal: string;
     on: GrammarKey;
     addTypes: readonly CardType[] = [];

@@ -43,7 +43,7 @@ test("a filtered destruction effect checks its whole batch and uses each permane
         power: 0,
         toughness: 0,
         abilities: [{ parts: {
-            AbilityPart_SelectObjectsFromZone: {
+            AbilityPart_SelectObjects: {
                 inSignal: "SPELL_RESOLVE",
                 saveAs: "WALLS",
                 zone: ZoneKind.Battlefield,

@@ -25,6 +25,7 @@ export class Zone<T extends GameObject = GameObject> {
         const index = this.objects.indexOf(object);
         if (index < 0)
             return;
+        object.captureBeforeLeaving?.();
         this.objects.splice(index, 1);
         object.retire();
     }

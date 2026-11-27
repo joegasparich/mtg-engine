@@ -3,6 +3,7 @@ import { AbilityPart_Target } from "@engine/abilities/parts/AbilityPart_Target";
 import type { CardObject } from "@engine/GameObject";
 import gameEventManager from "@engine/events/GameEventManager";
 import { ManaAmount,ManaUtility } from "@engine/mana";
+import type { LayerEffect,TimedEffect } from "@engine/effects/Layers";
 import type Player from "@engine/Player";
 import { AbilityActivator,AbilityDef } from "~/defs";
 import { SlateVar } from ".";
@@ -24,6 +25,7 @@ import { AbilityPart_Effect_AddMana } from "./parts/effect/AbilityPart_Effect_Ad
 // For caching purposes
 export class Ability {
     def: AbilityDef;
+    originalDefinition: AbilityDef;
     parts: AbilityPart[] = [];
     slate: Record<SlateVar | string, any> = {};
     source: CardObject;
@@ -31,6 +33,26 @@ export class Ability {
     constructor(source: CardObject, readonly grantedBy?: CardObject) {
         this.slate["THIS"] = [ source ];
         this.source = source;
+    }
+
+    private staticEffects?: TimedEffect[];
+    grantTimestamp?: () => number;
+
+    get timestamp() { return Math.max(this.source.timestamp, this.grantTimestamp?.() ?? 0); }
+
+    get layerEffects(): readonly TimedEffect[] {
+        if (!this.staticEffects) {
+            const groups: LayerEffect[] = [];
+            for (const part of this.parts) {
+                const effect = part.layerEffect?.();
+                if (!effect) continue;
+                const previous = effect.selectionKey && groups.find(group => group.selectionKey === effect.selectionKey);
+                if (previous) previous.changes = [...previous.changes, ...effect.changes];
+                else groups.push(effect);
+            }
+            this.staticEffects = groups.map(effect => ({ ...effect, timestamp: () => this.timestamp }));
+        }
+        return this.staticEffects;
     }
 
     private listening = false;

@@ -2,6 +2,7 @@ import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { Permanent } from "@engine/GameObject";
 import { Battlefield } from "@engine/Zone";
+import type { CardDef } from "~/defs";
 import { AbilityPart,EntryReplacementOrder } from "./AbilityPart";
 
 @RegisterAbilityPart
@@ -18,17 +19,17 @@ export class AbilityPart_EnterAsCopy extends AbilityPart {
         this.finishEntry = () => {
             const original = resolveAbilityGrammar(this.copyFrom, this.ability);
             if (original instanceof Permanent && original.zone instanceof Battlefield)
-                entering.enterAsCopyOf(original, this.copyDefinition(original));
+                entering.enterAsCopyOf(original, this.copyDefinition(original.copiableDefinition));
             resume();
         };
         this.ability.fireSignal(this.outSignal);
     }
 
-    private copyDefinition(original: Permanent) {
+    private copyDefinition(original: Readonly<CardDef>) {
         if (!this.modify)
-            return original.def;
+            return original;
         // 707.9b: Changes made to this draft become copiable when the permanent enters.
-        const draft = { ...original.def };
+        const draft = { ...original };
         const { signal, saveAs } = this.modify;
         const slate = this.ability.slate;
         const previous = slate[saveAs];
