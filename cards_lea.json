@@ -501,7 +501,7 @@
         "abilities": [
             {
                 "parts": {
-                    "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "controllerOnly": true },
+                    "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.controller" },
                     "AbilityPart_Effect_ChooseManaPayment": { "cost": "{W}{W}", "onDeclineSignal": "SACRIFICE" },
                     "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
                 }
@@ -657,7 +657,7 @@
                         "permanentsFrom": "ENCHANTED_LAND",
                         "grant": {
                             "parts": {
-                                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "controllerOnly": true },
+                                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.controller" },
                                 "AbilityPart_Effect_ChooseManaPayment": { "cost": "{W}{W}", "onPaySignal": "GAIN_LIFE" },
                                 "AbilityPart_Effect_GainLife": { "inSignal": "GAIN_LIFE", "target": "CONTROLLER", "amount": 1 }
                             }
@@ -1336,6 +1336,65 @@
                 },
                 "AbilityPart_Effect_AddMana": {
                     "inSignal": "ADD_MANA", "target": "THIS.controller", "manaFrom": "LOST_MANA"
+                }
+            }
+        }]
+    },
+    {
+        "name": "Feedback",
+        "image_url": "https://cards.scryfall.io/large/front/5/0/50f7099c-d7c6-421f-8e3a-fbde9d96109e.jpg?1783919560",
+        "oracle_text": "Enchant enchantment\nAt the beginning of the upkeep of enchanted enchantment's controller, this Aura deals 1 damage to that player.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{2}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Enchantment" } } } },
+            { "parts": {
+                "AbilityPart_Trigger_StepStart": { "step": "Upkeep", "player": "THIS.attachedTo.controller", "savePlayerAs": "UPKEEP_PLAYER" },
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "UPKEEP_PLAYER", "amount": 1 }
+            } }
+        ]
+    },
+    {
+        "name": "Flight",
+        "image_url": "https://cards.scryfall.io/large/front/0/6/06f820d9-c42b-436d-8dcc-6511ac940b2b.jpg?1783919558",
+        "oracle_text": "Enchant creature\nEnchanted creature has flying.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Creature" } } } },
+            { "parts": {
+                "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_CREATURE" },
+                "AbilityPart_GrantAbilityContinuously": { "permanentsFrom": "ENCHANTED_CREATURE", "grant": { "keyword": "flying" } }
+            } }
+        ]
+    },
+    {
+        "name": "Invisibility",
+        "image_url": "https://cards.scryfall.io/large/front/f/9/f90520d6-28e5-4ee3-92d4-162cf4248095.jpg?1783919558",
+        "oracle_text": "Enchant creature\nEnchanted creature can't be blocked except by Walls.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{U}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Creature" } } } },
+            { "parts": {
+                "AbilityPart_CanOnlyBeBlockedBy": { "attacker": "THIS.attachedTo", "allowedSubtypes": ["Wall"] }
+            } }
+        ]
+    },
+    {
+        "name": "Jump",
+        "image_url": "https://cards.scryfall.io/large/front/d/0/d0d54b4d-a867-43a2-824f-a5671130976a.jpg?1783919558",
+        "oracle_text": "Target creature gains flying until end of turn.",
+        "types": ["Instant"],
+        "cost": "{U}",
+        "abilities": [{
+            "parts": {
+                "AbilityPart_Target": { "zone": "battlefield", "targetValidator": { "cardType": "Creature" }, "saveAs": "CREATURE" },
+                "AbilityPart_Effect_GrantAbilityUntilEndOfTurn": {
+                    "inSignal": "SPELL_RESOLVE", "target": "CREATURE", "grant": { "keyword": "flying" }
                 }
             }
         }]

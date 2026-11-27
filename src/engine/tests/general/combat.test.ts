@@ -2,6 +2,7 @@ import { PlayerActions } from "@engine/actions";
 import playerActionManager from "@engine/actions/PlayerActionManager";
 import { CombatManager } from "@engine/CombatManager";
 import { GameEvent_Advance,GameEvent_ChangeCardZone,GameEvent_DealDamage,GameEvent_DeclareAttacker,GameEvent_GoToNextStep,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_TapAttacker,GameEvent_TapCard } from "@engine/events";
+import { GameEvent_DeclareBlocker } from "@engine/events/GameEvent_CardInteractionChecks";
 import gameEventManager,{ GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
 import Player from "@engine/Player";
@@ -323,6 +324,27 @@ test("flyer can't be blocked by non flyer", () => {
     gameEventManager.addEvent(new GameEvent_GoToNextStep());
 
     expect(playerActionManager.getCardActions(bears, playerB, false).length).toBe(0);
+});
+
+test("a blocker restriction accepts any configured type or subtype on the blocker", () => {
+    const bears = cardData[GRIZZLY_BEARS];
+    const attacker = addTestCard({
+        ...bears,
+        abilities: [{ parts: {
+            AbilityPart_CanOnlyBeBlockedBy: { allowedTypes: [CardType.Artifact], allowedSubtypes: bears.subtypes },
+        } }],
+    }, playerA, playerA.battlefield);
+    const otherAttacker = addTestCard(bears, playerA, playerA.battlefield);
+    const blocker = addTestCard({ ...bears, subtypes: [] }, playerB, playerB.battlefield);
+    const block = new GameEvent_DeclareBlocker(blocker, attacker);
+
+    expect(gameEventManager.checkEvent(block)).toBe(false);
+    expect(gameEventManager.checkEvent(new GameEvent_DeclareBlocker(blocker, otherAttacker))).toBe(true);
+    blocker.types = [CardType.Artifact, CardType.Creature];
+    expect(gameEventManager.checkEvent(block)).toBe(true);
+    blocker.types = [CardType.Creature];
+    blocker.subtypes = bears.subtypes;
+    expect(gameEventManager.checkEvent(block)).toBe(true);
 });
 
 test("islandwalk prevents blocks while the defender controls a land with the Island subtype", () => {

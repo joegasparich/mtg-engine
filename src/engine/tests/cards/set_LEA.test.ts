@@ -3775,3 +3775,128 @@ describe("Drain Power", () => {
         expect(caster.manaPool[ManaColour.B]).toBe(2);
     });
 });
+
+function castBlueSpellAtPermanent(caster: Player, def: CardDef, target: Permanent, mana: number, illegalTarget: CardObject) {
+    const card = addTestCard(def, caster, caster.hand);
+    caster.manaPool[ManaColour.U] = mana - 1;
+    expect(playerActionManager.getCardActions(card, caster)).toHaveLength(0);
+    caster.manaPool[ManaColour.U] = mana;
+    playerActionManager.getCardActions(card, caster)[0].perform(caster);
+    expect(game.pendingTargeter.validateTargets([illegalTarget])).toBe(false);
+    game.pendingTargeter.onTargeted([target]);
+    expect(caster.manaPool[ManaColour.U]).toBe(0);
+    passPriorityRound();
+    return card;
+}
+
+describe("Feedback", () => {
+    const def = cardData.find(card => card.name === "Feedback");
+    const castle = cardData.find(card => card.name === "Castle");
+
+    test("enchants an enchantment and damages the player whose upkeep triggered it", () => {
+        Game.init();
+        const caster = game.addPlayer(BASIC_DECK);
+        const opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        const target = addTestCard(castle, opponent, opponent.battlefield);
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, target, 3, creature);
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(target);
+        const hits: GameEvent_DealDamage[] = [];
+        gameEventManager.onGamePerformed(GameEventType.DealDamage, (hit: GameEvent_DealDamage) => hits.push(hit));
+
+        function beginNextUpkeep() {
+            gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+            gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.Upkeep));
+        }
+
+        beginNextUpkeep();
+        expect(game.stack.objects[0]).toBeInstanceOf(StackAbility);
+        expect(game.stack.objects[0]).toMatchObject({ source: aura, controller: caster });
+        expect(opponent.life).toBe(20);
+        target.controller = caster;
+        passPriorityRound();
+        expect(hits[0]).toMatchObject({ source: aura, recipient: opponent, amount: 1 });
+        expect([caster.life, opponent.life]).toEqual([20, 19]);
+
+        beginNextUpkeep();
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(hits[1]).toMatchObject({ source: aura, recipient: caster, amount: 1 });
+        expect([caster.life, opponent.life]).toEqual([19, 19]);
+        beginNextUpkeep();
+        expect(game.stack.objects).toHaveLength(0);
+    });
+});
+
+describe("Flight", () => {
+    const def = cardData.find(card => card.name === "Flight");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+
+    test("grants flying for as long as it remains attached", () => {
+        Game.init();
+        const caster = game.addPlayer(BASIC_DECK);
+        const opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const land = addTestCard(island, opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, creature, 1, land);
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(creature);
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(true);
+
+        moveTestCard(aura, caster.graveyard);
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(false);
+    });
+});
+
+describe("Invisibility", () => {
+    const def = cardData.find(card => card.name === "Invisibility");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+
+    test("allows Wall blockers and excludes even flying non-Walls", () => {
+        Game.init();
+        const caster = game.addPlayer(BASIC_DECK);
+        const opponent = game.addPlayer(BASIC_DECK);
+        const attacker = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const nonWall = addTestCard(cardData.find(card => card.name === "Air Elemental"), opponent, opponent.battlefield);
+        const wall = addTestCard(cardData.find(card => card.name === "Wall of Swords"), opponent, opponent.battlefield);
+        startMainPhase();
+        const land = addTestCard(island, opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, attacker, 2, land);
+        const aura = caster.battlefield.objects.find(object => object.card === card.card);
+        expect(aura.attachedTo).toBe(attacker);
+
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareAttackers));
+        new PlayerActions.DeclareAttacker(attacker).perform(caster, [opponent]);
+        gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.DeclareBlockers));
+        expect(CombatManager.canBlockAttacker(wall, attacker)).toBe(true);
+        expect(CombatManager.canBlockAttacker(nonWall, attacker)).toBe(false);
+
+        moveTestCard(aura, caster.graveyard);
+        expect(CombatManager.canBlockAttacker(nonWall, attacker)).toBe(true);
+    });
+});
+
+describe("Jump", () => {
+    const def = cardData.find(card => card.name === "Jump");
+    const island = cardData.find(card => card.name === BasicLandType.Island);
+
+    test("gives its target flying until cleanup", () => {
+        Game.init();
+        const caster = game.addPlayer(BASIC_DECK);
+        const opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        const other = addTestCard(cardData[GRIZZLY_BEARS], caster, caster.battlefield);
+        const land = addTestCard(island, opponent, opponent.battlefield);
+        const card = castBlueSpellAtPermanent(caster, def, creature, 1, land);
+        expect(caster.graveyard.objects.at(-1).card).toBe(card.card);
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(true);
+        expect(other.hasKeyword(Keyword.Flying)).toBe(false);
+
+        gameEventManager.addEvent(new GameEvent_Cleanup(caster));
+        expect(creature.hasKeyword(Keyword.Flying)).toBe(false);
+    });
+});

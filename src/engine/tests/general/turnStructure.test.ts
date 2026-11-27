@@ -105,6 +105,29 @@ test("a step-start trigger can pass the turn player to its effect", () => {
     expect(controller.life).toBe(20);
 });
 
+test("a step-start trigger can filter by a configured player", () => {
+    const owner = game.addPlayer(BASIC_DECK);
+    startMainPhase();
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS],
+        abilities: [{ parts: {
+            AbilityPart_Trigger_StepStart: { step: StepIndex[StepIndex.End], player: "THIS.owner" },
+            AbilityPart_Effect_GainLife: { target: "CONTROLLER", amount: 1 },
+        } }],
+    }, owner, player.battlefield);
+    source.controller = player;
+
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+    expect(game.stack.objects).toHaveLength(0);
+
+    gameEventManager.addEvent(new GameEvent_GoToNextTurn());
+    gameEventManager.addEvent(new GameEvent_GoToStep(StepIndex.End));
+    expect(game.stack.objects).toHaveLength(1);
+    expect(game.stack.objects[0]).toMatchObject({ source, controller: player });
+    passPriorityRound();
+    expect(player.life).toBe(21);
+});
+
 test.each([false, true])("only the starting player's first draw step is skipped with auto-skip %s", allowAutoSkip => {
     const opponent = game.addPlayer(BASIC_DECK);
     game.startGame({allowAutoSkip});
