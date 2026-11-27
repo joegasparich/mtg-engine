@@ -49,7 +49,7 @@
                     },
                     "AbilityPart_Effect_DrawCards": {
                         "inSignal": "SPELL_RESOLVE",
-                        "target": "TARGET_PLAYER",
+                        "playersFrom": "TARGET_PLAYER",
                         "count": 3
                     }
                 }
@@ -1204,7 +1204,7 @@
             "parts": {
                 "AbilityPart_Target": { "saveAs": "TARGET_PLAYER", "validTargets": ["Player"] },
                 "AbilityPart_Effect_DrawCards": {
-                    "inSignal": "SPELL_RESOLVE", "target": "TARGET_PLAYER", "count": "THIS.chosenX"
+                    "inSignal": "SPELL_RESOLVE", "playersFrom": "TARGET_PLAYER", "count": "THIS.chosenX"
                 }
             }
         }]
@@ -1761,6 +1761,20 @@
         "cost": "{1}{U}",
         "abilities": [{ "parts": {
             "AbilityPart_Effect_AddExtraTurn": { "inSignal": "SPELL_RESOLVE", "player": "THIS.controller" }
+        } }]
+    },
+    {
+        "name": "Timetwister",
+        "image_url": "https://cards.scryfall.io/large/front/f/4/f4524a4f-9b00-4b40-8461-33e36865df7e.jpg",
+        "oracle_text": "Each player shuffles their hand and graveyard into their library, then draws seven cards.",
+        "types": ["Sorcery"],
+        "cost": "{2}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_SelectObjects": { "inSignal": "SPELL_RESOLVE", "zone": ["hand", "graveyard"], "saveAs": "CARDS", "outSignal": "MOVE" },
+            "AbilityPart_Effect_ChangeZones": { "inSignal": "MOVE", "target": "CARDS", "destination": "library", "outSignal": "SELECT_PLAYERS" },
+            "AbilityPart_SelectPlayers": { "inSignal": "SELECT_PLAYERS", "saveAs": "PLAYERS", "outSignal": "SHUFFLE" },
+            "AbilityPart_Effect_ShuffleLibrary": { "inSignal": "SHUFFLE", "playersFrom": "PLAYERS", "outSignal": "DRAW" },
+            "AbilityPart_Effect_DrawCards": { "inSignal": "DRAW", "playersFrom": "PLAYERS", "count": 7 }
         } }]
     }
 ]

@@ -1,10 +1,11 @@
-import { type GrammarKey,resolveAbilityGrammar } from "@engine/abilities";
+import type { GrammarKey } from "@engine/abilities";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
+import { getObjectsFromSlateInZones } from "@engine/abilities/ZoneSelection";
 import type { OneShotEffect } from "@engine/effects/EffectSystem";
 import { GameEvent_ChangeCardZone } from "@engine/events";
 import { game } from "@engine/Game";
 import { CardObject } from "@engine/GameObject";
-import { Battlefield,ZoneKind } from "@engine/Zone";
+import { Battlefield,Zone,ZoneKind } from "@engine/Zone";
 import { AttachmentSubtype,CardType } from "~/defs";
 import { AbilityPart_Effect } from "./AbilityPart_Effect";
 
@@ -15,23 +16,27 @@ export class AbilityPart_Effect_ChangeZones extends AbilityPart_Effect {
     outSignal?: string;
 
     perform(effect: OneShotEffect) {
-        this.moveCard(effect);
+        const cards = new Set(getObjectsFromSlateInZones(this.ability, this.target, Zone));
+        const moves = [...cards].map(card => this.moveFor(card)).filter(move => move !== undefined);
+        if (moves.length === 1)
+            effect.emit(moves[0]);
+        else if (moves.length > 1)
+            effect.performSimultaneous(moves);
         // 608.2c and 609.3: Continue with the next instruction even if the move was prevented.
         if (this.outSignal)
             effect.continueResolution(() => this.ability.fireSignal(this.outSignal));
     }
 
-    private moveCard(effect: OneShotEffect) {
+    private moveFor(card: unknown): GameEvent_ChangeCardZone | undefined {
         const { ability } = this;
-        const card = resolveAbilityGrammar(this.target, ability);
-        if (!(card instanceof CardObject) || !card.zone)
+        if (!(card instanceof CardObject))
             return;
 
         if (this.destination !== ZoneKind.Battlefield) {
             // 400.3: Cards go to their owner's library, hand, or graveyard.
             const zone = this.destination === ZoneKind.Exile ? game.exile : card.owner[this.destination];
             if (zone && zone !== card.zone)
-                effect.emit(new GameEvent_ChangeCardZone(card, zone));
+                return new GameEvent_ChangeCardZone(card, zone);
             return;
         }
 
@@ -46,6 +51,6 @@ export class AbilityPart_Effect_ChangeZones extends AbilityPart_Effect {
         // 110.2a: A permanent enters under the control of the player putting it onto the battlefield.
         const controller = ability.controller ?? ability.source.controller;
         if (controller)
-            effect.emit(new GameEvent_ChangeCardZone(card, controller.battlefield, { controller }));
+            return new GameEvent_ChangeCardZone(card, controller.battlefield, { controller });
     }
 }

@@ -223,7 +223,7 @@ test("defers state-based actions and waiting triggers until the paused spell fin
     hand(opponent, 1);
     const source = addTestCard(testSpell, caster, caster.hand);
     const watcher = addTestCard({
-        ...bears, abilities: [{ parts: { AbilityPart_Effect_DrawCards: { inSignal: "DRAW", target: "CONTROLLER", count: 1 } } }],
+        ...bears, abilities: [{ parts: { AbilityPart_Effect_DrawCards: { inSignal: "DRAW", playersFrom: "CONTROLLER", count: 1 } } }],
     }, caster, caster.battlefield);
 
     const onSacrifice = () => {

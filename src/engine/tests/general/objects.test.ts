@@ -106,7 +106,7 @@ test("two nonmana activations of one permanent create independent stack objects"
         abilities: [{
             parts: {
                 AbilityPart_Activate_Tap: { outSignal: "DRAW" },
-                AbilityPart_Effect_DrawCards: { inSignal: "DRAW", target: "RECIPIENT", count: 1 },
+                AbilityPart_Effect_DrawCards: { inSignal: "DRAW", playersFrom: "RECIPIENT", count: 1 },
             },
         }],
     }, player, player.battlefield);
@@ -156,7 +156,7 @@ test("an enters trigger resolves with its original controller after its source l
         abilities: [{
             parts: {
                 AbilityPart_Trigger_Enters: { type: CardType.Creature, outSignal: "DRAW", storeAs: "ENTERED" },
-                AbilityPart_Effect_DrawCards: { inSignal: "DRAW", target: "CONTROLLER", count: 1 },
+                AbilityPart_Effect_DrawCards: { inSignal: "DRAW", playersFrom: "CONTROLLER", count: 1 },
             },
         }],
     }, player, player.battlefield);

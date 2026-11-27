@@ -5155,3 +5155,49 @@ describe("Time Walk", () => {
         expect(game.currentTurnPlayer()).toBe(opponent);
     });
 });
+
+describe("Timetwister", () => {
+    test("both players shuffle before drawing seven, with Timetwister still on the stack", () => {
+        Game.init();
+        const caster = game.addPlayer([]);
+        const opponent = game.addPlayer([]);
+        startMainPhase();
+        const pools = game.players.map(player => {
+            const hand = addTestCard(cardData[FOREST], player, player.hand);
+            const grave = addTestCard(cardData[GRIZZLY_BEARS], player, player.graveyard);
+            const library = Array.from({ length: 7 }, () => addTestCard(cardData[FOREST], player, player.library));
+            return { hand, cards: [hand, grave, ...library].map(object => object.card) };
+        });
+        const land = addTestCard(cardData[FOREST], caster, caster.battlefield);
+        const exiled = addTestCard(cardData[FOREST], opponent, game.exile);
+        const twister = addTestCard(cardData.find(card => card.name === "Timetwister"), caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 1;
+        caster.manaPool[ManaColour.Colourless] = 2;
+        playerActionManager.getCardActions(twister, caster)[0].perform(caster);
+        const [spell] = game.stack.objects;
+        const shuffles = game.players.map(player => vi.spyOn(player.library, "shuffle"));
+        const draws: Player[] = [];
+        gameEventManager.onGamePerformed<GameEvent_DrawCard>(GameEventType.DrawCard, event => {
+            expect(spell.zone).toBe(game.stack);
+            for (const shuffle of shuffles)
+                expect(shuffle).toHaveBeenCalledTimes(1);
+            draws.push(event.player);
+        });
+
+        passPriorityRound();
+        chooseEarliestTimestamps(caster, pools[0].hand);
+        chooseEarliestTimestamps(opponent, pools[1].hand);
+
+        expect(draws.map(player => player.id)).toEqual([...Array(7).fill(caster.id), ...Array(7).fill(opponent.id)]);
+        for (const [i, player] of game.players.entries()) {
+            expect(player.hand.objects).toHaveLength(7);
+            expect(player.library.objects).toHaveLength(2);
+            expect(new Set([...player.hand.objects, ...player.library.objects].map(object => object.card)))
+                .toEqual(new Set(pools[i].cards));
+        }
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([twister.card]);
+        expect(opponent.graveyard.objects).toHaveLength(0);
+        expect(land.zone).toBe(caster.battlefield);
+        expect(exiled.zone).toBe(game.exile);
+    });
+});

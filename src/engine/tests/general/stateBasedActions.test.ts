@@ -96,7 +96,7 @@ test("a host and its Aura are dealt with before a waiting trigger is put on the 
         types: [CardType.Enchantment],
         abilities: [{ parts: {
             AbilityPart_Trigger_Enters: { type: CardType.Creature, outSignal: "DRAW" },
-            AbilityPart_Effect_DrawCards: { inSignal: "DRAW", target: "CONTROLLER", count: 1 },
+            AbilityPart_Effect_DrawCards: { inSignal: "DRAW", playersFrom: "CONTROLLER", count: 1 },
         } }],
     }, player, player.battlefield);
     const incoming = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);

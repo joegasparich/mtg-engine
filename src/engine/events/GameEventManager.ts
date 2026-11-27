@@ -114,7 +114,8 @@ class GameEventManager {
     private readonly gameListenersByType = new Map<GameEventType, Set<GameSubscription>>();
     private checkSource?: CheckSource;
     private readonly eventsResolvedCallback: (() => void)[] = [];
-    private readonly resolutionSteps: (() => void)[] = [];
+    private resolutionSteps: (() => void)[] = [];
+    private readonly suspendedSteps: (() => void)[][] = [];
     private readonly idleCallbacks: (() => void)[] = [];
     private settleState?: () => boolean;
     private waitingForChoice?: () => boolean;
@@ -145,6 +146,7 @@ class GameEventManager {
         this.commitPending = false;
         this.eventsResolvedCallback.length = 0;
         this.resolutionSteps.length = 0;
+        this.suspendedSteps.length = 0;
         this.idleCallbacks.length = 0;
         this.settleState = settle;
         this.waitingForChoice = waitingForChoice;
@@ -347,7 +349,15 @@ class GameEventManager {
                 } else if (this.eventsResolvedCallback.length > 0) {
                     this.eventsResolvedCallback.shift()();
                 } else if (this.resolutionSteps.length > 0) {
-                    this.resolutionSteps.shift()();
+                    const next = this.resolutionSteps.shift();
+                    // Finish this instruction's events, choices, and nested steps before its siblings.
+                    if (this.resolutionSteps.length) {
+                        this.suspendedSteps.push(this.resolutionSteps);
+                        this.resolutionSteps = [];
+                    }
+                    next();
+                } else if (this.suspendedSteps.length > 0) {
+                    this.resolutionSteps = this.suspendedSteps.pop();
                 } else if (this.settleState?.()) {
                     continue;
                 } else if (this.idleCallbacks.length > 0) {

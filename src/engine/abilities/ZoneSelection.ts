@@ -17,15 +17,17 @@ export type ZoneSelection = {
     excludeSource?: boolean;
 };
 
-// Card definitions specify either a grammar reference (e.g. THIS.attachedTo) or a zone.
-export type ObjectSelection = Partial<ZoneSelection> & { target?: GrammarKey };
+// Card definitions select a grammar reference (e.g. THIS.attachedTo) or objects in one or more zones.
+export type ObjectSelection = Omit<ZoneSelection, "zone"> & { zone?: ZoneKind | readonly ZoneKind[]; target?: GrammarKey };
 
 export function selectObjects(ability: Ability, selection: ObjectSelection) {
     const { target, zone, zoneOf, controlledBy, targetValidator, excludeSource } = selection;
     if ((target === undefined) === (zone === undefined))
         throw new Error("An object selector requires exactly one of 'target' and 'zone'");
-    if (zone !== undefined)
-        return selectObjectsFromZone(ability, { zone, zoneOf, controlledBy, targetValidator, excludeSource });
+    if (zone !== undefined) {
+        const fromZone = (kind: ZoneKind) => selectObjectsFromZone(ability, { zone: kind, zoneOf, controlledBy, targetValidator, excludeSource });
+        return typeof zone === "string" ? fromZone(zone) : [...new Set(zone)].flatMap(fromZone);
+    }
 
     const object = resolveAbilityGrammar(target, ability);
     if (!object || (excludeSource && object === ability.source)
@@ -58,8 +60,9 @@ type ObjectInZone<T extends ZoneClass> = InstanceType<T>["objects"][number];
 export function getObjectsFromSlateInZones<T extends readonly ZoneClass[]>(ability: Ability, key: GrammarKey,
     ...zoneTypes: T): readonly ObjectInZone<T[number]>[] {
     // During a layer pass a static ability may exist before its event listeners are installed.
-    const objects: readonly unknown[] = ability.parts.map(part => part.continuousSelection?.(key))
-        .find(selection => selection !== undefined) ?? ability.slate[key] ?? [];
+    const objects: readonly unknown[] = key.includes(".") ? [resolveAbilityGrammar(key, ability)]
+        : ability.parts.map(part => part.continuousSelection?.(key))
+            .find(selection => selection !== undefined) ?? ability.slate[key] ?? [];
     return objects.filter((object): object is ObjectInZone<T[number]> =>
         object instanceof GameObject && zoneTypes.some(zoneType => object.zone instanceof zoneType));
 }

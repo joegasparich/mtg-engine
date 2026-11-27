@@ -2,7 +2,7 @@ import type { GrammarKey } from "@engine/abilities";
 import type { Ability } from "@engine/abilities/Ability";
 import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { type ObjectSelection,selectObjects } from "@engine/abilities/ZoneSelection";
-import { Battlefield,type ZoneKind } from "@engine/Zone";
+import { Battlefield } from "@engine/Zone";
 import { defineComputedProperty } from "@utility/objectUtility";
 import type { TargetValidator } from "~/defs";
 import { AbilityPart } from "./AbilityPart";
@@ -11,7 +11,7 @@ import { AbilityPart } from "./AbilityPart";
 export class AbilityPart_SelectObjectsContinuously extends AbilityPart implements ObjectSelection {
     saveAs: string;
     target?: GrammarKey;
-    zone?: ZoneKind;
+    zone?: ObjectSelection["zone"];
     zoneOf?: GrammarKey;
     controlledBy?: GrammarKey;
     targetValidator?: TargetValidator;
