@@ -1,6 +1,7 @@
 import { defineComputedProperty } from "@utility/objectUtility";
 import { isCardColour } from "~/defs";
 import { isBasicLandType,readWord,WordKind } from "~/rulesWords";
+import { resolveAbilityGrammar } from "./index";
 import type { Ability } from "./Ability";
 
 // CR 612.2: These configuration fields represent subtype words in the card's text.
@@ -13,6 +14,12 @@ export function bindPartConfig(config: object, ability: Ability, cache: WeakMap<
     let copy: object;
     const writable = () => copy ??= Array.isArray(config) ? [...config] : { ...config };
     for (const [key, value] of Object.entries(config)) {
+        if (key === "manaValueEquals" && typeof value === "string") {
+            // Keep an unresolved reference distinct from an omitted filter.
+            defineComputedProperty(writable(), key, () => resolveAbilityGrammar(value, ability) ?? value);
+            continue;
+        }
+
         if (subtypeFields.has(key) && isBasicLandType(value)) {
             defineComputedProperty(writable(), key, () => readWord(value, WordKind.BasicLandType, ability.wordReplacements));
             continue;

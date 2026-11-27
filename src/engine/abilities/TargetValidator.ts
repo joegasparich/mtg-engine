@@ -1,16 +1,22 @@
 import { CombatManager } from "@engine/CombatManager";
-import { type CardObject,Permanent } from "@engine/GameObject";
+import { CardObject,Permanent } from "@engine/GameObject";
+import { ManaUtility } from "@engine/mana";
+import type Player from "@engine/Player";
 import { Battlefield } from "@engine/Zone";
 import type { TargetValidator } from "~/defs";
 
 type TargetValidatorConfig = TargetValidator & { targetValidator?: TargetValidator };
 
-export function matchesTargetValidator(target: CardObject, config: TargetValidatorConfig): boolean {
+export function matchesTargetValidator(target: CardObject | Player, config: TargetValidatorConfig): boolean {
     // Explicit parts can still declare their filters directly.
     const { attackedThisTurn, baseSubtype, blocking, cardType, cardTypes, cardSubtype, colour, controlledSinceTurnStart,
-        excludedSubtype, hasManaAbility, onBattlefield, tapped, unblocked } = config.targetValidator ?? config;
+        excludedSubtype, hasManaAbility, manaValueEquals, onBattlefield, tapped, unblocked } = config.targetValidator ?? config;
+    if (!(target instanceof CardObject))
+        return manaValueEquals === undefined;
     // 105.2: An object can match any of its current colours.
     return (!onBattlefield || target.zone instanceof Battlefield)
+        // 202.3e: A spell's stack cost includes its own announced X.
+        && (manaValueEquals === undefined || ManaUtility.getManaValue(target.cost) === manaValueEquals)
         && (!cardType || target.hasType(cardType))
         && (!cardTypes || cardTypes.some(type => target.hasType(type)))
         && (!colour || target.colours.has(colour))

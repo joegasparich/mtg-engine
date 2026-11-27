@@ -4918,3 +4918,63 @@ describe("Sleight of Mind", () => {
         expect(returned.characteristics.rulesText).toBe(knight.def.oracle_text);
     });
 });
+
+describe("Spell Blast", () => {
+    const def = cardData.find(card => card.name === "Spell Blast");
+    let caster: Player;
+    let opponent: Player;
+    let blast: CardObject;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer([]);
+        opponent = game.addPlayer([]);
+        startMainPhase();
+        blast = addTestCard(def, caster, caster.hand);
+    });
+
+    test("pays {X}{U} and counters only the spell with the announced mana value", () => {
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        const recall = addTestCard(cardData[ANCESTRAL_RECALL], opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, bears)).toBe(true);
+        expect(game.stack.spellCast(opponent, recall, [opponent])).toBe(true);
+        const [bearSpell, recallSpell] = game.stack.objects;
+        caster.manaPool[ManaColour.U] = 3;
+
+        playerActionManager.getCardActions(blast, caster)[0].perform(caster);
+        game.pendingSpellXChoice.submit(caster, 2);
+        expect(game.pendingTargeter.validateTargets([recallSpell])).toBe(false);
+        game.pendingTargeter.onTargeted([bearSpell]);
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+
+        passPriorityRound();
+        expect(game.stack.objects).toEqual([recallSpell]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([bears.card]);
+        expect(caster.graveyard.objects.map(object => object.card)).toEqual([blast.card]);
+    });
+
+    test("can counter Black Lotus for one blue mana", () => {
+        const lotus = addTestCard(cardData.find(card => card.name === "Black Lotus"), opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, lotus)).toBe(true);
+        caster.manaPool[ManaColour.U] = 1;
+        new PlayerActions.PlayCard(blast).perform(caster);
+        game.pendingSpellXChoice.submit(caster, 0);
+        game.pendingTargeter.onTargeted([game.stack.objects[0]]);
+        passPriorityRound();
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([lotus.card]);
+    });
+
+    test("counts the target spell's own X on the stack", () => {
+        const bears = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.hand);
+        const sink = addTestCard(cardData.find(card => card.name === "Power Sink"), opponent, opponent.hand);
+        expect(game.stack.spellCast(opponent, bears)).toBe(true);
+        expect(game.stack.spellCast(opponent, sink, [game.stack.objects[0]], 3)).toBe(true);
+        const [bearSpell, sinkSpell] = game.stack.objects;
+        expect(game.stack.spellCast(caster, blast, [sinkSpell], 1)).toBe(false);
+        expect(game.stack.spellCast(caster, blast, [sinkSpell], 4)).toBe(true);
+        passPriorityRound();
+        expect(game.stack.objects).toEqual([bearSpell]);
+        expect(opponent.graveyard.objects.map(object => object.card)).toEqual([sink.card]);
+    });
+});

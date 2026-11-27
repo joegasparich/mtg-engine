@@ -22,7 +22,7 @@ export class GameEvent_CastSpell extends GameEvent {
     }
 
     perform(): boolean {
-        if (this.handObject.owner !== this.caster || !this.handObject.canPlay()
+        if (this.handObject.owner !== this.caster || !this.handObject.withCastingX(this.chosenX, () => this.handObject.canPlay())
             || !game.stack.spellCast(this.caster, this.handObject, this.targets, this.chosenX, this.chosenMode))
             return false;
 

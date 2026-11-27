@@ -58,11 +58,24 @@ export class CardObject extends GameObject {
     private readonly activeAbilities = new Set<Ability>();
     private readonly basicLandAbilities = new Map<AbilityDef, Ability>();
 
-    constructor(readonly card: Card, chosenMode?: number) {
+    constructor(readonly card: Card, chosenMode?: number, private announcedX?: number) {
         super();
         this.printed = this.bindDefinition(card.def);
         if (chosenMode !== undefined)
             this.printed.abilities = [...this.printed.abilities, ...this.getSpellModeAbilities(chosenMode)];
+    }
+
+    get chosenX() { return this.announcedX; }
+
+    // 601.2b–c: Check a proposed cast with its own X before the spell enters the stack.
+    withCastingX(x: number, check: () => boolean): boolean {
+        const previous = this.announcedX;
+        this.announcedX = x;
+        try {
+            return check();
+        } finally {
+            this.announcedX = previous;
+        }
     }
 
     createAbility(def: AbilityDef, grantedBy?: CardObject) { return makeAbility(def, this, grantedBy); }
@@ -436,8 +449,8 @@ export class Spell extends CardObject {
     override get resolvedDamageSource() { return this.resolvedPermanent; }
 
     constructor(card: Card, readonly caster: Player, targets: readonly ActionTarget[],
-        readonly chosenX = 0, readonly chosenMode?: number) {
-        super(card, chosenMode);
+        chosenX = 0, readonly chosenMode?: number) {
+        super(card, chosenMode, chosenX);
         this.targets = [...targets];
         // 107.3a: X in the cost of a spell on the stack equals its announced value.
         if (this.variableManaSymbols)

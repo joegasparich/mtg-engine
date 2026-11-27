@@ -72,7 +72,8 @@ export class PlayerAction_PlayCard extends PlayerAction {
             max,
             submit: (actor, x) => currentGame.submitResolutionChoice(choice, actor,
                 () => x === null || (Number.isSafeInteger(x) && x >= 0 && x <= max
-                    && playerActionManager.canAutoPayManaCost(this.getCost(x), player)),
+                    && playerActionManager.canAutoPayManaCost(this.getCost(x), player)
+                    && this.object.withCastingX(x, () => this.object.getSpellTargeter(mode)?.hasLegalTargets() ?? true)),
                 () => {
                     if (x !== null && this.canPlay(player, mode))
                         this.chooseTargets(player, x, mode);
@@ -89,7 +90,7 @@ export class PlayerAction_PlayCard extends PlayerAction {
 
             // 601.2c, 601.2h
             playerActionManager.startTargeting(this.object, target.targetTypes, target.count,
-                targets => target.validateTargets(targets), targets => {
+                targets => this.object.withCastingX(x, () => target.validateTargets(targets)), targets => {
                     if (this.canPlay(player, mode))
                         this.castSpell(player, x, targets, mode);
                 }, target.zone);

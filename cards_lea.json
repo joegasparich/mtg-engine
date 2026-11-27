@@ -1696,5 +1696,16 @@
             ],
             "AbilityPart_Effect_ReplaceRulesWord": { "inSignal": "REPLACE_WORD", "target": "TARGET", "from": "FROM", "to": "TO" }
         } }]
+    },
+    {
+        "name": "Spell Blast",
+        "image_url": "https://cards.scryfall.io/large/front/4/0/408f3df5-94cf-4e88-866b-cb0b87846bf6.jpg?1783919546",
+        "oracle_text": "Counter target spell with mana value X.",
+        "types": ["Instant"],
+        "cost": "{X}{U}",
+        "abilities": [{ "parts": {
+            "AbilityPart_Target": { "saveAs": "SPELL", "validTargets": ["Spell"], "targetValidator": { "manaValueEquals": "THIS.chosenX" } },
+            "AbilityPart_Effect_ChangeZones": { "inSignal": "SPELL_RESOLVE", "target": "SPELL", "destination": "graveyard" }
+        } }]
     }
 ]

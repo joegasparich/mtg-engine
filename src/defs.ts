@@ -1,3 +1,5 @@
+import type { GrammarKey } from "@engine/abilities";
+
 type ClassName = string;
 
 export interface CardDef {
@@ -50,6 +52,7 @@ export function isCardColour(value: unknown): value is CardColour {
 }
 
 export type TargetValidator = {
+    manaValueEquals?: number | GrammarKey;
     cardType?: CardType;
     cardTypes?: readonly CardType[];
     onBattlefield?: boolean;

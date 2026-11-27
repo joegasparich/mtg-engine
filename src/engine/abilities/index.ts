@@ -1,4 +1,4 @@
-import { CardObject,Permanent,Spell } from "@engine/GameObject";
+import { CardObject,Permanent } from "@engine/GameObject";
 import type { GameEvent_DealDamage } from "@engine/events/GameEvent_DealDamage";
 import { game } from "@engine/Game";
 import { CombatManager } from "@engine/CombatManager";
@@ -105,7 +105,7 @@ export function resolveAbilityGrammar(key: GrammarKey, ability: Ability): Gramma
                 break;
             case GrammarProperty.ChosenX:
                 // 107.3a: Use the X announced for this particular spell.
-                result = result instanceof Spell ? result.chosenX : undefined;
+                result = result.chosenX;
                 break;
             default:
                 return undefined;

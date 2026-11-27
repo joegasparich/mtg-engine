@@ -38,17 +38,19 @@ export class Stack extends Zone<Spell | StackAbility> {
         if (game.hasPendingPlayerInput || handObject.zone !== caster.hand || handObject.owner !== caster || handObject.hasType(CardType.Land))
             return false;
 
-        // 107.3a and 601.2b–c: Announce the mode, X, and targets for this particular spell.
-        if (handObject.def.spellModes ? !handObject.canChooseSpellMode(chosenMode) : chosenMode !== undefined)
-            return false;
-
         const variable = handObject.variableManaSymbols;
         const generic = (handObject.cost?.[ManaColour.Generic] ?? 0) + variable * chosenX;
         if (!Number.isSafeInteger(chosenX) || chosenX < 0 || !Number.isSafeInteger(generic) || (!variable && chosenX !== 0))
             return false;
 
-        const targeter = handObject.getSpellTargeter(chosenMode);
-        if (targeter ? !targeter.validateTargets(targets) : targets.length > 0)
+        // 107.3a and 601.2b–c: Validate mode and targets with this cast's announced X.
+        const legal = handObject.withCastingX(chosenX, () => {
+            if (handObject.def.spellModes ? !handObject.canChooseSpellMode(chosenMode) : chosenMode !== undefined)
+                return false;
+            const targeter = handObject.getSpellTargeter(chosenMode);
+            return targeter ? targeter.validateTargets(targets) : targets.length === 0;
+        });
+        if (!legal)
             return false;
 
         const move = new GameEvent_ChangeCardZone(handObject, this, { controller: caster, targets, chosenX, chosenMode });

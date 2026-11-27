@@ -1,11 +1,12 @@
 import { RulesEventType } from "@engine/events/RulesEvent";
+import { matchesTargetValidator } from "@engine/abilities/TargetValidator";
 import { makeAbility } from "@engine/abilities";
 import { PlayerActions } from "@engine/actions";
 import playerActionManager,{ TargetType,TargetTypeKeys } from "@engine/actions/PlayerActionManager";
 import { GameEvent_CastSpell,GameEvent_GoToNextTurn,GameEvent_GoToStep,GameEvent_PlayLand } from "@engine/events";
 import gameEventManager,{ GameEvent_Log,GameEventType } from "@engine/events/GameEventManager";
 import Game,{ game } from "@engine/Game";
-import { StackAbility } from "@engine/GameObject";
+import { type Spell,StackAbility } from "@engine/GameObject";
 import { ManaColour } from "@engine/mana";
 import Player from "@engine/Player";
 import { StepIndex } from "@engine/Step";
@@ -153,6 +154,63 @@ test("announces a safe affordable X, with cancellation before mana is paid", () 
     expect(game.stack.objects.at(-1)).toMatchObject({ card: spell.card, chosenX: 1, cost: [0, 1, 0, 0, 0, 0, 3] });
     expect(player.manaPool[ManaColour.R]).toBe(1);
     expect(player.manaPool[ManaColour.U]).toBe(0);
+});
+
+test("manaValueEquals accepts a number or a numeric slate reference", () => {
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+    const forest = addForestToHand(player);
+    const ability = makeAbility({ parts: {
+        AbilityPart_Target: { targetValidator: { manaValueEquals: "AMOUNT" } },
+    } }, bears);
+    expect(matchesTargetValidator(forest, { manaValueEquals: 0 })).toBe(true);
+    expect(matchesTargetValidator(bears, { manaValueEquals: 0 })).toBe(false);
+    const filter = ability.targeter.targetValidator;
+    expect(matchesTargetValidator(bears, filter)).toBe(false);
+    ability.slate.AMOUNT = [2];
+    expect(matchesTargetValidator(bears, filter)).toBe(true);
+    expect(matchesTargetValidator(player, filter)).toBe(false);
+    ability.slate.AMOUNT = [0];
+    expect(matchesTargetValidator(bears, filter)).toBe(false);
+    expect(matchesTargetValidator(forest, filter)).toBe(true);
+});
+
+test("an X-dependent target must be affordable and match X before casting and on resolution", () => {
+    startMainPhase();
+    const source = addTestCard({
+        ...cardData[GRIZZLY_BEARS], types: [CardType.Instant], cost: "{X}{U}",
+        abilities: [{ parts: {
+            AbilityPart_Target: { saveAs: "SPELL", validTargets: [TargetTypeKeys.Spell], targetValidator: { manaValueEquals: "THIS.chosenX" } },
+            AbilityPart_Effect_GainLife: { inSignal: "SPELL_RESOLVE", target: "THIS.controller", amount: 1 },
+        } }],
+    }, player, player.hand);
+    const bears = addTestCard(cardData[GRIZZLY_BEARS], player, player.hand);
+    expect(game.stack.spellCast(player, bears)).toBe(true);
+    const target = game.stack.objects[0] as Spell;
+    player.manaPool[ManaColour.U] = 2;
+    expect(playerActionManager.getCardActions(source, player)).toHaveLength(0);
+    player.manaPool[ManaColour.U] = 3;
+    playerActionManager.getCardActions(source, player)[0].perform(player);
+    const choice = game.pendingSpellXChoice;
+    choice.submit(player, 1);
+    expect(game.pendingSpellXChoice).toBe(choice);
+    expect(game.pendingTargeter).toBeNull();
+    expect(player.manaPool[ManaColour.U]).toBe(3);
+    choice.submit(player, 2);
+    expect(game.pendingTargeter.validateTargets([target])).toBe(true);
+    game.pendingTargeter.onCancelled();
+    expect(source.chosenX).toBeUndefined();
+    expect(source.spellTargeter.validateTargets([target])).toBe(false);
+    expect(player.manaPool[ManaColour.U]).toBe(3);
+
+    playerActionManager.getCardActions(source, player)[0].perform(player);
+    game.pendingSpellXChoice.submit(player, 2);
+    game.pendingTargeter.onTargeted([target]);
+
+    target.cost = [0, 0, 0, 0, 1, 0, 0];
+    passPriorityRound();
+    expect(player.life).toBe(20);
+    expect(game.stack.objects).toEqual([target]);
+    expect(player.graveyard.objects.map(object => object.card)).toEqual([source.card]);
 });
 
 test("cancelling targets after announcing X leaves the spell and mana available", () => {
