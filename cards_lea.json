@@ -1483,5 +1483,67 @@
                 "AbilityPart_Effect_SacrificePermanent": { "inSignal": "SACRIFICE", "target": "THIS" }
             } }
         ]
+    },
+    {
+        "name": "Phantasmal Terrain",
+        "image_url": "https://cards.scryfall.io/large/front/7/c/7c72724e-8df4-4908-99fe-8189e0c84376.jpg",
+        "oracle_text": "Enchant land\nAs this Aura enters, choose a basic land type.\nEnchanted land is the chosen type.",
+        "types": ["Enchantment"],
+        "subtypes": ["Aura"],
+        "cost": "{U}{U}",
+        "abilities": [
+            { "parts": { "SimpleAura": { "targetValidator": { "cardType": "Land" } } } },
+            { "parts": {
+                "AbilityPart_AsEnters": { "outSignal": "CHOOSE_TYPE", "inSignal": "TYPE_CHOSEN" },
+                "AbilityPart_Effect_ChooseBasicLandType": {
+                    "inSignal": "CHOOSE_TYPE", "prompt": "Choose a basic land type.", "saveAs": "TYPE", "outSignal": "TYPE_CHOSEN"
+                },
+                "AbilityPart_SelectObjectsContinuously": { "target": "THIS.attachedTo", "saveAs": "ENCHANTED_LAND" },
+                "AbilityPart_SetBasicLandType": { "landsFrom": "ENCHANTED_LAND", "landType": { "from": "TYPE" } }
+            } }
+        ]
+    },
+    {
+        "name": "Phantom Monster",
+        "image_url": "https://cards.scryfall.io/large/front/6/3/63605677-3586-4b0f-b19d-656dc1d84210.jpg",
+        "oracle_text": "Flying",
+        "types": ["Creature"],
+        "subtypes": ["Illusion"],
+        "cost": "{3}{U}",
+        "power": 3,
+        "toughness": 3,
+        "abilities": [{ "keyword": "flying" }]
+    },
+    {
+        "name": "Pirate Ship",
+        "image_url": "https://cards.scryfall.io/large/front/e/5/e5712102-29b7-4e53-9285-45bd5d5509a8.jpg",
+        "rulesTextTemplate": "This creature can't attack unless defending player controls {land:Island:article}.\n{T}: This creature deals 1 damage to any target.\nWhen you control no {land:Island:plural}, sacrifice this creature.",
+        "types": ["Creature"],
+        "subtypes": ["Human", "Pirate"],
+        "cost": "{4}{U}",
+        "power": 4,
+        "toughness": 3,
+        "abilities": [
+            { "parts": {
+                "AbilityPart_AttackRequiresDefenderPermanent": {
+                    "attacker": "THIS", "targetValidator": { "cardType": "Land", "cardSubtype": "Island" }
+                }
+            } },
+            { "activateString": "{T}: Deal 1 damage to any target", "parts": {
+                "AbilityPart_Activate_Tap": {},
+                "AbilityPart_Target": {
+                    "saveAs": "RECIPIENT", "validTargets": ["Player", "Permanent"], "targetValidator": { "cardType": "Creature" }
+                },
+                "AbilityPart_Effect_DealDamage": { "source": "THIS", "target": "RECIPIENT", "amount": 1 }
+            } },
+            { "parts": {
+                "AbilityPart_SelectObjectsContinuously": {
+                    "zone": "battlefield", "controlledBy": "THIS.controller",
+                    "targetValidator": { "cardType": "Land", "cardSubtype": "Island" }, "saveAs": "ISLANDS"
+                },
+                "AbilityPart_Trigger_NoPermanents": { "permanentsFrom": "ISLANDS" },
+                "AbilityPart_Effect_SacrificePermanent": { "target": "THIS" }
+            } }
+        ]
     }
 ]

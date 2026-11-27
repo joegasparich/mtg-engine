@@ -3,26 +3,23 @@ import { RegisterAbilityPart } from "@engine/abilities/registry";
 import { Permanent } from "@engine/GameObject";
 import { Battlefield } from "@engine/Zone";
 import type { CardDef } from "~/defs";
-import { AbilityPart,EntryReplacementOrder } from "./AbilityPart";
+import { AbilityPart_AsEnters } from "./AbilityPart_AsEnters";
+import { EntryReplacementOrder } from "./AbilityPart";
 
 @RegisterAbilityPart
-export class AbilityPart_EnterAsCopy extends AbilityPart {
+export class AbilityPart_EnterAsCopy extends AbilityPart_AsEnters {
     copyFrom: GrammarKey;
-    outSignal: string;
-    inSignal: string;
     modify?: { signal: string; saveAs: GrammarKey };
     override readonly entryReplacementOrder = EntryReplacementOrder.Copy;
-    private finishEntry?: () => void;
 
     replaceEntry(entering: Permanent, resume: () => void) {
         // 614.12a, 707.5: Keep the entry pending until the copy source is determined.
-        this.finishEntry = () => {
+        super.replaceEntry(entering, () => {
             const original = resolveAbilityGrammar(this.copyFrom, this.ability);
             if (original instanceof Permanent && original.zone instanceof Battlefield)
                 entering.enterAsCopyOf(original, this.copyDefinition(original.copiableDefinition));
             resume();
-        };
-        this.ability.fireSignal(this.outSignal);
+        });
     }
 
     private copyDefinition(original: Readonly<CardDef>) {
@@ -42,14 +39,6 @@ export class AbilityPart_EnterAsCopy extends AbilityPart {
                 delete slate[saveAs];
             else
                 slate[saveAs] = previous;
-        }
-    }
-
-    onSignalFired(signal: string) {
-        if (signal === this.inSignal && this.finishEntry) {
-            const finish = this.finishEntry;
-            this.finishEntry = undefined;
-            finish();
         }
     }
 }

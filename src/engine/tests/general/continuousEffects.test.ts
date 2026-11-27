@@ -46,6 +46,27 @@ test("control and permission to attack with defender follow a live selection of 
     expect(canDeclare(second)).toBe(false);
 });
 
+test("an attack restriction follows the attacker referenced by the slate", () => {
+    Game.init();
+    const player = game.addPlayer([]);
+    const opponent = game.addPlayer([]);
+    const bears = cardData[GRIZZLY_BEARS];
+    const source = addTestCard({ ...bears, abilities: [{ parts: {
+        AbilityPart_AttackRequiresDefenderPermanent: { attacker: "MARKED", targetValidator: { cardType: CardType.Land } },
+    } }] }, player, player.battlefield);
+    const other = addTestCard(bears, player, player.battlefield);
+    const canAttack = (creature: Permanent) => gameEventManager.checkEvent(new GameEvent_DeclareAttacker(creature, opponent));
+    const { slate } = source.abilities[0];
+    slate.MARKED = [other];
+    expect(canAttack(other)).toBe(false);
+    expect(canAttack(source)).toBe(true);
+    slate.MARKED = [source];
+    expect(canAttack(other)).toBe(true);
+    expect(canAttack(source)).toBe(false);
+    delete slate.MARKED;
+    expect(canAttack(source)).toBe(true);
+});
+
 test("a continuous object selection resolves its configured reference on each read", () => {
     Game.init();
     const player = game.addPlayer([]);

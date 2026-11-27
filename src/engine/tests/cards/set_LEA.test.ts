@@ -4238,3 +4238,127 @@ describe("Phantasmal Forces", () => {
         expect(controller.graveyard.objects.at(-1).card).toBe(forces.card);
     });
 });
+
+describe("Phantasmal Terrain", () => {
+    const terrain = cardData.find(card => card.name === "Phantasmal Terrain");
+    let caster: Player;
+    let opponent: Player;
+
+    beforeEach(() => {
+        Game.init();
+        caster = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        startMainPhase();
+    });
+
+    test("chooses as the Aura enters and changes only the enchanted land's type and mana", () => {
+        const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const other = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        const spell = addTestCard(terrain, caster, caster.hand);
+        caster.manaPool[ManaColour.U] = 2;
+        playerActionManager.getCardActions(spell, caster)[0].perform(caster);
+        expect(game.pendingTargeter.validateTargets([caster])).toBe(false);
+        game.pendingTargeter.onTargeted([forest]);
+        expect(game.pendingBasicLandTypeChoice).toBeNull();
+        expect(caster.manaPool[ManaColour.U]).toBe(0);
+        passPriorityRound();
+
+        const choice = game.pendingBasicLandTypeChoice;
+        expect(choice.options).toEqual(Object.values(BasicLandType));
+        expect(caster.battlefield.objects).toHaveLength(0);
+        expect(forest.subtypes).toEqual([BasicLandType.Forest]);
+        choice.submit(opponent, BasicLandType.Island);
+        expect(game.pendingBasicLandTypeChoice).toBe(choice);
+        choice.submit(caster, BasicLandType.Island);
+
+        const [aura] = caster.battlefield.objects;
+        expect(aura.attachedTo).toBe(forest);
+        expect(forest.subtypes).toEqual([BasicLandType.Island]);
+        expect(forest.getPotentialMana(opponent)[ManaColour.U]).toBe(1);
+        expect(forest.getPotentialMana(opponent)[ManaColour.G]).toBe(0);
+        expect(other.subtypes).toEqual([BasicLandType.Forest]);
+        moveTestCard(aura, caster.graveyard);
+        expect(forest.subtypes).toEqual([BasicLandType.Forest]);
+        expect(forest.getPotentialMana(opponent)[ManaColour.G]).toBe(1);
+    });
+
+    test("skips the entry choice if the targeted land leaves before resolution", () => {
+        const spell = addTestCard(terrain, caster, caster.hand);
+        const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        expect(game.stack.spellCast(caster, spell, [forest])).toBe(true);
+        moveTestCard(forest, opponent.hand);
+        passPriorityRound();
+        expect(game.pendingBasicLandTypeChoice).toBeNull();
+        expect(caster.graveyard.objects.at(-1).card).toBe(spell.card);
+    });
+});
+
+describe("Pirate Ship", () => {
+    const shipDef = cardData.find(card => card.name === "Pirate Ship");
+    const islandDef = cardData.find(card => card.name === BasicLandType.Island);
+    let controller: Player;
+    let opponent: Player;
+    let island: Permanent;
+    let ship: Permanent;
+
+    beforeEach(() => {
+        Game.init();
+        controller = game.addPlayer(BASIC_DECK);
+        opponent = game.addPlayer(BASIC_DECK);
+        island = addTestCard(islandDef, controller, controller.battlefield);
+        ship = addTestCard(shipDef, controller, controller.battlefield);
+        startMainPhase();
+    });
+
+    test("checks the defending player's current land types when declaring attackers", () => {
+        const canAttack = () => gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ship, opponent));
+        const forest = addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        expect(canAttack()).toBe(false);
+        const aura = addTestCard(cardData.find(card => card.name === "Phantasmal Terrain"), controller, controller.hand);
+        expect(game.stack.spellCast(controller, aura, [forest])).toBe(true);
+        passPriorityRound();
+        game.pendingBasicLandTypeChoice.submit(controller, BasicLandType.Island);
+        expect(canAttack()).toBe(true);
+        moveTestCard(forest, opponent.hand);
+        expect(canAttack()).toBe(false);
+    });
+
+    test.each(["player", "creature"])("taps to deal one damage to a %s", targetKind => {
+        const creature = addTestCard(cardData[GRIZZLY_BEARS], opponent, opponent.battlefield);
+        playerActionManager.getCardActions(ship, controller)[0].perform(controller);
+        expect(game.pendingTargeter.validateTargets([island])).toBe(false);
+        game.pendingTargeter.onTargeted([targetKind === "player" ? opponent : creature]);
+        expect(ship.tapped).toBe(true);
+        expect(opponent.life).toBe(20);
+        expect(creature.damageTaken).toBe(0);
+        passPriorityRound();
+        expect(opponent.life).toBe(targetKind === "player" ? 19 : 20);
+        expect(creature.damageTaken).toBe(targetKind === "creature" ? 1 : 0);
+    });
+
+    test("sacrifices on resolution even if its controller regains an Island in response", () => {
+        addTestCard(islandDef, opponent, opponent.battlefield);
+        const hand = moveTestCard(island, controller.hand);
+        expect(game.stack.objects).toHaveLength(1);
+        expect(ship.zone).toBe(controller.battlefield);
+        moveTestCard(hand, controller.battlefield);
+        passPriorityRound();
+        expect(controller.graveyard.objects.at(-1).card).toBe(ship.card);
+        expect(game.stack.objects).toHaveLength(0);
+    });
+
+    test("Magical Hack changes both Island conditions", () => {
+        addTestCard(islandDef, opponent, opponent.battlefield);
+        const hack = addTestCard(cardData.find(card => card.name === "Magical Hack"), controller, controller.hand);
+        expect(game.stack.spellCast(controller, hack, [ship])).toBe(true);
+        passPriorityRound();
+        game.pendingBasicLandTypeChoice.submit(controller, BasicLandType.Island);
+        game.pendingBasicLandTypeChoice.submit(controller, BasicLandType.Forest);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ship, opponent))).toBe(false);
+        addTestCard(cardData[FOREST], opponent, opponent.battlefield);
+        expect(gameEventManager.checkEvent(new GameEvent_DeclareAttacker(ship, opponent))).toBe(true);
+        expect(game.stack.objects).toHaveLength(1);
+        passPriorityRound();
+        expect(controller.graveyard.objects.at(-1).card).toBe(ship.card);
+    });
+});
